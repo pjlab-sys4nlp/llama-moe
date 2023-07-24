@@ -1,7 +1,7 @@
 from typing import Any, Mapping
 
-import torch
 import numpy as np
+import torch
 
 
 def fault_tolerance_data_collator(features: list) -> dict[str, Any]:

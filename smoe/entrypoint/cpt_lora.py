@@ -3,18 +3,25 @@ import os
 import sys
 from itertools import chain
 from pathlib import Path
+
 import datasets
 import torch
-from datasets import load_dataset, concatenate_datasets
-
 import transformers
+from datasets import concatenate_datasets, load_dataset
+from peft import (
+    LoraConfig,
+    PeftModel,
+    TaskType,
+    get_peft_model,
+    get_peft_model_state_dict,
+)
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
     AutoModelForCausalLM,
+    AutoTokenizer,
     LlamaForCausalLM,
     LlamaTokenizer,
-    AutoTokenizer,
     Trainer,
     is_torch_tpu_available,
     set_seed,
@@ -22,25 +29,23 @@ from transformers import (
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 
-from peft import (
-    LoraConfig,
-    TaskType,
-    get_peft_model,
-    PeftModel,
-    get_peft_model_state_dict,
-)
-
 from smoe.callbacks.save_peft_model import SavePeftModelCallback
-from smoe.metrics.preprocess import logits_argmax
-from smoe.metrics.accuracy import compute_metrics
 from smoe.data.collate_fn import fault_tolerance_data_collator
-from smoe.utils.config import parse_args
-from smoe.utils.config import ModelArguments, DataArguments, LoraTrainingArguments
+from smoe.metrics.accuracy import compute_metrics
+from smoe.metrics.preprocess import logits_argmax
+from smoe.utils.config import (
+    DataArguments,
+    LoraTrainingArguments,
+    ModelArguments,
+    parse_args,
+)
 from smoe.utils.logging import get_logger_from_training_args
 
 
 def main():
-    model_args, data_args, training_args = parse_args(ModelArguments, DataArguments, LoraTrainingArguments)
+    model_args, data_args, training_args = parse_args(
+        ModelArguments, DataArguments, LoraTrainingArguments
+    )
     logger = get_logger_from_training_args(__name__, training_args)
     logger.warning(
         f"Process local rank: {training_args.local_rank}, "

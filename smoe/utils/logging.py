@@ -1,10 +1,9 @@
-import sys
 import logging
+import sys
 
 import datasets
 import transformers
 from transformers import TrainingArguments
-
 
 # Setup logging
 logging.basicConfig(
@@ -28,7 +27,7 @@ def set_logging(should_log, log_level):
     transformers.utils.logging.set_verbosity(log_level)
 
 
-def get_logger(name, log_level = None):
+def get_logger(name, log_level=None):
     logger = logging.getLogger(name)
     if log_level:
         logger.setLevel(log_level)

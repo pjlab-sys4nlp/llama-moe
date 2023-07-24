@@ -3,10 +3,12 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional, Type, TypeVar
 
-from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
+from transformers import (
+    MODEL_FOR_CAUSAL_LM_MAPPING,
+    HfArgumentParser,
+    TrainingArguments,
+)
 from transformers.utils.versions import require_version
-from transformers import HfArgumentParser
-
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -218,15 +220,13 @@ def parse_args(*args: Type[Arguments]) -> tuple[Arguments, ...]:
         if sys.argv[1].endswith(".json"):
             # If we pass only one argument to the script and it's the path to a json file,
             # let's parse it to get our arguments.
-            arg_tuple = parser.parse_json_file(
-                json_file=os.path.abspath(sys.argv[1])
-            )
+            arg_tuple = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
         elif sys.argv[1].endswith(".yaml") or sys.argv[1].endswith(".yml"):
-            arg_tuple = parser.parse_yaml_file(
-                yaml_file=os.path.abspath(sys.argv[1])
-            )
+            arg_tuple = parser.parse_yaml_file(yaml_file=os.path.abspath(sys.argv[1]))
         else:
-            raise ValueError(f"Only yaml, yml, and json config files are supported, got {sys.argv[1]}")
+            raise ValueError(
+                f"Only yaml, yml, and json config files are supported, got {sys.argv[1]}"
+            )
     else:
         arg_tuple = parser.parse_args_into_dataclasses()
 

@@ -5,8 +5,8 @@ Example:
     $ python -m smoe.utils.extract_text_from_jsonl -c content -i resources/redpajama/commoncrawl.jsonl -o resources/redpajama-processed/commoncrawl.txt
 """
 
-import json
 import argparse
+import json
 
 
 def get_parser():
