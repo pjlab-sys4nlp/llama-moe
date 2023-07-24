@@ -186,6 +186,12 @@ class DataArguments:
     data_cache_dir: Optional[str] = field(
         default="./", metadata={"help": "The datasets processed stored"}
     )
+    prob_map: Optional[dict[str, float]] = field(
+        default=None,
+        metadata={
+            "help": 'data type to sampling probabilities. e.g. {"commoncrawl": 0.67, "c4": 0.15}'
+        },
+    )
 
     def __post_init__(self):
         if self.streaming:

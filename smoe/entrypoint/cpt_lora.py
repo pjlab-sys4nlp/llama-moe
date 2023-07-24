@@ -1,12 +1,6 @@
-import math
 import os
-from itertools import chain
-from pathlib import Path
 
-import datasets
 import torch
-import transformers
-from datasets import concatenate_datasets, load_dataset
 from peft import (
     LoraConfig,
     PeftModel,
@@ -25,11 +19,11 @@ from transformers import (
     is_torch_tpu_available,
     set_seed,
 )
-from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 
 from smoe.callbacks.save_model import SaveModelCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
+from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
 from smoe.utils.config import (
@@ -119,23 +113,6 @@ def main():
         )
 
     # Preprocessing the datasets.
-    # First we tokenize all the texts.
-    # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
-    tok_logger = transformers.utils.logging.get_logger(
-        "transformers.tokenization_utils_base"
-    )
-
-    def tokenize_function(examples):
-        with CaptureLogger(tok_logger) as cl:
-            output = tokenizer(examples["text"])
-        # clm input could be much much longer than block_size
-        if "Token indices sequence length is longer than the" in cl.out:
-            tok_logger.warning(
-                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits"
-                " before being passed to the model."
-            )
-        return output
-
     if data_args.block_size is None:
         block_size = tokenizer.model_max_length
         if block_size > 1024:
@@ -153,90 +130,28 @@ def main():
             )
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
-    # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
-    def group_texts(examples):
-        # Concatenate all texts.
-        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-        if total_length >= block_size:
-            total_length = (total_length // block_size) * block_size
-        # Split by chunks of max_len.
-        result = {
-            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-            for k, t in concatenated_examples.items()
+    if data_args.prob_map is None:
+        data_args.prob_map = {
+            "en_cc": 0.67,
+            "en_arxiv": 0.025,
+            "en_book": 0.045,
+            "en_c4": 0.15,
+            "en_wikipedia": 0.045,
+            "github": 0.045,
         }
-        result["labels"] = result["input_ids"].copy()
-        return result
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
-        lm_datasets = []
-        path = Path(data_args.dataset_dir)
-        files = [file.name for file in path.glob("*.txt")]
-        if training_args.debug_mode is True:
-            files = [files[0]]
-        for idx, file in enumerate(files):
-            data_file = os.path.join(path, file)
-            filename = "".join(file.split(".")[:-1])
-            cache_path = os.path.join(data_args.data_cache_dir, filename)
-            os.makedirs(cache_path, exist_ok=True)
-            try:
-                processed_dataset = datasets.load_from_disk(
-                    cache_path, keep_in_memory=False
-                )
-                logger.info(f"training datasets-{filename} has been loaded from disk")
-            except Exception:
-                cache_dir = os.path.join(data_args.data_cache_dir, filename + "_text")
-                os.makedirs(cache_dir, exist_ok=True)
-                raw_dataset = load_dataset(
-                    "text",
-                    data_files=data_file,
-                    cache_dir=cache_dir,
-                    keep_in_memory=False,
-                )
-                logger.info(f"{file} has been loaded")
-                tokenized_dataset = raw_dataset.map(
-                    tokenize_function,
-                    batched=True,
-                    num_proc=data_args.preprocessing_num_workers,
-                    remove_columns="text",
-                    load_from_cache_file=True,
-                    keep_in_memory=False,
-                    cache_file_names={
-                        k: os.path.join(cache_dir, "tokenized.arrow")
-                        for k in raw_dataset
-                    },
-                    desc="Running tokenizer on dataset",
-                )
-                grouped_datasets = tokenized_dataset.map(
-                    group_texts,
-                    batched=True,
-                    num_proc=data_args.preprocessing_num_workers,
-                    load_from_cache_file=True,
-                    keep_in_memory=False,
-                    cache_file_names={
-                        k: os.path.join(cache_dir, "grouped.arrow")
-                        for k in tokenized_dataset
-                    },
-                    desc=f"Grouping texts in chunks of {block_size}",
-                )
-                processed_dataset = grouped_datasets
-                processed_dataset.save_to_disk(cache_path)
-            if idx == 0:
-                lm_datasets = processed_dataset["train"]
-            else:
-                assert (
-                    lm_datasets.features.type
-                    == processed_dataset["train"].features.type
-                )
-                lm_datasets = concatenate_datasets(
-                    [lm_datasets, processed_dataset["train"]]
-                )
-
-        lm_datasets = lm_datasets.train_test_split(
-            test_size=data_args.validation_split_percentage
+        lm_datasets = load_streaming_datasets(
+            data_args.dataset_dir,
+            prob_map=data_args.prob_map,
+            num_proc=data_args.preprocessing_num_workers,
+            debug_mode=training_args.debug_mode,
+            block_size=data_args.block_size,
         )
+        # streaming IterableDataset does not support `train_test_split``
+        # lm_datasets = lm_datasets.train_test_split(
+        #     test_size=data_args.validation_split_percentage
+        # )
 
     if training_args.do_train:
         train_dataset = lm_datasets["train"]
@@ -246,14 +161,17 @@ def main():
         logger.info(f"Num train_samples  {len(train_dataset)}")
         logger.info("training example:")
         logger.info(tokenizer.decode(train_dataset[0]["input_ids"]))
+
+    eval_dataset = None
     if training_args.do_eval:
-        eval_dataset = lm_datasets["test"]
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-            eval_dataset = eval_dataset.select(range(max_eval_samples))
-        logger.info(f"Num eval_samples  {len(eval_dataset)}")
-        logger.info("training example:")
-        logger.info(tokenizer.decode(eval_dataset[0]["input_ids"]))
+        raise NotImplementedError
+        # eval_dataset = lm_datasets["test"]
+        # if data_args.max_eval_samples is not None:
+        #     max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+        #     eval_dataset = eval_dataset.select(range(max_eval_samples))
+        # logger.info(f"Num eval_samples  {len(eval_dataset)}")
+        # logger.info("training example:")
+        # logger.info(tokenizer.decode(eval_dataset[0]["input_ids"]))
 
     if model_args.model_name_or_path:
         torch_dtype = (
@@ -354,24 +272,25 @@ def main():
 
     # Evaluation
     if training_args.do_eval:
-        logger.info("*** Evaluate ***")
+        raise NotImplementedError
+        # logger.info("*** Evaluate ***")
 
-        metrics = trainer.evaluate()
+        # metrics = trainer.evaluate()
 
-        max_eval_samples = (
-            data_args.max_eval_samples
-            if data_args.max_eval_samples is not None
-            else len(eval_dataset)
-        )
-        metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
-        try:
-            perplexity = math.exp(metrics["eval_loss"])
-        except OverflowError:
-            perplexity = float("inf")
-        metrics["perplexity"] = perplexity
+        # max_eval_samples = (
+        #     data_args.max_eval_samples
+        #     if data_args.max_eval_samples is not None
+        #     else len(eval_dataset)
+        # )
+        # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
+        # try:
+        #     perplexity = math.exp(metrics["eval_loss"])
+        # except OverflowError:
+        #     perplexity = float("inf")
+        # metrics["perplexity"] = perplexity
 
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
+        # trainer.log_metrics("eval", metrics)
+        # trainer.save_metrics("eval", metrics)
 
 
 if __name__ == "__main__":

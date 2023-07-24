@@ -84,7 +84,7 @@ def tokenize_jsonl():
 
     pbar = tqdm(input_files, desc="Tokenization Progress")
     for input_file in pbar:
-        out_filename = input_file.name.removesuffix(input_file.suffix) + ".jsonl"
+        out_filename = input_file.stem + ".jsonl"
         output_file = output_dir / out_filename
         input_file = str(input_file)
         output_file = str(output_file)

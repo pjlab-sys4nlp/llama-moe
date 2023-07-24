@@ -21,8 +21,7 @@ lora_dropout=0.05
 
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
-dataset_dir=resources
-data_cache=temp_data_cache_dir
+dataset_dir=resources/redpajama
 per_device_train_batch_size=1
 per_device_eval_batch_size=1
 gradient_accumulation_steps=8
@@ -81,4 +80,5 @@ srun torchrun \
         --lora_dropout ${lora_dropout} \
         --torch_dtype float16 \
         --gradient_checkpointing \
-        --ddp_find_unused_parameters False
+        --ddp_find_unused_parameters False \
+        --report_to tensorboard
