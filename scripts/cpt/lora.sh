@@ -1,11 +1,11 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-lora-bf16-2nodes
+#SBATCH --job-name=cpt-lora-bf16-4nodes
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x.log
 #SBATCH --error=logs/%x.log
 
-#SBATCH --nodes=2
+#SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=8
@@ -26,9 +26,9 @@ data_cache=temp_data_cache_dir
 per_device_train_batch_size=1
 per_device_eval_batch_size=1
 gradient_accumulation_steps=8
-output_dir=output_dir
+output_dir=outputs/cpt-lora-bf16-4nodes
 
-deepspeed_config_file=conf/ds_bf16.json
+deepspeed_config_file=conf/deepspeed/bf16.json
 
 nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
 nodes_array=($nodes)
@@ -45,7 +45,7 @@ srun torchrun \
     --rdzv_id $RANDOM \
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
-    src/entrypoint/run_clm_pt_with_peft.py \
+    smoe/entrypoint/cpt_lora.py \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \
         --tokenizer_name_or_path ${tokenizer_path} \

@@ -1,6 +1,5 @@
 import math
 import os
-import sys
 from itertools import chain
 from pathlib import Path
 
@@ -29,7 +28,7 @@ from transformers import (
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 
-from smoe.callbacks.save_peft_model import SavePeftModelCallback
+from smoe.callbacks.save_model import SaveModelCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
@@ -280,22 +279,11 @@ def main():
         )
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
-    if not (
-        (model_vocab_size == 32000 and len(tokenizer) == 49953)
-        or (model_vocab_size == 32000 and len(tokenizer) == 32000)
-        or (model_vocab_size == 49953 and len(tokenizer) == 49953)
-        or (model_vocab_size == 49954 and len(tokenizer) == 49954)
-    ):
+    if model_vocab_size != len(tokenizer):
+        model.resize_token_embeddings(len(tokenizer))
         raise ValueError(
-            f"The combination of base model (size: {model_vocab_size}) and tokenizer (size: {len(tokenizer)}) is not a valid configuration. Please check our project wiki for further information. \n"
-            "Valid configurations (base model / tokenizer):\n"
-            "- Continue pre-training original LLaMA: 32000 / 32000 \n"
-            "- Pre-training Chinese LLaMA based on original LLaMA: 32000 / 49953 \n"
-            "- Continue pre-training Chinese LLaMA: 49953 / 49953 \n"
-            "- Continue pre-training Chinese Alpaca: 49954 / 49954 \n"
+            f"The model's vocab size ({model_vocab_size}) does not match with the tokenizer ({len(tokenizer)})"
         )
-
-    model.resize_token_embeddings(len(tokenizer))
     if training_args.peft_path is not None:
         logger.info("Peft from pre-trained model")
         model = PeftModel.from_pretrained(model, training_args.peft_path)
@@ -341,7 +329,7 @@ def main():
         if training_args.do_eval and not is_torch_tpu_available()
         else None,
     )
-    trainer.add_callback(SavePeftModelCallback("lora_model"))
+    trainer.add_callback(SaveModelCallback)
     # Training
     if training_args.do_train:
         checkpoint = None

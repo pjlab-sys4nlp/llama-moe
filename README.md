@@ -9,3 +9,7 @@ $ git clone https://github.com/Spico197/smoe
 $ pip install -e .[dev]
 $ pre-commit install
 ```
+
+## Tokenization
+
+- RedPajama: `bash scripts/tokenize/redpajama.sh`
