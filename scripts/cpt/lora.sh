@@ -6,7 +6,7 @@
 #SBATCH --error=logs/%x.log
 
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 
@@ -15,9 +15,10 @@ source ~/anaconda3/bin/activate torch
 lr=2e-4
 lora_rank=8
 lora_alpha=32
-lora_trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
-# modules_to_save="embed_tokens,lm_head"
 lora_dropout=0.05
+lora_trainable="q_proj,v_proj"
+# lora_trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
+# modules_to_save="embed_tokens,lm_head"
 
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
@@ -26,7 +27,7 @@ per_device_train_batch_size=48
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 num_nodes=1
-num_gpu_per_node=8
+num_gpu_per_node=1
 
 data_cache=resources/cache
 output_dir=outputs/cpt-lora-bf16-4nodes
@@ -89,7 +90,7 @@ srun torchrun \
         --lora_dropout ${lora_dropout} \
         --torch_dtype auto \
         --ddp_find_unused_parameters False \
-        --gradient_checkpointing \
         --report_to tensorboard
 
+        # --gradient_checkpointing \
         # --modules_to_save ${modules_to_save} \
