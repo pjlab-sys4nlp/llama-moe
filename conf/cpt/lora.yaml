@@ -1,0 +1,2 @@
+# this config file is for demonstration usage only
+deepspeed: conf/deepspeed/bf16.json

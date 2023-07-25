@@ -33,6 +33,7 @@ setuptools.setup(
         "datasets>=2.13.1",
         "transformers>=4.30.2",
         "peft>=0.4.0",
+        "tensorboard>=2.13.0",
     ],
     extras_require={
         "dev": [

@@ -63,6 +63,7 @@ def tokenize_jsonl():
         def _tokenization_func(examples):
             return {"input_ids": tokenizer(examples[text_column_name])["input_ids"]}
 
+        ds = ds.filter(lambda example: text_column_name in example)
         tokenized_ds = ds.map(
             _tokenization_func,
             batched=True,
@@ -84,7 +85,7 @@ def tokenize_jsonl():
 
     pbar = tqdm(input_files, desc="Tokenization Progress")
     for input_file in pbar:
-        out_filename = input_file.name.removesuffix(input_file.suffix) + ".jsonl"
+        out_filename = input_file.stem + ".jsonl"
         output_file = output_dir / out_filename
         input_file = str(input_file)
         output_file = str(output_file)
