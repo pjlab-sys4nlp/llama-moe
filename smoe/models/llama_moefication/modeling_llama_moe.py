@@ -2,9 +2,6 @@
 
 import torch
 import torch.utils.checkpoint
-from llama_moe.configuration_llama_moe import LlamaMoEConfig
-from llama_moe.modeling_outputs_moe import BaseMoEModelOutputWithPast
-from llama_moe.moe_utils import LinearGLUMoELayer
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from transformers.modeling_outputs import CausalLMOutputWithPast
@@ -15,6 +12,9 @@ from transformers.models.llama.modeling_llama import (
     LlamaPreTrainedModel,
 )
 from transformers.utils import logging
+
+from smoe.models.llama_moefication import BaseMoEModelOutputWithPast, LlamaMoEConfig
+from smoe.modules.moefication import LinearGLUMoELayer
 
 logger = logging.get_logger(__name__)
 

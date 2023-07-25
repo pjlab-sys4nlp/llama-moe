@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 from .moe_calculators import UniversalCalculator

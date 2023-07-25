@@ -1,7 +1,6 @@
 import os
 
 import torch
-import xformers
 from peft import (
     LoraConfig,
     PeftModel,
@@ -16,7 +15,6 @@ from transformers import (
     AutoTokenizer,
     LlamaForCausalLM,
     LlamaTokenizer,
-    Trainer,
     is_torch_tpu_available,
     set_seed,
 )
@@ -51,6 +49,9 @@ def main():
         f"fp16 training: {training_args.fp16}, "
         f"bf16 training: {training_args.bf16}"
     )
+    logger.info(f"Model args: {model_args}")
+    logger.info(f"Data args: {data_args}")
+    logger.info(f"Training args: {training_args.to_json_string()}")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -139,11 +140,12 @@ def main():
     if data_args.prob_map is None:
         data_args.prob_map = {
             "en_cc": 0.67,
-            "en_arxiv": 0.025,
-            "en_book": 0.045,
             "en_c4": 0.15,
-            "en_wikipedia": 0.045,
             "github": 0.045,
+            "en_wikipedia": 0.045,
+            "en_book": 0.045,
+            "en_arxiv": 0.025,
+            "en_stack": 0.02,
         }
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):

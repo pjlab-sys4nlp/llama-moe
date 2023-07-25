@@ -1,17 +1,18 @@
 """Convert a vanilla llama to llama-moe"""
 import os
 import shutil
-import sys
 from collections import Counter
 
 import torch
-from llama_moe import LlamaMoEConfig, LlamaMoEForCausalLM, LlamaMoEModel
-from run_moefication.moefication_utils.expert_select import load_template_file
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaModel
 
-# sys.path.append("/home/dongdz/workspace/moefication/")
-# print(sys.path)
+from smoe.models.llama_moefication import (
+    LlamaMoEConfig,
+    LlamaMoEForCausalLM,
+    LlamaMoEModel,
+)
+from smoe.utils.io import torch_load_template_file
 
 
 def convert_llama_model(
@@ -37,8 +38,8 @@ def convert_llama_model(
     num_layers = model_llama.config.num_hidden_layers
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
-        this_layer_index = load_template_file(split_index_path, template, i)
-        this_layer_gate = load_template_file(select_gate_path, template, i)
+        this_layer_index = torch_load_template_file(split_index_path, template, i)
+        this_layer_gate = torch_load_template_file(select_gate_path, template, i)
         this_layer_size_expert = Counter(this_layer_index)
         this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
 
@@ -151,8 +152,8 @@ def convert_llama_model_for_causal_lm(
     num_layers = model_llama.config.num_hidden_layers
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
-        this_layer_index = load_template_file(split_index_path, template, i)
-        this_layer_gate = load_template_file(select_gate_path, template, i)
+        this_layer_index = torch_load_template_file(split_index_path, template, i)
+        this_layer_gate = torch_load_template_file(select_gate_path, template, i)
         this_layer_size_expert = Counter(this_layer_index)
         this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
 

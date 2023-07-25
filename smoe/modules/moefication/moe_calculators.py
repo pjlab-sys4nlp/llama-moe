@@ -1,8 +1,5 @@
 import torch
-import torch.nn.functional as F
 from torch import nn
-
-from .moe_kernels import get_kernel
 
 # valid_mode = ("default", "faster")
 

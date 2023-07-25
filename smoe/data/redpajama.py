@@ -29,7 +29,9 @@ def load_streaming_datasets(
 
     for filepath in files:
         data_type = filepath.parent.stem
-        assert data_type in prob_map if prob_map else True
+        assert (
+            data_type in prob_map if prob_map else True
+        ), f"{data_type} not in {prob_map.keys()}"
         ds = load_dataset(
             "json",
             data_files=str(filepath),

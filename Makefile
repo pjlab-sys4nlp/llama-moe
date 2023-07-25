@@ -8,7 +8,7 @@ format:
 
 .PHONY: test
 test:
-	coverage run --source rex -m pytest -vv .
+	coverage run --source smoe -m pytest -vv .
 	coverage report -m
 	flake8
 

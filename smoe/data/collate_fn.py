@@ -63,3 +63,19 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
                     batch[k] = torch.tensor([features[0][k]] * len(features))
 
     return batch
+
+
+def separate_collater(batch):
+    return (
+        torch.cat([item[0] for item in batch], dim=0),
+        torch.cat([item[1] for item in batch], dim=0),
+    )
+
+
+class padding_collater:
+    # 自动padding到最大长度的collate_fn
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+
+    def __call__(self, batch):
+        return self.tokenizer.pad(batch, return_tensors="pt")
