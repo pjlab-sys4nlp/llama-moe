@@ -201,7 +201,17 @@ class DataArguments:
 
 
 @dataclass
-class LoraTrainingArguments(TrainingArguments):
+class EnhancedTrainingArguments(TrainingArguments):
+    final_lr_portion: Optional[float] = field(
+        default=0.0,
+        metadata={
+            "help": "Final lr = learning_rate * final_lr_portion. Default is 0.0"
+        },
+    )
+
+
+@dataclass
+class LoraTrainingArguments(EnhancedTrainingArguments):
     trainable: Optional[str] = field(default="q_proj,v_proj")
     lora_rank: Optional[int] = field(default=8)
     lora_dropout: Optional[float] = field(default=0.1)

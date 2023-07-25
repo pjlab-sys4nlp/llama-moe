@@ -1,6 +1,7 @@
 import os
 
 import torch
+import xformers
 from peft import (
     LoraConfig,
     PeftModel,
@@ -26,6 +27,8 @@ from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
+from smoe.modules.flash_attn import replace_xformers
+from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
     DataArguments,
     LoraTrainingArguments,
@@ -92,6 +95,9 @@ def main():
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
 
+    if training_args.gradient_checkpointing:
+        config.use_cache = False
+
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
         "use_fast": model_args.use_fast_tokenizer,
@@ -154,13 +160,13 @@ def main():
         # )
 
     if training_args.do_train:
-        train_dataset = lm_datasets["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
-        logger.info(f"Num train_samples  {len(train_dataset)}")
+        train_dataset = lm_datasets
+        if data_args.max_train_samples is None:
+            raise ValueError("max_train_samples cannot be None")
         logger.info("training example:")
-        logger.info(tokenizer.decode(train_dataset[0]["input_ids"]))
+        logger.info(
+            tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
+        )
 
     eval_dataset = None
     if training_args.do_eval:
@@ -189,6 +195,7 @@ def main():
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
         )
+        replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
@@ -223,7 +230,7 @@ def main():
             r=lora_rank,
             lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
-            modules_to_save=modules_to_save,
+            modules_to_save=None,
         )
         model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
@@ -233,7 +240,7 @@ def main():
     ).__get__(model, type(model))
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = LlamaLrSchedulingTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
@@ -258,13 +265,7 @@ def main():
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         metrics = train_result.metrics
-
-        max_train_samples = (
-            data_args.max_train_samples
-            if data_args.max_train_samples is not None
-            else len(train_dataset)
-        )
-        metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+        metrics["train_samples"] = data_args.max_train_samples
 
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)

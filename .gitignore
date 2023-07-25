@@ -161,3 +161,4 @@ cython_debug/
 
 debug.py
 resources/
+outputs/
