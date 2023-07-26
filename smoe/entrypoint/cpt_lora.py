@@ -235,12 +235,19 @@ def main():
             lora_dropout=lora_dropout,
             modules_to_save=None,
         )
+        # must include this if-else block before get_peft_model,
+        #   in case of gradient-zero err:
+        #   None of the inputs have requires_grad=True. Gradients will be None
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
         model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
-    old_state_dict = model.state_dict
-    model.state_dict = (
-        lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())
-    ).__get__(model, type(model))
 
     # Initialize our Trainer
     trainer = LlamaLrSchedulingTrainer(
