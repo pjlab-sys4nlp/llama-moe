@@ -1,6 +1,5 @@
-import math
 from types import MethodType
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -20,11 +19,12 @@ try:
 except ImportError:
     pass
 
-# try:
-#     from flash_attn import flash_attn_func, flash_attn_qkvpacked_func
-#     SUPPORT_FLASH2 = True
-# except ImportError:
-#     pass
+try:
+    from flash_attn import flash_attn_func
+
+    SUPPORT_FLASH2 = True
+except ImportError:
+    pass
 
 SUPPORT_FLASH = SUPPORT_XFORMERS or SUPPORT_FLASH2
 

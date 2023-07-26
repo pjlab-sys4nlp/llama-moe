@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 valid_kernel_name = "linear"
