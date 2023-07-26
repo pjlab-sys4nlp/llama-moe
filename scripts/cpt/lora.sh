@@ -29,7 +29,7 @@ modules_to_save="embed_tokens,lm_head"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
 dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
-per_device_train_batch_size=24
+per_device_train_batch_size=16
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 block_size=2048
@@ -102,7 +102,8 @@ srun torchrun \
         --lora_dropout ${lora_dropout} \
         --torch_dtype auto \
         --ddp_find_unused_parameters False \
-        --report_to tensorboard
+        --report_to tensorboard \
+        --log_level info
 
         # --gradient_checkpointing \
         # --modules_to_save ${modules_to_save} \

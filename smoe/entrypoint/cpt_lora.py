@@ -75,6 +75,7 @@ def main():
             )
 
     # Set seed before initializing model.
+    logger.info(f"Seed set to: {training_args.seed}")
     set_seed(training_args.seed)
 
     config_kwargs = {
