@@ -25,8 +25,7 @@
 
 **NOTICE:** Please create `logs/` folder manually: `mkdir -p logs`
 
-- Dense LLaMA-v1 LoRA: `sbatch scripts/cpt/lora.sh`
--
+- LLaMA MoEfication LoRA: `sbatch scripts/cpt/lora.sh`
 
 ## 🤝 Contribution
 

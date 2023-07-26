@@ -2,9 +2,14 @@ import os
 
 import numpy as np
 import torch
+import torch.nn as nn
 from sklearn.preprocessing import Normalizer
 from tqdm import tqdm
 from transformers import LlamaModel
+
+from smoe.modules.moefication.moe_gates import TopKBalancedNoisyGate
+
+torch.set_printoptions(precision=4, linewidth=140)
 
 
 class BaseGate:
@@ -69,24 +74,22 @@ class MLPGate(BaseGate):
                 # torch.nn.init.normal_(m.weight.data)
             # m.bias.data[:] = 0
 
-    def calculate_scores(self, hidden_gate_outputs, expert_masks):
+    def calculate_scores(self, hidden_outputs, expert_masks, use_softmax=False):
         with torch.no_grad():
             if self.select_criterion == "plain":
-                scores = torch.matmul(
-                    hidden_gate_outputs, expert_masks
-                )  # 各个专家所对应神经元的输出总值，shape(batch_size, expert_num)
-                scores /= scores.max()  # 归一化
+                # 各个专家所对应神经元的输出总值，shape(batch_size, expert_num)
+                scores = torch.matmul(hidden_outputs, expert_masks)
+                # scores /= torch.abs(scores).max()  # 归一化
 
             elif self.select_criterion == "positive":
-                hidden_gate_outputs_mask = (
-                    hidden_gate_outputs < 0
-                )  # 选出输出值小于0的神经元，标记其为死神经元
-                hidden_gate_outputs[hidden_gate_outputs_mask] = 0  # 死神经元的输出置零
+                # 选出输出值小于0的神经元，标记其为死神经元
+                hidden_outputs_mask = hidden_outputs < 0
+                # 死神经元的输出置零
+                hidden_outputs[hidden_outputs_mask] = 0
 
-                scores = torch.matmul(
-                    hidden_gate_outputs, expert_masks
-                )  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
-                scores /= scores.max()  # 归一化
+                # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
+                scores = torch.matmul(hidden_outputs, expert_masks)
+                # scores /= scores.max()  # 归一化
 
             elif self.select_criterion == "l2_norm":
                 threshold = (
@@ -95,23 +98,33 @@ class MLPGate(BaseGate):
                     else self.criterion_config["threshold"]
                 )
 
-                hidden_gate_outputs_l2 = (
-                    hidden_gate_outputs * hidden_gate_outputs
-                )  # 输出值L2范数
-                hidden_gate_outputs_mask = (
-                    hidden_gate_outputs_l2 <= threshold
-                )  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
-                hidden_gate_outputs_l2[hidden_gate_outputs_mask] = 0  # 死神经元的输出置零
+                # 输出值L2范数
+                hidden_outputs_l2 = hidden_outputs * hidden_outputs
+                # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+                hidden_outputs_mask = hidden_outputs_l2 <= threshold
+                # 死神经元的输出置零
+                hidden_outputs_l2[hidden_outputs_mask] = 0
 
-                scores = torch.matmul(
-                    hidden_gate_outputs_l2, expert_masks
-                )  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
-                scores /= scores.max()  # 归一化
+                # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
+                scores = torch.matmul(hidden_outputs_l2, expert_masks)
+                # scores /= scores.max()  # 归一化
+
+            if use_softmax:
+                scores = nn.Softmax(1)(scores)
 
         return scores
 
     def train(
-        self, device, batch_size=1024, train_epochs=30, lr=0.01, accumulate_steps=1
+        self,
+        device,
+        batch_size=1024,
+        train_epochs=30,
+        lr=0.01,
+        accumulate_steps=1,
+        use_balance=False,
+        add_noise=False,
+        use_softmax=False,
+        balance_loss_lambda=0.0005,
     ):
         """"""
 
@@ -128,7 +141,7 @@ class MLPGate(BaseGate):
         # weights for initialization
         ffn_weight = self.llama_model_dict[
             self.config.template.format(self.layer_index)
-        ].numpy()  # llama的gate_proj参数权重，shape(hidden_neurons, input_dim)
+        ].numpy()  # llama的参数权重，shape(hidden_neurons, input_dim)
         ffn_weight_norm_ = Normalizer().transform(ffn_weight)
 
         centers = []
@@ -136,19 +149,23 @@ class MLPGate(BaseGate):
             centers.append(
                 ffn_weight_norm_[np.array(self.expert_indices) == j, :].mean(0)
             )  # shape(1, input_dim)
-        self.centers = np.array(
-            centers
-        )  # 各个专家神经元所对应权重的均值中心，shape(expert_num, input_dim)
+        # 各个专家神经元所对应权重的均值中心，shape(expert_num, input_dim)
+        self.centers = np.array(centers)
 
         # create models
-        self.mlp_model = torch.nn.Sequential(
-            torch.nn.Linear(self.hidden_dim, self.config.num_experts, bias=False),
-            torch.nn.Tanh(),
-            torch.nn.Linear(
-                self.config.num_experts, self.config.num_experts, bias=False
-            ),
+        # self.mlp_model = torch.nn.Sequential(torch.nn.Linear(self.hidden_dim, self.config.num_experts, bias=False),
+        #                                      torch.nn.Tanh(),
+        #                                      torch.nn.Linear(self.config.num_experts, self.config.num_experts, bias=False))
+        self.mlp_model = TopKBalancedNoisyGate(
+            self.hidden_dim,
+            self.config.num_experts,
+            self.config.num_selects,
+            gate_network="mlp",
+            use_balance=use_balance,
+            add_noise=add_noise,
+            use_softmax=use_softmax,
         )
-        self.mlp_model.apply(self.mlp_gate_weights_init)
+        self.mlp_model.gate_network.apply(self.mlp_gate_weights_init)
         self.mlp_model = self.mlp_model.to(device)
         optimizer = torch.optim.Adam(self.mlp_model.parameters(), lr=lr)
 
@@ -186,35 +203,42 @@ class MLPGate(BaseGate):
             for train_step in process_bar2:
                 train_loss_this_step = []
                 train_acc_this_step = []
-                hidden_inputs_examples, hidden_gate_outputs_examples = next(iter_train)
+                hidden_inputs_examples, hidden_outputs_examples = next(iter_train)
                 hidden_inputs_examples = torch.split(
                     hidden_inputs_examples.float().to(device), batch_size, dim=0
                 )  # LLaMA模型MLP的输入
-                hidden_gate_outputs_examples = torch.split(
-                    hidden_gate_outputs_examples.float().to(device), batch_size, dim=0
+                hidden_outputs_examples = torch.split(
+                    hidden_outputs_examples.float().to(device), batch_size, dim=0
                 )  # LLaMA模型MLP的GLU门控输出
 
                 # Forward mlp gates with hidden_states, compute loss and backward
                 for batch_id in range(len(hidden_inputs_examples)):
                     train_batch_cnt += 1
                     hidden_inputs = hidden_inputs_examples[batch_id]
-                    hidden_gate_outputs = hidden_gate_outputs_examples[batch_id]
+                    hidden_outputs = hidden_outputs_examples[batch_id]
 
-                    pred = self.mlp_model(
-                        hidden_inputs
-                    )  # MoE gate选择的各个专家的logits，shape(batch, expert_num)
+                    # MoE gate选择的各个专家的scores，shape(batch_size, expert_num)
+                    pred, gate_loss = self.mlp_model.forward_return_scores(
+                        hidden_inputs, loss_coef=balance_loss_lambda
+                    )
                     pred_topk, pred_labels = torch.topk(
                         pred, k=int(self.config.num_selects), dim=-1
                     )
 
+                    # 根据当前层激活后的输出所计算出的各个专家的分数
                     scores = self.calculate_scores(
-                        hidden_gate_outputs, expert_masks
-                    )  # 根据当前层激活后的输出所计算出的各个专家的分数
+                        hidden_outputs, expert_masks, use_softmax=use_softmax
+                    )
                     scores_topk, scores_labels = torch.topk(
                         scores, k=int(self.config.num_selects), dim=-1
                     )
 
+                    # scores_reform = torch.zeros((batch_size, self.config.num_experts), device=device)
+                    # # shape(batch_size, expert_num)
+                    # scores_reform = scores_reform.scatter(dim=1, index=scores_labels, value=1)
+
                     loss = loss_function(pred.view(-1), scores.view(-1))  # 二分类损失
+                    loss += gate_loss
                     loss.backward()
 
                     correct_num = torch.sum(torch.eq(pred_labels, scores_labels)).item()
@@ -254,14 +278,12 @@ class MLPGate(BaseGate):
                 for valid_step in process_bar3:
                     valid_loss_this_step = []
                     valid_acc_this_step = []
-                    hidden_inputs_examples, hidden_gate_outputs_examples = next(
-                        iter_valid
-                    )
+                    hidden_inputs_examples, hidden_outputs_examples = next(iter_valid)
                     hidden_inputs_examples = torch.split(
                         hidden_inputs_examples.float().to(device), batch_size, dim=0
                     )  # LLaMA模型MLP的输入
-                    hidden_gate_outputs_examples = torch.split(
-                        hidden_gate_outputs_examples.float().to(device),
+                    hidden_outputs_examples = torch.split(
+                        hidden_outputs_examples.float().to(device),
                         batch_size,
                         dim=0,
                     )  # LLaMA模型MLP的GLU门控输出
@@ -269,18 +291,20 @@ class MLPGate(BaseGate):
                     # Forward mlp gates with hidden_states, compute loss and backward
                     for batch_id in range(len(hidden_inputs_examples)):
                         hidden_inputs = hidden_inputs_examples[batch_id]
-                        hidden_gate_outputs = hidden_gate_outputs_examples[batch_id]
+                        hidden_outputs = hidden_outputs_examples[batch_id]
 
-                        pred = self.mlp_model(
-                            hidden_inputs
-                        )  # MoE gate选择的各个专家的logits，shape(batch, expert_num)
+                        # MoE gate选择的各个专家的scores，shape(batch, expert_num)
+                        pred, gate_loss = self.mlp_model.forward_return_scores(
+                            hidden_inputs, loss_coef=balance_loss_lambda
+                        )
                         pred_topk, pred_labels = torch.topk(
                             pred, k=int(self.config.num_selects), dim=-1
                         )
 
+                        # 根据当前层激活后的输出所计算出的各个专家的分数
                         scores = self.calculate_scores(
-                            hidden_gate_outputs, expert_masks
-                        )  # 根据当前层激活后的输出所计算出的各个专家的分数
+                            hidden_outputs, expert_masks, use_softmax=use_softmax
+                        )
                         scores_topk, scores_labels = torch.topk(
                             scores, k=int(self.config.num_selects), dim=-1
                         )
@@ -373,7 +397,7 @@ class MLPGate(BaseGate):
             + save_file_name
             + '"...'
         )
-        torch.save(self.mlp_model.cpu(), save_file_name)
+        torch.save(self.mlp_model.cpu().state_dict(), save_file_name)
 
         # Save acc
         with open("{}.acc".format(save_file_name), "w") as fout:

@@ -15,10 +15,10 @@ from torch import nn
 #     return calculator
 
 
-class UniversalCalculator(
-    nn.Module
-):  # traditional calculation mode, forward $num_experts$ times with re-batch optimization
+# traditional calculation mode, forward $num_experts$ times with re-batch optimization
+class UniversalCalculator(nn.Module):
     """
+    https://github.com/YeonwooSung/Pytorch_mixture-of-experts
     接收topK scores的DisPatcher，相比原版的SparseDispatcher进行了计算上的优化
     原理依旧是重新分配各个专家的batch。
     """
@@ -61,12 +61,10 @@ class UniversalCalculator(
             )  # 使用0补全列表
 
         """对每个专家重新组合batch"""
-        sorted_x = x.index_select(0, sorted_batch_indices).squeeze(
-            1
-        )  # 将输入按照排序后的batch编号，重新编制
-        split_x = torch.split(
-            sorted_x, expert_batch_size, dim=0
-        )  # 按照排序后每个专家的batch_size进行分隔，恰好得到各个专家所需的batch
+        # 将输入按照排序后的batch编号，重新编制
+        sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)
+        # 按照排序后每个专家的batch_size进行分隔，恰好得到各个专家所需的batch
+        split_x = torch.split(sorted_x, expert_batch_size, dim=0)
         # print(expert_batch_size)
         # print(len(split_x))
 
@@ -81,17 +79,20 @@ class UniversalCalculator(
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
+            # 乘权重
             cat_expert_outputs = torch.mul(
                 cat_expert_outputs, sorted_topK_scores.reshape(-1, 1)
-            )  # 乘权重
+            )
         zeros = torch.zeros(
             (batch_size, output_dim),
             requires_grad=True,
+            dtype=cat_expert_outputs.dtype,
             device=cat_expert_outputs.device,
         )
+        # 按照对应的batch编号，添加输出
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs).to(
             cat_expert_outputs.device
-        )  # 按照对应的batch编号，添加输出
+        )
         # add eps to all zero values in order to avoid nans when going back to log space
         # combined[combined == 0] = np.finfo(float).eps
         # back to log space

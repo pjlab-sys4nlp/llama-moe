@@ -242,6 +242,7 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
         self.now_epoch += 1
 
         self.hidden_inputs.append(x.detach().half())
+
         if self.now_epoch % self.save_interval == (self.save_interval - 1):
             save_path = os.path.join(
                 self.save_path_hidden_inputs,
@@ -250,7 +251,6 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
                 + str(self.now_epoch // self.save_interval)
                 + ".pth",
             )
-            # save_compressed_tensor_gz(torch.cat(self.hidden_inputs, dim=0).reshape(-1, self.hidden_dim).half().cpu(), save_path, compresslevel=1)
             torch.save(
                 torch.cat(self.hidden_inputs, dim=0)
                 .reshape(-1, self.hidden_dim)
@@ -262,28 +262,34 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
             self.hidden_inputs = []
 
         gate_proj_output = self.act_fn(self.gate_proj(x))
+        up_proj_output = self.up_proj(x)
+        gate_up_mm_output = gate_proj_output * up_proj_output
+        down_proj_output = self.down_proj(gate_up_mm_output)
 
-        self.hidden_gate_outputs.append(gate_proj_output.detach().half())
+        if "gate_proj" in template:
+            self.hidden_outputs.append(gate_proj_output.detach().half())
+        elif "up_proj" in template:
+            self.hidden_outputs.append(up_proj_output.detach().half())
+
         if self.now_epoch % self.save_interval == (self.save_interval - 1):
             save_path = os.path.join(
-                self.save_path_hidden_gate_outputs,
+                self.save_path_hidden_outputs,
                 str(self.device_id)
                 + "_"
                 + str(self.now_epoch // self.save_interval)
                 + ".pth",
             )
-            # save_compressed_tensor_gz(torch.cat(self.hidden_gate_outputs, dim=0).reshape(-1, self.hidden_dim).half().cpu(), save_path, compresslevel=1)
             torch.save(
-                torch.cat(self.hidden_gate_outputs, dim=0)
-                .reshape(-1, self.intermediate_size)
+                torch.cat(self.hidden_outputs, dim=0)
+                .reshape(-1, self.hidden_neurons)
                 .half()
                 .cpu(),
                 save_path,
                 pickle_protocol=4,
             )
-            self.hidden_gate_outputs = []
+            self.hidden_outputs = []
 
-        return self.down_proj(gate_proj_output * self.up_proj(x))
+        return down_proj_output
 
     for layer_idx, layer in enumerate(
         llama_model.layers
@@ -295,7 +301,7 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
             _forward, mlp
         )  # change forward function for LlamaMLP
         mlp.hidden_inputs = []
-        mlp.hidden_gate_outputs = []
+        mlp.hidden_outputs = []
 
         mlp.device_id = device_id
         mlp.layer_idx = layer_idx
@@ -305,15 +311,20 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
         mlp.save_path_hidden_inputs = os.path.join(
             save_path, "hidden_inputs", template.format(layer_idx)
         )
-        mlp.save_path_hidden_gate_outputs = os.path.join(
-            save_path, "hidden_gate_outputs", template.format(layer_idx)
-        )
+        if "gate_proj" in template:
+            mlp.save_path_hidden_outputs = os.path.join(
+                save_path, "hidden_gate_outputs", template.format(layer_idx)
+            )
+        elif "up_proj" in template:
+            mlp.save_path_hidden_outputs = os.path.join(
+                save_path, "hidden_up_outputs", template.format(layer_idx)
+            )
         mlp.save_interval = save_interval
 
         if not os.path.exists(mlp.save_path_hidden_inputs):
             os.makedirs(mlp.save_path_hidden_inputs)
-        if not os.path.exists(mlp.save_path_hidden_gate_outputs):
-            os.makedirs(mlp.save_path_hidden_gate_outputs)
+        if not os.path.exists(mlp.save_path_hidden_outputs):
+            os.makedirs(mlp.save_path_hidden_outputs)
 
 
 num_layers = model.config.num_hidden_layers
@@ -360,61 +371,9 @@ for train_step in process_bar2:
     train_sampler.set_epoch(train_step)
     train_batch = next(iter_train)
     train_batch = train_batch.cuda(args.local_rank, non_blocking=True)
-    # print("train", train_batch)
 
     with torch.no_grad():
         model(train_batch)
-
-    # with torch.cuda.device("cuda:" + str(args.local_rank)):
-    #     print("Used GPU memory (GPU " + str(args.local_rank) + ") (Model+Data+Forward): " + str(int(torch.cuda.memory_allocated() / 1024 / 1024)) + " MB")
-
-    # if train_step % save_interval == (save_interval - 1):
-    #     for i in range(num_layers):
-    #         # save hidden_inputs
-    #         hidden_inputs_list = [torch.zeros((batch_size, 2048, hidden_dim)) for _ in range(dist.get_world_size())]
-    #         print(i, hidden_inputs_list)
-    #         print(i, len(model.module.layers[i].mlp.hidden_inputs), model.module.layers[i].mlp.hidden_inputs, model.module.layers[i].mlp.hidden_inputs[0].shape)
-    #         dist.all_gather(hidden_inputs_list,
-    #                         torch.cat(model.module.layers[i].mlp.hidden_inputs, dim=0))  # (batch_size, 2048, hidden_dim)
-    #
-    #         torch.cuda.synchronize()
-    #         if dist.get_rank() == 0:
-    #             print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    #             print(hidden_inputs_list)
-    #             hidden_inputs_cat = torch.cat(hidden_inputs_list, dim=0)  # (save_batch_size, 2048, hidden_dim)
-    #             print(hidden_inputs_cat.shape)
-    #
-    #             save_path = os.path.join(args.save_path, "hidden_inputs", args.template.format(i))
-    #             save_name = str(train_step // save_interval) + ".pkl"
-    #             if not os.path.exists(save_path):
-    #                 os.makedirs(save_path)
-    #
-    #             torch.save(hidden_inputs_cat, os.path.join(save_path, save_name))
-    #
-    #         model.module.layers[i].mlp.hidden_inputs = []
-    #         del hidden_inputs_list, hidden_inputs_cat
-    #
-    #         # save hidden_gate_outputs
-    #         hidden_gate_outputs_list = [torch.zeros((batch_size, 2048, hidden_dim)) for _ in range(dist.get_world_size())]
-    #         print(hidden_gate_outputs_list)
-    #         dist.all_gather(hidden_gate_outputs_list,
-    #                         torch.cat(model.module.layers[i].mlp.hidden_gate_outputs, dim=0))  # (batch_size, 2048, hidden_dim)
-    #
-    #         torch.cuda.synchronize()
-    #         if dist.get_rank() == 0:
-    #             print(hidden_gate_outputs_list)
-    #             hidden_gate_outputs_cat = torch.cat(hidden_gate_outputs_list, dim=0)  # (save_batch_size, 2048, hidden_dim)
-    #             print(hidden_gate_outputs_cat.shape)
-    #
-    #             save_path = os.path.join(args.save_path, "hidden_gate_outputs", args.template.format(i))
-    #             save_name = str(train_step // save_interval) + ".pkl"
-    #             if not os.path.exists(save_path):
-    #                 os.makedirs(save_path)
-    #
-    #             torch.save(hidden_gate_outputs_cat, os.path.join(save_path, save_name))
-    #
-    #         model.module.layers[i].mlp.hidden_gate_outputs = []
-    #         del hidden_inputs_list, hidden_inputs_cat
 
     process_bar2.update(1)
 process_bar2.close()

@@ -1,18 +1,14 @@
 import os
 
 import torch
-from peft import (
-    LoraConfig,
-    PeftModel,
-    TaskType,
-    get_peft_model,
-    get_peft_model_state_dict,
-)
+import torch.nn as nn
+from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    LlamaConfig,
     LlamaForCausalLM,
     LlamaTokenizer,
     is_torch_tpu_available,
@@ -25,6 +21,8 @@ from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
+from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
@@ -34,6 +32,18 @@ from smoe.utils.config import (
     parse_args,
 )
 from smoe.utils.logging import get_logger_from_training_args
+
+MODEL_MAP = {
+    "llama": LlamaForCausalLM,
+    "llama_moe": LlamaMoEForCausalLM,
+}
+
+CONFIG_MAPPING.update(
+    {
+        "llama": LlamaConfig,
+        "llama_moe": LlamaMoEConfig,
+    }
+)
 
 
 def main():
@@ -83,10 +93,13 @@ def main():
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
+    ConfigClass = AutoConfig
+    if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":
+        ConfigClass = LlamaMoEConfig
     if model_args.config_name:
-        config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
+        config = ConfigClass.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(
+        config = ConfigClass.from_pretrained(
             model_args.model_name_or_path, **config_kwargs
         )
     else:
@@ -157,10 +170,6 @@ def main():
             debug_mode=training_args.debug_mode,
             block_size=data_args.block_size,
         )
-        # streaming IterableDataset does not support `train_test_split``
-        # lm_datasets = lm_datasets.train_test_split(
-        #     test_size=data_args.validation_split_percentage
-        # )
 
     if training_args.do_train:
         train_dataset = lm_datasets
@@ -174,13 +183,6 @@ def main():
     eval_dataset = None
     if training_args.do_eval:
         raise NotImplementedError
-        # eval_dataset = lm_datasets["test"]
-        # if data_args.max_eval_samples is not None:
-        #     max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
-        #     eval_dataset = eval_dataset.select(range(max_eval_samples))
-        # logger.info(f"Num eval_samples  {len(eval_dataset)}")
-        # logger.info("training example:")
-        # logger.info(tokenizer.decode(eval_dataset[0]["input_ids"]))
 
     if model_args.model_name_or_path:
         torch_dtype = (
@@ -188,7 +190,8 @@ def main():
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        model = LlamaForCausalLM.from_pretrained(
+        ModelClass = MODEL_MAP[model_args.model_type]
+        model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
@@ -198,6 +201,11 @@ def main():
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
         )
+        for name, param in model.named_parameters():
+            if "weight_noise.weight" in name:
+                nn.init.zeros_(param)
+        model.change_moe_gate_add_noise(False)
+        model.change_moe_gate_use_balance(False)
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)
@@ -233,7 +241,7 @@ def main():
             r=lora_rank,
             lora_alpha=lora_alpha,
             lora_dropout=lora_dropout,
-            modules_to_save=None,
+            modules_to_save=modules_to_save,
         )
         # must include this if-else block before get_peft_model,
         #   in case of gradient-zero err:
@@ -284,24 +292,6 @@ def main():
     # Evaluation
     if training_args.do_eval:
         raise NotImplementedError
-        # logger.info("*** Evaluate ***")
-
-        # metrics = trainer.evaluate()
-
-        # max_eval_samples = (
-        #     data_args.max_eval_samples
-        #     if data_args.max_eval_samples is not None
-        #     else len(eval_dataset)
-        # )
-        # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
-        # try:
-        #     perplexity = math.exp(metrics["eval_loss"])
-        # except OverflowError:
-        #     perplexity = float("inf")
-        # metrics["perplexity"] = perplexity
-
-        # trainer.log_metrics("eval", metrics)
-        # trainer.save_metrics("eval", metrics)
 
 
 if __name__ == "__main__":

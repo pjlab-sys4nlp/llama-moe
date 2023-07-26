@@ -5,11 +5,12 @@ from collections import Counter
 
 import torch
 from tqdm import tqdm
-from transformers import LlamaForCausalLM, LlamaModel
+from transformers import LlamaForCausalLM, LlamaForSequenceClassification, LlamaModel
 
 from smoe.models.llama_moefication import (
     LlamaMoEConfig,
     LlamaMoEForCausalLM,
+    LlamaMoEForSequenceClassification,
     LlamaMoEModel,
 )
 from smoe.utils.io import torch_load_template_file
@@ -24,6 +25,9 @@ def convert_llama_model(
     num_experts,
     num_selects,
 ):
+    """
+    LlamaMoEModel
+    """
     moe_indices = []
     moe_gates = []
     size_experts = []
@@ -48,6 +52,7 @@ def convert_llama_model(
         size_experts.append(this_layer_size_expert)
 
     """build config"""
+    print("Buiding llama-moe config...")
     config_llama_moe = LlamaMoEConfig.from_pretrained(llama_model_path)
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
@@ -108,10 +113,10 @@ def convert_llama_model(
     for layer_index in range(num_layers):
         model_llama_moe_state_dict[
             "layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
-        ] = (moe_gates[layer_index]._modules["0"].weight.cpu().half())
+        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
         model_llama_moe_state_dict[
             "layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
-        ] = (moe_gates[layer_index]._modules["2"].weight.cpu().half())
+        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
 
     print("Converting...")
     model_llama_moe.load_state_dict(model_llama_moe_state_dict)
@@ -138,6 +143,9 @@ def convert_llama_model_for_causal_lm(
     num_experts,
     num_selects,
 ):
+    """
+    LlamaMoEForCausalLM
+    """
     moe_indices = []
     moe_gates = []
     size_experts = []
@@ -162,6 +170,7 @@ def convert_llama_model_for_causal_lm(
         size_experts.append(this_layer_size_expert)
 
     """build config"""
+    print("Buiding llama-moe config...")
     config_llama_moe = LlamaMoEConfig.from_pretrained(llama_model_path)
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
@@ -222,10 +231,10 @@ def convert_llama_model_for_causal_lm(
     for layer_index in range(num_layers):
         model_llama_moe_state_dict[
             "model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
-        ] = (moe_gates[layer_index]._modules["0"].weight.cpu().half())
+        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
         model_llama_moe_state_dict[
             "model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
-        ] = (moe_gates[layer_index]._modules["2"].weight.cpu().half())
+        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
 
     print("Converting...")
     model_llama_moe.load_state_dict(model_llama_moe_state_dict)
@@ -241,6 +250,126 @@ def convert_llama_model_for_causal_lm(
     config_llama_moe.save_pretrained(save_path)
     model_llama_moe.save_pretrained(save_path)
     print(f'Converted LlamaMoEForCausalLM saved to "{save_path}".')
+
+
+def convert_llama_model_for_sequence_classificaiton(
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+):
+    """
+    LlamaMoEForSequenceClassification
+    """
+
+    moe_indices = []
+    moe_gates = []
+    size_experts = []
+
+    """load model"""
+    print("Loading llama model...")
+    model_llama = LlamaForSequenceClassification.from_pretrained(llama_model_path)
+    model_llama.to("cpu")
+    model_llama_state_dict = model_llama.state_dict()
+
+    """load indices and gate weights"""
+    num_layers = model_llama.config.num_hidden_layers
+
+    for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
+        this_layer_index = torch_load_template_file(split_index_path, template, i)
+        this_layer_gate = torch_load_template_file(select_gate_path, template, i)
+        this_layer_size_expert = Counter(this_layer_index)
+        this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
+
+        moe_indices.append(torch.tensor(this_layer_index, dtype=torch.int))
+        moe_gates.append(this_layer_gate)
+        size_experts.append(this_layer_size_expert)
+
+    """build config"""
+    print("Buiding llama-moe config...")
+    config_llama_moe = LlamaMoEConfig.from_pretrained(llama_model_path)
+    config_llama_moe.num_experts = num_experts
+    config_llama_moe.num_selects = num_selects
+    config_llama_moe.size_experts = size_experts
+    config_llama_moe.gates = "mlp"
+
+    """initialize moe model"""
+    print("Initializing llama-moe model...")
+    model_llama_moe = LlamaMoEForSequenceClassification(config_llama_moe)
+    model_llama_moe.to("cpu")
+    model_llama_moe_state_dict = model_llama_moe.state_dict().copy()
+
+    """conversion"""
+    print("Locating state dict values...")
+    for key in model_llama_state_dict.keys():
+        if "mlp" not in key:
+            model_llama_moe_state_dict[key] = model_llama_state_dict[key].cpu().half()
+        else:
+            layer_index = int(key.split(".")[2])
+            for expert_index in range(num_experts):
+                if "gate" in key:
+                    model_llama_moe_state_dict[
+                        "model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(
+                            layer_index, expert_index
+                        )
+                    ] = (
+                        model_llama_state_dict[key][
+                            moe_indices[layer_index] == expert_index
+                        ]
+                        .cpu()
+                        .half()
+                    )
+                elif "up" in key:
+                    model_llama_moe_state_dict[
+                        "model.layers.{}.mlp.calculator.experts.weight_up.{}".format(
+                            layer_index, expert_index
+                        )
+                    ] = (
+                        model_llama_state_dict[key][
+                            moe_indices[layer_index] == expert_index
+                        ]
+                        .cpu()
+                        .half()
+                    )
+                elif "down" in key:
+                    model_llama_moe_state_dict[
+                        "model.layers.{}.mlp.calculator.experts.weight_down.{}".format(
+                            layer_index, expert_index
+                        )
+                    ] = (
+                        model_llama_state_dict[key]
+                        .transpose(0, 1)[moe_indices[layer_index] == expert_index]
+                        .transpose(0, 1)
+                        .cpu()
+                        .half()
+                    )
+
+    print(moe_gates[0].keys())
+    for layer_index in range(num_layers):
+        model_llama_moe_state_dict[
+            "model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
+        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
+        model_llama_moe_state_dict[
+            "model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
+        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
+
+    print("Converting...")
+    model_llama_moe.load_state_dict(model_llama_moe_state_dict)
+    model_llama_moe = model_llama_moe.half()
+
+    """save to file"""
+    if os.path.exists(save_path):
+        print(f'Removed existed files in "{save_path}"')
+        shutil.rmtree(save_path)
+    os.makedirs(save_path)
+
+    print("Saving converted model...")
+    config_llama_moe.save_pretrained(save_path)
+    model_llama_moe.save_pretrained(save_path)
+    print(f'Converted LlamaMoEForSequenceClassification saved to "{save_path}".')
 
 
 if __name__ == "__main__":

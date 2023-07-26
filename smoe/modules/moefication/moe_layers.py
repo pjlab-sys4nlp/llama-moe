@@ -13,10 +13,10 @@ class LinearMoELayer(nn.Module):
         num_experts,
         num_selects,
         bias=True,
-        gate_network=None,
+        gate_network="mlp",
+        gate_use_balance=True,
         gate_add_noise=True,
         gate_use_softmax=True,
-        multiply_gate_scores=True,
     ):
         super(LinearMoELayer, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
@@ -31,21 +31,21 @@ class LinearMoELayer(nn.Module):
             num_experts,
             num_selects,
             gate_network=gate_network,
+            use_balance=gate_use_balance,
             add_noise=gate_add_noise,
             use_softmax=gate_use_softmax,
         )  # noisy gate
         self.calculator = UniversalCalculator(
-            experts, multiply_gate_scores=multiply_gate_scores
+            experts, multiply_gate_scores=gate_use_softmax
         )  # forward calculator for experts
 
-    def forward(self, x, set_num_selects=None):
+    def forward(self, x):
         batch_size = x.shape[0]
         seq_len = x.shape[1]
         x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
 
-        indices, scores, gate_loss = self.gate(
-            x, set_num_selects=set_num_selects
-        )  # 计算被选出的专家及其分数，以及gate的loss
+        # 计算被选出的专家及其分数，以及gate的loss
+        indices, scores, gate_loss = self.gate(x)
         y = self.calculator(x, indices, scores)  # 合并各专家的计算结果
 
         y = y.reshape(
@@ -59,6 +59,15 @@ class LinearMoELayer(nn.Module):
         else:
             self.gate.num_selects = num_selects
 
+    def change_gate_use_balance(self, use_balance):
+        self.gate.use_balance = use_balance
+
+    def change_gate_add_noise(self, add_noise):
+        self.gate.add_noise = add_noise
+
+    def change_gate_use_softmax(self, use_softmax):
+        self.gate.use_softmax = use_softmax
+
 
 class LinearGLUMoELayer(nn.Module):
     def __init__(
@@ -71,11 +80,10 @@ class LinearGLUMoELayer(nn.Module):
         num_selects,
         size_experts=None,
         bias=True,
-        gate_network="linear",
+        gate_network="mlp",
         gate_use_balance=True,
         gate_add_noise=True,
         gate_use_softmax=True,
-        multiply_gate_scores=True,
     ):
         super(LinearGLUMoELayer, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
@@ -95,6 +103,7 @@ class LinearGLUMoELayer(nn.Module):
             size_experts=size_experts,
             bias=bias,
         )
+        # noisy gate
         self.gate = TopKBalancedNoisyGate(
             input_size,
             num_experts,
@@ -103,19 +112,19 @@ class LinearGLUMoELayer(nn.Module):
             use_balance=gate_use_balance,
             add_noise=gate_add_noise,
             use_softmax=gate_use_softmax,
-        )  # noisy gate
+        )
+        # forward calculator for experts
         self.calculator = UniversalCalculator(
-            experts, multiply_gate_scores=multiply_gate_scores
-        )  # forward calculator for experts
+            experts, multiply_gate_scores=gate_use_softmax
+        )
 
-    def forward(self, x, set_num_selects=None):
+    def forward(self, x):
         batch_size = x.shape[0]
         seq_len = x.shape[1]
         x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
 
-        indices, scores, gate_loss = self.gate(
-            x, set_num_selects=set_num_selects
-        )  # 计算被选出的专家及其分数，以及gate的loss
+        # 计算被选出的专家及其分数，以及gate的loss
+        indices, scores, gate_loss = self.gate(x)
         y = self.calculator(x, indices, scores)  # 合并各专家的计算结果
 
         y = y.reshape(
@@ -128,3 +137,12 @@ class LinearGLUMoELayer(nn.Module):
             raise ValueError(num_selects)
         else:
             self.gate.num_selects = num_selects
+
+    def change_gate_use_balance(self, use_balance):
+        self.gate.use_balance = use_balance
+
+    def change_gate_add_noise(self, add_noise):
+        self.gate.add_noise = add_noise
+
+    def change_gate_use_softmax(self, use_softmax):
+        self.gate.use_softmax = use_softmax

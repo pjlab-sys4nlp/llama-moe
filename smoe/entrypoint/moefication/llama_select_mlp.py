@@ -47,6 +47,8 @@ parser.add_argument(
     nargs="+",
     help='used to specify train layers, example "--specify_layer 0 1 2 3"',
 )
+# MLP Gate输出是否使用softmax激活
+parser.add_argument("--use_softmax", action="store_true")
 
 args = parser.parse_args()
 args.save_path = os.path.join(
@@ -57,6 +59,8 @@ args.save_path = os.path.join(
     + "Expert-Select-MLP-"
     + args.select_criterion,
 )
+if args.use_softmax:
+    args.save_path += "-Softmax"
 print(args, "\n")
 
 """load model"""
@@ -83,19 +87,26 @@ for layer in train_layers:
     hidden_inputs_path = os.path.join(
         args.hidden_features_path, "hidden_inputs", args.template.format(layer)
     )
-    hidden_gate_outputs_path = os.path.join(
-        args.hidden_features_path, "hidden_gate_outputs", args.template.format(layer)
-    )
+    if "gate_proj" in args.template:
+        hidden_outputs_path = os.path.join(
+            args.hidden_features_path,
+            "hidden_gate_outputs",
+            args.template.format(layer),
+        )
+    elif "up_proj" in args.template:
+        hidden_outputs_path = os.path.join(
+            args.hidden_features_path, "hidden_up_outputs", args.template.format(layer)
+        )
 
     train_dataset = ShardDatasetForMoEGate(
         hidden_inputs_path,
-        hidden_gate_outputs_path,
+        hidden_outputs_path,
         parallel_mode="workers",
         file_load_index_range=[0, int(train_percent * len(hidden_inputs_path))],
     )
     valid_dataset = ShardDatasetForMoEGate(
         hidden_inputs_path,
-        hidden_gate_outputs_path,
+        hidden_outputs_path,
         parallel_mode="workers",
         file_load_index_range=[
             int(train_percent * len(hidden_inputs_path)),
@@ -143,6 +154,14 @@ for layer in train_layers:
         criterion_config=criterion_config,
     )
     center.train(
-        device, batch_size=batch_size, train_epochs=epochs, lr=lr, accumulate_steps=1
+        device,
+        batch_size=batch_size,
+        train_epochs=epochs,
+        lr=lr,
+        accumulate_steps=1,
+        use_balance=True,
+        add_noise=False,
+        use_softmax=args.use_softmax,
+        balance_loss_lambda=0.0001,
     )
 print("Done.")

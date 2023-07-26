@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-lora-speed
+#SBATCH --job-name=cpt-moe-lora-bs16
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -26,10 +26,14 @@ lora_dropout=0.05
 lora_trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
 # modules_to_save="embed_tokens,lm_head"
 
-pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
-tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B/
+# model_type="LlamaForCausalLM"
+# pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+# tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+model_type="llama_moe"
+pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
-per_device_train_batch_size=8
+per_device_train_batch_size=16
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 block_size=2048
@@ -64,6 +68,7 @@ srun torchrun \
     smoe/entrypoint/cpt_lora.py \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \
+        --model_type ${model_type} \
         --tokenizer_name_or_path ${tokenizer_path} \
         --dataset_dir ${dataset_dir} \
         --data_cache_dir ${data_cache} \
@@ -100,7 +105,7 @@ srun torchrun \
         --lora_alpha ${lora_alpha} \
         --trainable ${lora_trainable} \
         --lora_dropout ${lora_dropout} \
-        --torch_dtype auto \
+        --torch_dtype bfloat16 \
         --ddp_find_unused_parameters False \
         --report_to tensorboard \
         --gradient_checkpointing \
