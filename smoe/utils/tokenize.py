@@ -1,8 +1,9 @@
 import argparse
+import json
 import multiprocessing as mp
 from pathlib import Path
 
-from datasets import load_dataset
+from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
@@ -33,6 +34,24 @@ def get_parser():
     return args
 
 
+def load_jsonlines(filepath):
+    data = []
+    with open(filepath, "r", encoding="utf8") as fin:
+        for line in tqdm(fin, desc="Loading"):
+            ins = json.loads(line)
+            if "content" in ins:
+                data.append({"content": ins["content"]})
+    return data
+
+
+def load_txt(filepath):
+    data = []
+    with open(filepath, "r", encoding="utf8") as fin:
+        for line in tqdm(fin, desc="Loading"):
+            data.append({"content": line.strip()})
+    return data
+
+
 def tokenize_jsonl():
     args = get_parser()
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=args.use_fast)
@@ -51,13 +70,14 @@ def tokenize_jsonl():
 
     def _tokenize_and_dump(input_filepath, output_filepath):
         if args.format == "jsonl":
-            dformat = "json"
+            data = load_jsonlines(input_filepath)
         elif args.format == "txt":
-            dformat = "txt"
+            data = load_txt(input_filepath)
         else:
             raise ValueError(f"{args.format} format not supported")
-        ds = load_dataset(dformat, data_files=input_filepath)
-        column_names = ds["train"].column_names
+
+        ds = Dataset.from_list(data)
+        column_names = ds.column_names
         text_column_name = "content" if "content" in column_names else column_names[0]
 
         def _tokenization_func(examples):
@@ -72,9 +92,7 @@ def tokenize_jsonl():
             desc="Running tokenizer on dataset",
         )
 
-        tokenized_ds["train"].to_json(
-            output_filepath, lines=True, num_proc=args.num_proc
-        )
+        tokenized_ds.to_json(output_filepath, lines=True, num_proc=args.num_proc)
 
     if input_path.is_dir():
         input_files = list(input_path.glob(f"*.{args.format}"))
