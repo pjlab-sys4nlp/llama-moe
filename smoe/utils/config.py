@@ -208,6 +208,7 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "Final lr = learning_rate * final_lr_portion. Default is 0.0"
         },
     )
+    debug_mode: Optional[bool] = field(default=False)
 
 
 @dataclass
@@ -217,7 +218,6 @@ class LoraTrainingArguments(EnhancedTrainingArguments):
     lora_dropout: Optional[float] = field(default=0.1)
     lora_alpha: Optional[float] = field(default=32.0)
     modules_to_save: Optional[str] = field(default=None)
-    debug_mode: Optional[bool] = field(default=False)
     peft_path: Optional[str] = field(default=None)
 
 

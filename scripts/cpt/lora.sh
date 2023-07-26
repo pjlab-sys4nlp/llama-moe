@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-lora-bs16
+#SBATCH --job-name=cpt-llama-moe-scratch-lora-bs16
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -23,16 +23,18 @@ lr=2e-4
 lora_rank=8
 lora_alpha=32
 lora_dropout=0.05
+# lora_trainable="q_proj,v_proj"
 lora_trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
 # modules_to_save="embed_tokens,lm_head"
 
-# model_type="LlamaForCausalLM"
+# model_type="llama"
 # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 model_type="llama_moe"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+
 per_device_train_batch_size=16
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
@@ -47,7 +49,8 @@ tokens_per_batch=$(echo "$global_bs * $block_size" | bc)
 echo "#tokens/batch: $tokens_per_batch"
 
 data_cache=resources/cache
-output_dir=outputs/cpt-lora-bf16-4nodes
+output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+echo "output_dir: $output_dir"
 deepspeed_config_file=conf/deepspeed/bf16.json
 
 nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
@@ -87,7 +90,7 @@ srun torchrun \
         --weight_decay 0.1 \
         --max_grad_norm 1.0 \
         --warmup_steps 2000 \
-        --max_steps 48828125 \
+        --max_steps ${max_steps} \
         --max_train_samples 48828125 \
         --logging_strategy steps \
         --logging_steps 10 \

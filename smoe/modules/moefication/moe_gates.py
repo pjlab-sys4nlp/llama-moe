@@ -87,7 +87,8 @@ class TopKBalancedNoisyGate(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
-        nn.init.zeros_(self.weight_noise.weight)
+        self.weight_noise.weight.data.zero_()
+        # nn.init.zeros_(self.weight_noise.weight)
         # nn.init.zeros_(self.weight_noise)
         # nn.init.constant_(self.weight_noise.weight, 0.0)
 
