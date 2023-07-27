@@ -18,7 +18,7 @@ pre:
 
 .PHONY: debug
 debug:
-	pytest -vv tests/tasks/test_re.py
+	pytest -vv tests/utils/test_logging.py
 
 .PHONY: clean
 clean:
