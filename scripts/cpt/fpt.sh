@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-bs8
+#SBATCH --job-name=cpt-moe-fpt-bs1-debug
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -18,6 +18,8 @@ num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=1
+export NCCL_DEBUG=INFO
+export LOGLEVEL=INFO
 
 lr=1e-4
 
@@ -29,7 +31,7 @@ pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-per_device_train_batch_size=8
+per_device_train_batch_size=1
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 block_size=2048
@@ -53,7 +55,6 @@ head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 echo "Node: $head_node"
 echo "Node IP: $head_node_ip"
-export LOGLEVEL=INFO
 
 srun torchrun \
     --nnodes ${num_nodes} \

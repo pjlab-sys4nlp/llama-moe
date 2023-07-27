@@ -4,7 +4,7 @@
 
 ## 🌴 Dependencies
 
-- Python >= 3.10
+- Python >= 3.11
     - scikit-learn>=1.3.0
     - omegaconf>=2.0.6
     - tqdm>=4.65.0
@@ -33,6 +33,12 @@
 
 ```bash
 $ git clone git@github.com:pjlab-sys4nlp/train-moe.git
+$ cd train-moe
 $ pip install -e .[dev]
 $ pre-commit install
 ```
+
+## 🔗 Experiments
+
+- CPT
+  - [MoEfication L2-norm 8选4 继续预训练实验](https://m04hsypyylv.feishu.cn/docx/R9Tid61U0oOuQ4xwrbGcyCyvnMf)

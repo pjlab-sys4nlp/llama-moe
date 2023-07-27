@@ -19,7 +19,10 @@ parser.add_argument(
     "--templates",
     type=str,
     default="layers.{}.mlp.gate_proj.weight",
-    help="weight names of the first linear layer in each FFN (use comma to separate multiple templates)",
+    help=(
+        "weight names of the first linear layer in each FFN (use comma to separate"
+        " multiple templates)"
+    ),
 )
 parser.add_argument("--num_experts", type=int, default=8, help="number of experts")
 

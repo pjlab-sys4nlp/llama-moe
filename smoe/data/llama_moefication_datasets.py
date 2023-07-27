@@ -21,7 +21,8 @@ class LineByLineJsonlTextDataset(Dataset):
         """numthreads should be set <=1, otherwise it will slow down the reading process by ~4 times"""
         if num_threads > 1:
             warnings.warn(
-                "num_threads should be set <=1, otherwise it will slow down the reading process by ~4 times!"
+                "num_threads should be set <=1, otherwise it will slow down the reading"
+                " process by ~4 times!"
             )
 
         if os.path.isfile(file_path) is False:

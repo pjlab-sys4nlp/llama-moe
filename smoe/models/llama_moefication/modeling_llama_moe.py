@@ -36,9 +36,11 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             hidden_act=config.hidden_act,
             num_experts=config.num_experts,
             num_selects=config.num_selects,
-            size_experts=config.size_experts[layer_index]
-            if config.size_experts is not None
-            else None,
+            size_experts=(
+                config.size_experts[layer_index]
+                if config.size_experts is not None
+                else None
+            ),
             bias=False,
             gate_network=config.gates,
             gate_use_balance=True,
@@ -145,7 +147,8 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         # retrieve input_ids and inputs_embeds
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError(
-                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
+                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at"
+                " the same time"
             )
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape
@@ -197,7 +200,8 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         if self.gradient_checkpointing and self.training:
             if use_cache:
                 logger.warning_once(
-                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                    "`use_cache=True` is incompatible with gradient checkpointing."
+                    " Setting `use_cache=False`..."
                 )
                 use_cache = False
 

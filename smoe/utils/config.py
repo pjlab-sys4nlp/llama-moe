@@ -24,7 +24,8 @@ class ModelArguments:
         default=None,
         metadata={
             "help": (
-                "The model checkpoint for weights initialization.Don't set if you want to train a model from scratch."
+                "The model checkpoint for weights initialization.Don't set if you want"
+                " to train a model from scratch."
             )
         },
     )
@@ -32,22 +33,26 @@ class ModelArguments:
         default=None,
         metadata={
             "help": (
-                "The tokenizer for weights initialization.Don't set if you want to train a model from scratch."
+                "The tokenizer for weights initialization.Don't set if you want to"
+                " train a model from scratch."
             )
         },
     )
     model_type: Optional[str] = field(
         default=None,
         metadata={
-            "help": "If training from scratch, pass a model type from the list: "
-            + ", ".join(MODEL_TYPES)
+            "help": (
+                "If training from scratch, pass a model type from the list: "
+                + ", ".join(MODEL_TYPES)
+            )
         },
     )
     config_overrides: Optional[str] = field(
         default=None,
         metadata={
             "help": (
-                "Override some existing default config settings when a model is trained from scratch. Example: "
+                "Override some existing default config settings when a model is trained"
+                " from scratch. Example: "
                 "n_embd=10,resid_pdrop=0.2,scale_attn_weights=false,summary_type=cls_index"
             )
         },
@@ -67,27 +72,36 @@ class ModelArguments:
     cache_dir: Optional[str] = field(
         default=None,
         metadata={
-            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"
+            "help": (
+                "Where do you want to store the pretrained models downloaded from"
+                " huggingface.co"
+            )
         },
     )
     use_fast_tokenizer: bool = field(
         default=True,
         metadata={
-            "help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."
+            "help": (
+                "Whether to use one of the fast tokenizer (backed by the tokenizers"
+                " library) or not."
+            )
         },
     )
     model_revision: str = field(
         default="main",
         metadata={
-            "help": "The specific model version to use (can be a branch name, tag name or commit id)."
+            "help": (
+                "The specific model version to use (can be a branch name, tag name or"
+                " commit id)."
+            )
         },
     )
     use_auth_token: bool = field(
         default=False,
         metadata={
             "help": (
-                "Will use the token generated when running `huggingface-cli login` (necessary to use this script "
-                "with private models)."
+                "Will use the token generated when running `huggingface-cli login`"
+                " (necessary to use this script with private models)."
             )
         },
     )
@@ -95,8 +109,9 @@ class ModelArguments:
         default=None,
         metadata={
             "help": (
-                "Override the default `torch.dtype` and load the model under this dtype. If `auto` is passed, the "
-                "dtype will be automatically derived from the model's weights."
+                "Override the default `torch.dtype` and load the model under this"
+                " dtype. If `auto` is passed, the dtype will be automatically derived"
+                " from the model's weights."
             ),
             "choices": ["auto", "bfloat16", "float16", "float32"],
         },
@@ -107,7 +122,8 @@ class ModelArguments:
             self.config_name is not None or self.model_name_or_path is not None
         ):
             raise ValueError(
-                "--config_overrides can't be used in combination with --config_name or --model_name_or_path"
+                "--config_overrides can't be used in combination with --config_name or"
+                " --model_name_or_path"
             )
 
 
@@ -124,7 +140,10 @@ class DataArguments:
     dataset_config_name: Optional[str] = field(
         default=None,
         metadata={
-            "help": "The configuration name of the dataset to use (via the datasets library)."
+            "help": (
+                "The configuration name of the dataset to use (via the datasets"
+                " library)."
+            )
         },
     )
     train_file: Optional[str] = field(
@@ -133,15 +152,18 @@ class DataArguments:
     validation_file: Optional[str] = field(
         default=None,
         metadata={
-            "help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."
+            "help": (
+                "An optional input evaluation data file to evaluate the perplexity on"
+                " (a text file)."
+            )
         },
     )
     max_train_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": (
-                "For debugging purposes or quicker training, truncate the number of training examples to this "
-                "value if set."
+                "For debugging purposes or quicker training, truncate the number of"
+                " training examples to this value if set."
             )
         },
     )
@@ -149,8 +171,8 @@ class DataArguments:
         default=None,
         metadata={
             "help": (
-                "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-                "value if set."
+                "For debugging purposes or quicker training, truncate the number of"
+                " evaluation examples to this value if set."
             )
         },
     )
@@ -159,9 +181,10 @@ class DataArguments:
         default=None,
         metadata={
             "help": (
-                "Optional input sequence length after tokenization. "
-                "The training dataset will be truncated in block of this size for training. "
-                "Default to the model max input length for single sentence inputs (take into account special tokens)."
+                "Optional input sequence length after tokenization. The training"
+                " dataset will be truncated in block of this size for training. Default"
+                " to the model max input length for single sentence inputs (take into"
+                " account special tokens)."
             )
         },
     )
@@ -172,7 +195,10 @@ class DataArguments:
     validation_split_percentage: Optional[float] = field(
         default=0.05,
         metadata={
-            "help": "The percentage of the train set used as validation set in case there's no validation split"
+            "help": (
+                "The percentage of the train set used as validation set in case there's"
+                " no validation split"
+            )
         },
     )
     preprocessing_num_workers: Optional[int] = field(
@@ -189,7 +215,10 @@ class DataArguments:
     prob_map: Optional[dict[str, float]] = field(
         default=None,
         metadata={
-            "help": 'data type to sampling probabilities. e.g. {"commoncrawl": 0.67, "c4": 0.15}'
+            "help": (
+                'data type to sampling probabilities. e.g. {"commoncrawl": 0.67, "c4":'
+                " 0.15}"
+            )
         },
     )
 
@@ -241,7 +270,8 @@ def parse_args(*args: Type[Arguments]) -> tuple[Arguments, ...]:
             arg_tuple = parser.parse_yaml_file(yaml_file=os.path.abspath(sys.argv[1]))
         else:
             raise ValueError(
-                f"Only yaml, yml, and json config files are supported, got {sys.argv[1]}"
+                "Only yaml, yml, and json config files are supported, got"
+                f" {sys.argv[1]}"
             )
     else:
         arg_tuple = parser.parse_args_into_dataclasses()

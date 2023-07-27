@@ -31,6 +31,7 @@ from smoe.utils.config import (
     parse_args,
 )
 from smoe.utils.logging import get_logger_from_training_args
+from smoe.utils.param import get_trainable_parameters
 
 MODEL_MAP = {
     "llama": LlamaForCausalLM,
@@ -72,15 +73,16 @@ def main():
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
+                f"Output directory ({training_args.output_dir}) already exists and is"
+                " not empty. Use --overwrite_output_dir to overcome."
             )
         elif (
             last_checkpoint is not None and training_args.resume_from_checkpoint is None
         ):
             logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid"
+                " this behavior, change the `--output_dir` or add"
+                " `--overwrite_output_dir` to train from scratch."
             )
 
     # Set seed before initializing model.
@@ -128,8 +130,9 @@ def main():
         )
     else:
         raise ValueError(
-            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+            "You are instantiating a new tokenizer from scratch. This is not supported"
+            " by this script.You can do it from another script, save it, and load it"
+            " from here, using --tokenizer_name."
         )
 
     # Preprocessing the datasets.
@@ -137,16 +140,18 @@ def main():
         block_size = tokenizer.model_max_length
         if block_size > 1024:
             logger.warning(
-                "The chosen tokenizer supports a `model_max_length` that is longer than the default `block_size` value"
-                " of 1024. If you would like to use a longer `block_size` up to `tokenizer.model_max_length` you can"
+                "The chosen tokenizer supports a `model_max_length` that is longer than"
+                " the default `block_size` value of 1024. If you would like to use a"
+                " longer `block_size` up to `tokenizer.model_max_length` you can"
                 " override this default with `--block_size xxx`."
             )
             block_size = 1024
     else:
         if data_args.block_size > tokenizer.model_max_length:
             logger.warning(
-                f"The block_size passed ({data_args.block_size}) is larger than the maximum length for the model"
-                f"({tokenizer.model_max_length}). Using block_size={tokenizer.model_max_length}."
+                f"The block_size passed ({data_args.block_size}) is larger than the"
+                f" maximum length for the model({tokenizer.model_max_length}). Using"
+                f" block_size={tokenizer.model_max_length}."
             )
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
@@ -200,11 +205,14 @@ def main():
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
         )
-        for name, param in model.named_parameters():
-            if "weight_noise.weight" in name:
-                nn.init.zeros_(param)
-        model.change_moe_gate_add_noise(False)
-        model.change_moe_gate_use_balance(False)
+        # train an MoE model from scratch 👇
+        # model: LlamaMoEForCausalLM = LlamaMoEForCausalLM(config)
+        if isinstance(model, LlamaMoEForCausalLM):
+            for name, param in model.named_parameters():
+                if "weight_noise.weight" in name:
+                    nn.init.zeros_(param)
+            model.change_moe_gate_add_noise(False)
+            model.change_moe_gate_use_balance(False)
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)
@@ -217,8 +225,11 @@ def main():
     if model_vocab_size != len(tokenizer):
         model.resize_token_embeddings(len(tokenizer))
         raise ValueError(
-            f"The model's vocab size ({model_vocab_size}) does not match with the tokenizer ({len(tokenizer)})"
+            f"The model's vocab size ({model_vocab_size}) does not match with the"
+            f" tokenizer ({len(tokenizer)})"
         )
+
+    get_trainable_parameters(model, verbose=True)
 
     # Initialize our Trainer
     trainer = LlamaLrSchedulingTrainer(
@@ -228,12 +239,16 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=fault_tolerance_data_collator,
-        compute_metrics=compute_metrics
-        if training_args.do_eval and not is_torch_tpu_available()
-        else None,
-        preprocess_logits_for_metrics=logits_argmax
-        if training_args.do_eval and not is_torch_tpu_available()
-        else None,
+        compute_metrics=(
+            compute_metrics
+            if training_args.do_eval and not is_torch_tpu_available()
+            else None
+        ),
+        preprocess_logits_for_metrics=(
+            logits_argmax
+            if training_args.do_eval and not is_torch_tpu_available()
+            else None
+        ),
     )
     trainer.add_callback(SaveModelCallback)
     # Training
