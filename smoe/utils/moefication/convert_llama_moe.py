@@ -28,6 +28,7 @@ def convert_llama_model(
     """
     LlamaMoEModel
     """
+
     moe_indices = []
     moe_gates = []
     size_experts = []
@@ -39,6 +40,7 @@ def convert_llama_model(
     model_llama_state_dict = model_llama.state_dict()
 
     """load indices and gate weights"""
+    hidden_size = model_llama.config.hidden_size
     num_layers = model_llama.config.num_hidden_layers
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
@@ -65,6 +67,7 @@ def convert_llama_model(
     model_llama_moe.to("cpu")
     model_llama_moe_state_dict = model_llama_moe.state_dict().copy()
 
+    # fmt: off
     """conversion"""
     print("Locating state dict values...")
     for key in model_llama_state_dict.keys():
@@ -74,49 +77,17 @@ def convert_llama_model(
             layer_index = int(key.split(".")[1])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict[
-                        "layers.{}.mlp.calculator.experts.weight_gate.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict[
-                        "layers.{}.mlp.calculator.experts.weight_up.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict[
-                        "layers.{}.mlp.calculator.experts.weight_down.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key]
-                        .transpose(0, 1)[moe_indices[layer_index] == expert_index]
-                        .transpose(0, 1)
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        model_llama_moe_state_dict[
-            "layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
-        model_llama_moe_state_dict[
-            "layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
+        model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
+        model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        model_llama_moe_state_dict["layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
+    # fmt: on
 
     print("Converting...")
     model_llama_moe.load_state_dict(model_llama_moe_state_dict)
@@ -146,6 +117,7 @@ def convert_llama_model_for_causal_lm(
     """
     LlamaMoEForCausalLM
     """
+
     moe_indices = []
     moe_gates = []
     size_experts = []
@@ -157,6 +129,7 @@ def convert_llama_model_for_causal_lm(
     model_llama_state_dict = model_llama.state_dict()
 
     """load indices and gate weights"""
+    hidden_size = model_llama.config.hidden_size
     num_layers = model_llama.config.num_hidden_layers
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
@@ -183,6 +156,7 @@ def convert_llama_model_for_causal_lm(
     model_llama_moe.to("cpu")
     model_llama_moe_state_dict = model_llama_moe.state_dict().copy()
 
+    # fmt: off
     """conversion"""
     print("Locating state dict values...")
     for key in model_llama_state_dict.keys():
@@ -192,49 +166,18 @@ def convert_llama_model_for_causal_lm(
             layer_index = int(key.split(".")[2])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_up.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_down.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key]
-                        .transpose(0, 1)[moe_indices[layer_index] == expert_index]
-                        .transpose(0, 1)
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        model_llama_moe_state_dict[
-            "model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
-        model_llama_moe_state_dict[
-            "model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
+        # print(model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)])
+    # fmt: on
 
     print("Converting...")
     model_llama_moe.load_state_dict(model_llama_moe_state_dict)
@@ -276,6 +219,7 @@ def convert_llama_model_for_sequence_classificaiton(
     model_llama_state_dict = model_llama.state_dict()
 
     """load indices and gate weights"""
+    hidden_size = model_llama.config.hidden_size
     num_layers = model_llama.config.num_hidden_layers
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
@@ -302,6 +246,7 @@ def convert_llama_model_for_sequence_classificaiton(
     model_llama_moe.to("cpu")
     model_llama_moe_state_dict = model_llama_moe.state_dict().copy()
 
+    # fmt: off
     """conversion"""
     print("Locating state dict values...")
     for key in model_llama_state_dict.keys():
@@ -311,50 +256,17 @@ def convert_llama_model_for_sequence_classificaiton(
             layer_index = int(key.split(".")[2])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_up.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key][
-                            moe_indices[layer_index] == expert_index
-                        ]
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict[
-                        "model.layers.{}.mlp.calculator.experts.weight_down.{}".format(
-                            layer_index, expert_index
-                        )
-                    ] = (
-                        model_llama_state_dict[key]
-                        .transpose(0, 1)[moe_indices[layer_index] == expert_index]
-                        .transpose(0, 1)
-                        .cpu()
-                        .half()
-                    )
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
-    print(moe_gates[0].keys())
     for layer_index in range(num_layers):
-        model_llama_moe_state_dict[
-            "model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.0.weight"].cpu().half())
-        model_llama_moe_state_dict[
-            "model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)
-        ] = (moe_gates[layer_index]["gate_network.2.weight"].cpu().half())
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
+    # fmt: on
 
     print("Converting...")
     model_llama_moe.load_state_dict(model_llama_moe_state_dict)
