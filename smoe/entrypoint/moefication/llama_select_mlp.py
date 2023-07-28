@@ -28,8 +28,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
-    if args.use_softmax:
-        args.save_path += "-Softmax"
     print(args, "\n")
 
     """load model"""
