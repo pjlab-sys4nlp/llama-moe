@@ -105,7 +105,15 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
     config_class = LlamaMoEConfig
+    base_model_prefix = "model"
+    supports_gradient_checkpointing = True  # tianjia
     _no_split_modules = ["LlamaMoEDecoderLayer"]
+    _skip_keys_device_placement = "past_key_values"
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, LlamaMoEModel):
+            module.gradient_checkpointing = value
+
 
 
 class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
