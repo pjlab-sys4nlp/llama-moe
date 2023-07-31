@@ -7,3 +7,4 @@ peft>=0.4.0
 xformers>=0.0.20
 k_means_constrained==0.7.3
 matplotlib
+pebble

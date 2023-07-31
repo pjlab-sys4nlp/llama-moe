@@ -1,14 +1,13 @@
 #!/usr/bin/bash
 
-llama_size="llama_7B" #  7B  13B  30B  base
+llama_size="llama_7B"                   #  7B  13B  30B  base
+num_experts=8                           #  8  16
+metric=cos                              #  l2  cos
+template=layers.{}.mlp.gate_proj.weight #  gate_proj  up_proj
 
-num_experts=8
-metric=l2 # l2 cos
-template=layers.{}.mlp.up_proj.weight
-
-root_path=/mnt/petrelfs/share_data/quxiaoye
-model_path=${root_path}/models/${llama_size}
-save_path=${root_path}/moefication_results/split
+data_path=/mnt/petrelfs/share_data/quxiaoye
+model_path=${data_path}/models/${llama_size}
+save_path=${data_path}/moefication_results/split
 
 gpus=0
 cpus=32

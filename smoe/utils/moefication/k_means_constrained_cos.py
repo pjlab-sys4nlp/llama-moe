@@ -15,7 +15,7 @@
 import warnings
 import numpy as np
 import scipy.sparse as sp
-from k_means_constrained.sklearn_import.metrics.pairwise import cosine_similarity
+from k_means_constrained.sklearn_import.metrics.pairwise import cosine_distances
 from k_means_constrained.sklearn_import.utils.extmath import row_norms, squared_norm, cartesian
 from k_means_constrained.sklearn_import.utils.validation import check_array, check_random_state, as_float_array, check_is_fitted
 from joblib import Parallel
@@ -399,7 +399,7 @@ def _labels_constrained_cos(X, centers, size_min, size_max, distances):
 
     # Distances to each centre C. (the `distances` parameter is the distance to the closest centre)
     # K-mean original uses squared distances but this equivalent for constrained k-means
-    D = cosine_similarity(X, C)
+    D = cosine_distances(X, C)
 
     edges, costs, capacities, supplies, n_C, n_X = minimum_cost_flow_problem_graph(X, C, D, size_min, size_max)
     labels = solve_min_cost_flow_graph(edges, costs, capacities, supplies, n_C, n_X)

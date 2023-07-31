@@ -12,11 +12,11 @@ from transformers import PreTrainedTokenizer
 
 class LineByLineJsonlTextDataset(Dataset):
     def __init__(
-        self,
-        tokenizer: PreTrainedTokenizer,
-        file_path: str,
-        block_size: int,
-        num_threads=1,
+            self,
+            tokenizer: PreTrainedTokenizer,
+            file_path: str,
+            block_size: int,
+            num_threads=1,
     ):
         """numthreads should be set <=1, otherwise it will slow down the reading process by ~4 times"""
         if num_threads > 1:
@@ -93,7 +93,7 @@ class LineByLineJsonlTextDataset(Dataset):
 
     def split_list_by_n(self, list_collection, n):  # 将集合均分，每份n个元素
         for i in range(0, len(list_collection), n):
-            yield list_collection[i : i + n]
+            yield list_collection[i: i + n]
 
     def process_line(self, line, tokenizer, block_size):  # 多进程分词函数
         # fmt: off
@@ -134,12 +134,12 @@ class CommonDataset(Dataset):
 
 class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数据集读取
     def __init__(
-        self,
-        hidden_inputs_path,
-        hidden_outputs_path,
-        parallel_mode="shards",
-        file_load_index_range=None,
-        shards_in_memory=8,
+            self,
+            hidden_inputs_path,
+            hidden_outputs_path,
+            parallel_mode="shards",
+            file_load_index_range=None,
+            shards_in_memory=8,
     ):
         # fmt: off
         hidden_inputs_filename_list = os.listdir(hidden_inputs_path)
@@ -152,7 +152,7 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
         assert self.parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
 
         if file_load_index_range is None:
-            file_load_index_range = [0, len(hidden_inputs_filename_list) - 1]
+            file_load_index_range = [0, len(hidden_inputs_filename_list) - 1]  # 未指读取范围，则读取所有文件
         hidden_inputs_filename_list = hidden_inputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
         hidden_outputs_filename_list = hidden_outputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
 
