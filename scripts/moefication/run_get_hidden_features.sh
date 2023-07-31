@@ -12,7 +12,9 @@ save_path=${root_path}/llama_moe_temp_files
 template=layers.{}.mlp.gate_proj.weight
 
 gpus=8
-OMP_NUM_THREADS=8 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c 128 --kill-on-bad-exit=1 \  python -m torch.distributed.launch --nproc_per_node=${gpus} ${root_path}/run_moefication/llama_get_hidden_features.py \
+cpus=128
+OMP_NUM_THREADS=8 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  python -m torch.distributed.launch --nproc_per_node=${gpus} ${root_path}/run_moefication/llama_get_hidden_features.py \
   --model_path ${model_path} \
   --train_data_path ${train_data_path} \
   --train_data_cache_path ${train_data_cache_path} \
