@@ -22,14 +22,12 @@ if __name__ == "__main__":
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--select_criterion', type=str, default='l2_norm', choices=["plain", "positive", "l2_norm"])
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
-    parser.add_argument('--num_selects', type=int, default=2, help='number of experts')
+    parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
     parser.add_argument('--specify_layer', nargs='+', help='used to specify train layers, example \"--specify_layer 0 1 2 3\"')
     parser.add_argument('--use_softmax', action='store_true')  # MLP Gate输出是否使用softmax激活
 
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
-    if args.use_softmax:
-        args.save_path += "-Softmax"
     print(args, "\n")
 
     """load model"""
@@ -53,11 +51,11 @@ if __name__ == "__main__":
         print(f"Training MoE Gate for layer {layer}...")
 
         """prepare datasets"""
-        hidden_inputs_path = os.path.join(args.hidden_features_path, "hidden_inputs", args.template.format(layer))
+        hidden_inputs_path = os.path.join(args.hidden_features_path, "hidden_inputs", "layer" + str(layer))
         if "gate_proj" in args.template:
-            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_gate_outputs", args.template.format(layer))
+            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_gate_outputs", "layer" + str(layer))
         elif "up_proj" in args.template:
-            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_up_outputs", args.template.format(layer))
+            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_up_outputs", "layer" + str(layer))
 
         train_dataset = ShardDatasetForMoEGate(hidden_inputs_path, hidden_outputs_path,
                                                parallel_mode="workers", file_load_index_range=[0, int(train_percent * len(hidden_inputs_path))])

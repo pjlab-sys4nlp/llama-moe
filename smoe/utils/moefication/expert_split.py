@@ -4,7 +4,9 @@ from collections import Counter
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
+from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
 from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import Normalizer
 
 
 def load_ffn_weight(model, template, layer):
@@ -13,7 +15,7 @@ def load_ffn_weight(model, template, layer):
 
 
 class LayerSplit:
-    def __init__(self, config, model, template, layer=0):
+    def __init__(self, config, model, template, layer):
         self.config = config
         self.layer = layer
         self.template = template
@@ -39,20 +41,36 @@ class LayerSplit:
 
 
 class ClusteringSplit(LayerSplit):
-    def __init__(self, config, model, template, layer=0):
-        super().__init__(config, model, template, layer=layer)
+    def __init__(self, config, model, template, layer, distance="l2"):
+        super().__init__(config, model, template, layer)
         self.type = "split_clustering"
+        self.distance = distance
 
-    def split(self):
+    def split(self, cpu_threads=-1):
         self.load_param()
         ffn_weight_norm = sklearn.preprocessing.normalize(self.ffn_weight)
-        kmeans = KMeansConstrained(
-            n_clusters=self.config.num_experts,
-            size_min=self.split_size,
-            size_max=self.split_size,
-            max_iter=500,
-            random_state=0,
-            n_jobs=-1,
-            verbose=True,
-        ).fit(ffn_weight_norm, None)
+        # ffn_weight_norm = Normalizer().transform(self.ffn_weight)
+
+        if self.distance.lower() == "l2":
+            kmeans = KMeansConstrained(
+                n_clusters=self.config.num_experts,
+                size_min=self.split_size,
+                size_max=self.split_size,
+                max_iter=500,
+                random_state=0,
+                n_jobs=cpu_threads,
+                verbose=True,
+            ).fit(ffn_weight_norm, None)
+
+        elif self.distance.lower() == "cos":
+            kmeans = KMeansConstrainedCos(
+                n_clusters=self.config.num_experts,
+                size_min=self.split_size,
+                size_max=self.split_size,
+                max_iter=500,
+                random_state=0,
+                n_jobs=cpu_threads,
+                verbose=True,
+            ).fit(ffn_weight_norm, None)
+
         self.labels = [x for x in kmeans.labels_]

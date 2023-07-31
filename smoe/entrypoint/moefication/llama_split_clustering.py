@@ -27,12 +27,18 @@ parser.add_argument(
 parser.add_argument("--num_experts", type=int, default=8, help="number of experts")
 
 args = parser.parse_args()
-args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Split-Clustering")
+args.save_path = os.path.join(
+    args.save_path,
+    os.path.split(args.model_path)[1]
+    + "-"
+    + str(args.num_experts)
+    + "Expert-Split-Clustering",
+)
 
 print("Loading llama model...")
 model = LlamaForCausalLM.from_pretrained(args.model_path).model
 
-templates = args.templates.split(',')
+templates = args.templates.split(",")
 for template in templates:
     for i in tqdm.tqdm(range(model.config.num_hidden_layers)):
         split = ClusteringSplit(args, model, template, i)

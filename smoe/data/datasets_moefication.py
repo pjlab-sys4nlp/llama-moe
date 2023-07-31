@@ -153,7 +153,7 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
         assert self.parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
 
         if file_load_index_range is None:
-            file_load_index_range = [0, len(hidden_inputs_filename_list) - 1]
+            file_load_index_range = [0, len(hidden_inputs_filename_list) - 1]  # 未指读取范围，则读取所有文件
         hidden_inputs_filename_list = hidden_inputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
         hidden_outputs_filename_list = hidden_outputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
 
