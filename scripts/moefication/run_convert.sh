@@ -27,3 +27,5 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --num_experts ${num_experts} \
   --num_selects ${num_selects} \
   --convert_type ${convert_type}
+
+chmod -R 777 ${save_path}

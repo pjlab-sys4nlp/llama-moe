@@ -18,3 +18,5 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --template ${template} \
   --num_experts ${num_experts} \
   --metric ${metric}
+
+chmod -R 777 ${save_path}
