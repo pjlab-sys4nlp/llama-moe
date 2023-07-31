@@ -5,7 +5,7 @@ save_interval=1
 batch_size=4
 data_use_percent=0.01
 
-template=layers.{}.mlp.gate_proj.weight #  gate_proj  up_proj
+template=layers.{}.mlp.up_proj.weight #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
@@ -25,3 +25,5 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres
   --data_use_percent ${data_use_percent} \
   --save_interval ${save_interval} \
   --batch_size ${batch_size}
+
+chmod -R 777 ${save_path}
