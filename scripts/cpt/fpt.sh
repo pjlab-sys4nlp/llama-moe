@@ -11,7 +11,7 @@
 #SBATCH --nodes=6
 #SBATCH --gres=gpu:8
 
-source ~/anaconda3/bin/activate torch
+source ~/anaconda3/bin/activate smoe
 
 num_nodes=6         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
