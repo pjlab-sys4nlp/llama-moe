@@ -179,12 +179,15 @@ class LinearGLUExperts(nn.Module):
         return down
 
     def extra_repr(self):
-        return "in_features={}, hidden_features={}, out_features={}, hidden_act={}, num_experts={}, size_experts={}, bias={}".format(
-            self.in_features,
-            self.hidden_features,
-            self.out_features,
-            self.hidden_act,
-            self.num_experts,
-            self.size_experts,
-            self.bias_gate is not None,
+        return (
+            "in_features={}, hidden_features={}, out_features={}, hidden_act={},"
+            " num_experts={}, size_experts={}, bias={}".format(
+                self.in_features,
+                self.hidden_features,
+                self.out_features,
+                self.hidden_act,
+                self.num_experts,
+                self.size_experts,
+                self.bias_gate is not None,
+            )
         )
