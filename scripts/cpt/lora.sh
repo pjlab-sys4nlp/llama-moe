@@ -96,7 +96,7 @@ srun torchrun \
         --save_strategy steps \
         --save_total_limit 3 \
         --save_steps 1000 \
-        --dataloader_num_workers 1 \
+        --dataloader_num_workers 0 \
         --gradient_accumulation_steps ${gradient_accumulation_steps} \
         --block_size ${block_size} \
         --output_dir ${output_dir} \
