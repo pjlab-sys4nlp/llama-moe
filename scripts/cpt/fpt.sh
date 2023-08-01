@@ -103,5 +103,3 @@ srun torchrun \
         --report_to tensorboard \
         --gradient_checkpointing \
         --log_level info
-
-        # --modules_to_save ${modules_to_save} \

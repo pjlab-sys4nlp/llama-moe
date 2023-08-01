@@ -250,7 +250,6 @@ def main():
             else None
         ),
     )
-    trainer.add_callback(SaveModelCallback)
     # Training
     if training_args.do_train:
         checkpoint = None
