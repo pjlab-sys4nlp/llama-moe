@@ -6,7 +6,7 @@
 #SBATCH --error=logs/%x-%j.log
 
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=32
 
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8

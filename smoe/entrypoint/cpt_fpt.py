@@ -14,7 +14,6 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-from smoe.callbacks.save_model import SaveModelCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics

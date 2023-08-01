@@ -23,7 +23,7 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
-        batch_indices = torch.arange(batch_size).repeat_interleave(num_selects).to(topK_scores.device)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
+        batch_indices = torch.arange(batch_size, device=topK_scores.device).repeat_interleave(num_selects)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
 
         """按照专家序号从小到大的顺序，生成专家索引"""
         _, index_sorted_topK_indices = topK_indices.sort(0)
@@ -47,8 +47,8 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
             cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
-        # tzhu: change previous two-step conversion to `.to(cat_expert_outputs)` to support device and dtype transformation
-        zeros = torch.zeros((batch_size, output_dim), requires_grad=True).to(cat_expert_outputs)
+        # tzhu: change previous two-step conversion to single-step supporting device and dtype transformation
+        zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
         # add eps to all zero values in order to avoid nans when going back to log space
         # combined[combined == 0] = np.finfo(float).eps
