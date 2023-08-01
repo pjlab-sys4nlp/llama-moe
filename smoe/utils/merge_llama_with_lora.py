@@ -242,13 +242,17 @@ def merge_shards(output_dir, num_shards: int):
         [
             f
             for f in os.listdir(output_dir)
-            if re.match("L(\d+)-consolidated.(\d+).pth", f)
+            if re.match(r"L(\d+)-consolidated.(\d+).pth", f)
         ]
     )
 
     for i in range(num_shards):
         shards_filenames = sorted(
-            [f for f in ckpt_filenames if re.match(f"L(\d+)-consolidated.0{i}.pth", f)]
+            [
+                f
+                for f in ckpt_filenames
+                if re.match(f"L(\d+)-consolidated.0{i}.pth", f)  # noqa: W605
+            ]
         )
         print(f"Loading {shards_filenames} ...")
         shards_dicts = [
@@ -336,7 +340,7 @@ if __name__ == "__main__":
         [
             f
             for f in os.listdir(base_model_path)
-            if re.match("pytorch_model-(\d+)-of-(\d+).bin", f)
+            if re.match(r"pytorch_model-(\d+)-of-(\d+).bin", f)
         ]
     )
 

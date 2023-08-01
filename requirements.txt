@@ -29,3 +29,5 @@ triton==2.0.0
 trl==0.4.7
 wandb==0.15.6
 xformers==0.0.20
+pebble==5.0.3
+matplotlib==3.7.2

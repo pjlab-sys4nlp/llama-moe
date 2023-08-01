@@ -10,17 +10,18 @@ def main():
     tokenizer_path = "/mnt/petrelfs/share_data/quxiaoye/models/llama_7B"
 
     load_from_file = False
-    model_path = (
-        "/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_8Select2-l2_norm"
-    )
+    model_path = "/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/llama_7B_8Select2-l2_norm"
 
     if load_from_file:  # 从文件读取现有模型
         print("Loading model...")
+        # model_llama_moe = LlamaMoEModel.from_pretrained(model_path)
         model_llama_moe = LlamaMoEForCausalLM.from_pretrained(model_path)
-        model_llama_moe.change_moe_num_selects(4)  # 修改专家的选择数量
-        model_llama_moe.change_moe_gate_add_noise(True)  # 修改是否在训练时添加随机噪声到门控输出
-        model_llama_moe.change_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
-        model_llama_moe.change_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
+        # model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(model_path)
+
+        model_llama_moe.set_moe_num_selects(4)  # 修改专家的选择数量
+        model_llama_moe.set_moe_gate_add_noise(True)  # 修改是否在训练时添加随机噪声到门控输出
+        model_llama_moe.set_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
+        model_llama_moe.set_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
 
     else:  # 从零创建模型
         """randomly generate intermediate sizes for experts"""
@@ -48,10 +49,9 @@ def main():
             num_selects=num_selects,
             size_experts=size_experts,
         )
+        # model_llama_moe = LlamaMoEModel(config_llama_moe)
         model_llama_moe = LlamaMoEForCausalLM(config_llama_moe)
         # model_llama_moe = LlamaMoEForSequenceClassification(config_llama_moe)
-
-    print(model_llama_moe)
 
     """prepare data"""
     sentence_list = [
@@ -70,8 +70,8 @@ def main():
     """forward test"""
     model_llama_moe.to(device)
     tokens.to(device)
-    result = model_llama_moe(**tokens)
-    print(result)
+    result = model_llama_moe(**tokens)  # noqa: F841
+    # print(result)
 
 
 if __name__ == "__main__":

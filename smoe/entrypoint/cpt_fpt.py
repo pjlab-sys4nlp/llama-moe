@@ -1,7 +1,6 @@
 import os
 
 import torch
-import torch.nn as nn
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,

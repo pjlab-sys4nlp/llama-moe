@@ -1,5 +1,4 @@
 """ PyTorch LLaMA-MoE model."""
-
 import torch
 import torch.utils.checkpoint
 from torch import nn
@@ -90,17 +89,17 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 
         return outputs
 
-    def change_moe_num_selects(self, num_selects):
-        self.mlp.change_num_selects(num_selects)
+    def set_moe_num_selects(self, num_selects):
+        self.mlp.set_num_selects(num_selects)
 
-    def change_moe_gate_use_balance(self, use_balance):
-        self.mlp.change_gate_use_balance(use_balance)
+    def set_moe_gate_use_balance(self, use_balance):
+        self.mlp.set_gate_use_balance(use_balance)
 
-    def change_moe_gate_add_noise(self, add_noise):
-        self.mlp.change_gate_add_noise(add_noise)
+    def set_moe_gate_add_noise(self, add_noise):
+        self.mlp.set_gate_add_noise(add_noise)
 
-    def change_moe_gate_use_softmax(self, use_softmax):
-        self.mlp.change_gate_use_softmax(use_softmax)
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.mlp.set_gate_use_softmax(use_softmax)
 
 
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
@@ -133,7 +132,6 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-        **kwargs
     ):
         output_attentions = (
             output_attentions
@@ -282,21 +280,21 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
             attentions=all_self_attns,
         )
 
-    def change_moe_num_selects(self, num_selects):
+    def set_moe_num_selects(self, num_selects):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.change_moe_num_selects(num_selects)
+            decoder_layer.set_moe_num_selects(num_selects)
 
-    def change_moe_gate_use_balance(self, use_balance):
+    def set_moe_gate_use_balance(self, use_balance):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.change_moe_gate_use_balance(use_balance)
+            decoder_layer.set_moe_gate_use_balance(use_balance)
 
-    def change_moe_gate_add_noise(self, add_noise):
+    def set_moe_gate_add_noise(self, add_noise):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.change_moe_gate_add_noise(add_noise)
+            decoder_layer.set_moe_gate_add_noise(add_noise)
 
-    def change_moe_gate_use_softmax(self, use_softmax):
+    def set_moe_gate_use_softmax(self, use_softmax):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.change_moe_gate_use_softmax(use_softmax)
+            decoder_layer.set_moe_gate_use_softmax(use_softmax)
 
 
 class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
@@ -375,17 +373,17 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             attentions=outputs.attentions,
         )
 
-    def change_moe_num_selects(self, num_selects):
-        self.model.change_moe_num_selects(num_selects)
+    def set_moe_num_selects(self, num_selects):
+        self.model.set_moe_num_selects(num_selects)
 
-    def change_moe_gate_use_balance(self, use_balance):
-        self.model.change_moe_gate_use_balance(use_balance)
+    def set_moe_gate_use_balance(self, use_balance):
+        self.model.set_moe_gate_use_balance(use_balance)
 
-    def change_moe_gate_add_noise(self, add_noise):
-        self.model.change_moe_gate_add_noise(add_noise)
+    def set_moe_gate_add_noise(self, add_noise):
+        self.model.set_moe_gate_add_noise(add_noise)
 
-    def change_moe_gate_use_softmax(self, use_softmax):
-        self.model.change_moe_gate_use_softmax(use_softmax)
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.model.set_moe_gate_use_softmax(use_softmax)
 
 
 class LlamaMoEForSequenceClassification(
@@ -482,7 +480,7 @@ class LlamaMoEForSequenceClassification(
         if loss is not None and gate_loss is not None:
             loss += gate_loss
         if not return_dict:
-            output = (pooled_logits,) + transformer_outputs[2:]
+            output = (pooled_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
 
         return SequenceClassifierOutputWithPast(
@@ -492,3 +490,15 @@ class LlamaMoEForSequenceClassification(
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
+
+    def set_moe_num_selects(self, num_selects):
+        self.model.set_moe_num_selects(num_selects)
+
+    def set_moe_gate_use_balance(self, use_balance):
+        self.model.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_add_noise(self, add_noise):
+        self.model.set_moe_gate_add_noise(add_noise)
+
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.model.set_moe_gate_use_softmax(use_softmax)

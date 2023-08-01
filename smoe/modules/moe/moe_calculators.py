@@ -1,22 +1,9 @@
 import torch
 from torch import nn
 
-# valid_mode = ("default", "faster")
 
-
-# def get_linear_layer_calculator(mode, experts, kernel="linear", multiply_by_gates=True):
-#     if mode == "default":
-#         calculator = UniversalCalculator(experts, multiply_gate_scores=multiply_by_gates)
-#     elif mode == "faster":
-#         calculator = MoE_FasterLinearCalculator(experts, kernel=kernel, multiply_by_gates=multiply_by_gates)
-#     else:
-#         raise ValueError("Invalid calculation mode, expected " + str(valid_mode) + ", get " + mode + ".")
-#
-#     return calculator
-
-
-# traditional calculation mode, forward $num_experts$ times with re-batch optimization
-class UniversalCalculator(nn.Module):
+# fmt: off
+class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $num_experts$ times with re-batch optimization
     """
     https://github.com/YeonwooSung/Pytorch_mixture-of-experts
     接收topK scores的DisPatcher，相比原版的SparseDispatcher进行了计算上的优化
@@ -36,63 +23,32 @@ class UniversalCalculator(nn.Module):
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
-        batch_indices = (
-            torch.arange(batch_size)
-            .repeat_interleave(num_selects)
-            .to(topK_scores.device)
-        )  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
+        batch_indices = torch.arange(batch_size).repeat_interleave(num_selects).to(topK_scores.device)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
 
         """按照专家序号从小到大的顺序，生成专家索引"""
         _, index_sorted_topK_indices = topK_indices.sort(0)
 
         """按照索引重新排列scores与batch_indices，并计算专家的batch_size"""
-        sorted_topK_scores = topK_scores.index_select(
-            0, index_sorted_topK_indices
-        )  # 各个输出对应的权重
-        sorted_batch_indices = batch_indices.index_select(
-            0, index_sorted_topK_indices
-        )  # 各个专家对应的batch编号
+        sorted_topK_scores = topK_scores.index_select(0, index_sorted_topK_indices)  # 各个输出对应的权重
+        sorted_batch_indices = batch_indices.index_select(0, index_sorted_topK_indices)  # 各个专家对应的batch编号
         expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
-        if (
-            len(expert_batch_size) < self.num_experts
-        ):  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
-            expert_batch_size.extend(
-                [0] * (self.num_experts - len(expert_batch_size))
-            )  # 使用0补全列表
+        if (len(expert_batch_size) < self.num_experts):  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
+            expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
 
         """对每个专家重新组合batch"""
-        # 将输入按照排序后的batch编号，重新编制
-        sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)
-        # 按照排序后每个专家的batch_size进行分隔，恰好得到各个专家所需的batch
-        split_x = torch.split(sorted_x, expert_batch_size, dim=0)
-        # print(expert_batch_size)
-        # print(len(split_x))
+        sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)  # 将输入按照排序后的batch编号，重新编制
+        split_x = torch.split(sorted_x, expert_batch_size, dim=0)  # 按照排序后每个专家的batch_size进行分隔，恰好得到各个专家所需的batch
 
         """各专家分别正向传播"""  # 此处应该有并行优化的空间 (如果单次forward不足以占满显卡利用率)
-        expert_outputs = [
-            self.experts(split_x[i], i)
-            for i in range(self.num_experts)
-            if split_x[i].shape[0] > 0
-        ]
+        expert_outputs = [self.experts(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
 
         """重组各个专家的输出，并进行加权"""
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
-            # 乘权重
-            cat_expert_outputs = torch.mul(
-                cat_expert_outputs, sorted_topK_scores.reshape(-1, 1)
-            )
-        zeros = torch.zeros(
-            (batch_size, output_dim),
-            requires_grad=True,
-            dtype=cat_expert_outputs.dtype,
-            device=cat_expert_outputs.device,
-        )
-        # 按照对应的batch编号，添加输出
-        y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs).to(
-            cat_expert_outputs.device
-        )
+            cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
+        zeros = torch.zeros((batch_size, output_dim), requires_grad=True, device=cat_expert_outputs.device)
+        y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs).to(cat_expert_outputs.device)  # 按照对应的batch编号，添加输出
         # add eps to all zero values in order to avoid nans when going back to log space
         # combined[combined == 0] = np.finfo(float).eps
         # back to log space
@@ -100,6 +56,13 @@ class UniversalCalculator(nn.Module):
 
 
 """下述代码为失败方案，不要启用"""
+# class LinearKernel(nn.Module):
+#     def __init__(self):
+#         super(LinearKernel, self).__init__()
+#
+#     def forward(self, weight):
+#         return weight
+#
 # class MoE_FasterLinearCalculator(nn.Module): # aggregate expert weights for all inputs, forward 1 time with group-conv transformation optimization
 #     """
 #     使用优化方法，先合并权重，再正向传播，只需要1次计算

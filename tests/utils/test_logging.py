@@ -8,9 +8,9 @@ def err_func():
 
 
 def test_log():
-    logger = get_logger("test")
+    logger = get_logger("test")  # noqa: F841
 
 
 def test_err_func():
     with pytest.raises(ZeroDivisionError):
-        res = err_func()
+        res = err_func()  # noqa: F841
