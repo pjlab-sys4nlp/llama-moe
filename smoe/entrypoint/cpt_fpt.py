@@ -206,13 +206,14 @@ def main():
             low_cpu_mem_usage=True,
         )
         # train an MoE model from scratch 👇
+        # config.num_hidden_layers = 20
         # model: LlamaMoEForCausalLM = LlamaMoEForCausalLM(config)
-        if isinstance(model, LlamaMoEForCausalLM):
-            for name, param in model.named_parameters():
-                if "weight_noise.weight" in name:
-                    nn.init.zeros_(param)
-            model.change_moe_gate_add_noise(False)
-            model.change_moe_gate_use_balance(False)
+        # if isinstance(model, LlamaMoEForCausalLM):
+        #     for name, param in model.named_parameters():
+        #         if "weight_noise.weight" in name:
+        #             nn.init.zeros_(param)
+        #     model.change_moe_gate_add_noise(True)
+        #     model.change_moe_gate_use_balance(True)
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)
