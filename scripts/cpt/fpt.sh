@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-bs1-debug
+#SBATCH --job-name=cpt-moe-fpt-debug
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -8,12 +8,12 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=1         # should match with --nodes
+num_nodes=2         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
@@ -30,7 +30,7 @@ pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-per_device_train_batch_size=1
+per_device_train_batch_size=16
 per_device_eval_batch_size=1
 gradient_accumulation_steps=1
 block_size=2048

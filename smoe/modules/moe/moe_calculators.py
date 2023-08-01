@@ -47,8 +47,9 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
             cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
-        zeros = torch.zeros((batch_size, output_dim), requires_grad=True, device=cat_expert_outputs.device)
-        y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs).to(cat_expert_outputs.device)  # 按照对应的batch编号，添加输出
+        # tzhu: change previous two-step conversion to `.to(cat_expert_outputs)` to support device and dtype transformation
+        zeros = torch.zeros((batch_size, output_dim), requires_grad=True).to(cat_expert_outputs)
+        y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
         # add eps to all zero values in order to avoid nans when going back to log space
         # combined[combined == 0] = np.finfo(float).eps
         # back to log space
