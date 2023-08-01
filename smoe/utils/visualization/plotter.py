@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 
 matplotlib.use("Agg")
 
+
 # fmt: off
 class plotter:
     def __init__(self, cmap='Set2'):
@@ -16,7 +17,7 @@ class plotter:
         plt.set_cmap(cmap)
         plt.cla()
 
-    def add_figure(self, figure_name, xlabel="", ylabel="", title="", legend="best"):
+    def add_figure(self, figure_name, xlabel="", ylabel="", title="", legend=None):
         if not figure_name in self.data:
             self.data[figure_name] = {}, xlabel, ylabel, title, legend
 
@@ -29,6 +30,11 @@ class plotter:
         self.add_label(figure_name, label)
         self.data[figure_name][0][label][0].append(x)
         self.data[figure_name][0][label][1].append(y)
+
+    def set_data(self, figure_name, label, x_list, y_list):
+        self.add_label(figure_name, label)
+        self.data[figure_name][0][label][0] = x_list
+        self.data[figure_name][0][label][1] = y_list
 
     def draw(self, show=False, save=False, path="", name_prefix=None, format="png", dpi=320):
         for figure_name in self.data.keys():
@@ -59,11 +65,15 @@ class plotter:
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)
             plt.title(title)
-            plt.legend(loc=legend)
+            if legend:
+                plt.legend(loc=legend)  # "best"
 
             if show:
                 fig.show()
+
             if save:
+                if not os.path.exists(path):
+                    os.makedirs(path)
                 if name_prefix is None:
                     fig.savefig(os.path.join(path, figure_name + "." + format), dpi=dpi)
                 else:

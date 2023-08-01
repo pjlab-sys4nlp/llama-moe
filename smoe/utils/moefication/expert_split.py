@@ -6,9 +6,9 @@ import numpy as np
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
+from sklearn.preprocessing import MultiLabelBinarizer, Normalizer
+
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
-from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.preprocessing import Normalizer
 
 
 def load_ffn_weight(model, template, layer):

@@ -1,12 +1,12 @@
 import argparse
 import math
 import os
-from pebble import ProcessPool, ProcessExpired
 
 import torch
+from pebble import ProcessExpired, ProcessPool
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import LlamaModel, LlamaConfig
+from transformers import LlamaConfig, LlamaModel
 
 from smoe.data.collate_fn import separate_collater
 from smoe.data.datasets_moefication import ShardDatasetForMoEGate
@@ -14,7 +14,8 @@ from smoe.utils.io import torch_load_template_file
 from smoe.utils.moefication.expert_select import MLPGate
 
 
-def train_layer(args, train_layers, train_percent, batch_size, epochs, lr, device):  # 多进程分词函数
+# 多进程分词函数
+def train_layer(args, train_layers, train_percent, batch_size, epochs, lr, device):
     # fmt: off
     print("Loading llama model...")
     model = LlamaModel.from_pretrained(args.model_path)

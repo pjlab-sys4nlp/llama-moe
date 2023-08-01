@@ -47,15 +47,15 @@ if __name__ == "__main__":
         train_layers = range(model.config.num_hidden_layers)
 
     print(train_layers)
-    for layer in train_layers:
-        print(f"Training MoE Gate for layer {layer}...")
+    for layer_idx in train_layers:
+        print(f"Training MoE Gate for layer {layer_idx}...")
 
         """prepare datasets"""
-        hidden_inputs_path = os.path.join(args.hidden_features_path, "hidden_inputs", "layer" + str(layer))
+        hidden_inputs_path = os.path.join(args.hidden_features_path, "hidden_inputs", "layer" + str(layer_idx))
         if "gate_proj" in args.template:
-            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_gate_outputs", "layer" + str(layer))
+            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_gate_outputs", "layer" + str(layer_idx))
         elif "up_proj" in args.template:
-            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_up_outputs", "layer" + str(layer))
+            hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_up_outputs", "layer" + str(layer_idx))
 
         train_dataset = ShardDatasetForMoEGate(hidden_inputs_path, hidden_outputs_path,
                                                parallel_mode="workers", file_load_index_range=[0, int(train_percent * len(hidden_inputs_path))])
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, collate_fn=separate_collater, num_workers=16, pin_memory=True)
 
         """prepare expert indices"""
-        expert_indices = torch_load_template_file(args.split_file_path, args.template, layer)
+        expert_indices = torch_load_template_file(args.split_file_path, args.template, layer_idx)
 
         """train MLP"""
         if args.select_criterion == "l2_norm":
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         else:
             criterion_config = None
 
-        center = MLPGate(args, model, train_loader, valid_loader, expert_indices, layer,
+        center = MLPGate(args, model, train_loader, valid_loader, expert_indices, layer_idx,
                          select_criterion=args.select_criterion, criterion_config=criterion_config)
         center.train(device, batch_size=batch_size, train_epochs=epochs, lr=lr, accumulate_steps=1,
                      use_balance=True, add_noise=False, use_softmax=args.use_softmax, balance_loss_lambda=0.0001)

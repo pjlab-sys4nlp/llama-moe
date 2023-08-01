@@ -1,3 +1,4 @@
+import ast
 import os
 
 import numpy as np
@@ -8,6 +9,7 @@ from tqdm import tqdm
 from transformers import LlamaModel
 
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
+from smoe.utils.visualization.plotter import plotter
 
 
 class BaseGate:
@@ -306,3 +308,96 @@ class MLPGate(BaseGate):
             fout.write("best_acc: " + str(self.save_acc) + "\n")
             fout.write("save_epoch: " + str(self.save_epoch) + "\n")
         # fmt: on
+
+
+def results_summarizer(result_path, save_path):
+    # fmt: off
+    """从acc与log文件中汇总结果，给出训练曲线"""
+    layer_best_acc = {}
+    layer_best_epoch = {}
+
+    layer_train_epochs = {}
+    layer_train_losses = {}
+    layer_train_accs = {}
+    layer_valid_epochs = {}
+    layer_valid_losses = {}
+    layer_valid_accs = {}
+
+    for filename in tqdm(os.listdir(result_path), desc="loading files..."):
+
+        layer_index = -1  # 层号
+        for split_part in filename.split("."):  # layers.0.mlp.up_proj.weight
+            try:
+                layer_index = int(split_part)
+            except:
+                pass
+
+        if filename.endswith(".acc"):
+            with open(os.path.join(result_path, filename), "r", encoding="UTF-8") as file:
+                lines = file.readlines()
+                layer_best_acc[layer_index] = float(lines[0].split(" ")[1])  # best_acc: 0.352923583984375
+                layer_best_epoch[layer_index] = float(lines[1].split(" ")[1])  # save_epoch: 79
+
+        elif filename.endswith(".log"):
+            with open(os.path.join(result_path, filename), "r", encoding="UTF-8") as file:
+                lines = file.readlines()
+                for i in range(len(lines)):
+                    line = lines[i]  # train_acc: ['0.2017', '0.1989', ..., '0.2409', '0.2328']
+                    list_str = line.split(": ")[1].strip()  # ['0.2017', '0.1989', ..., '0.2409', '0.2328']
+                    list_str = list_str[1:-1]  # '0.2017', '0.1989', ..., '0.2409', '0.2328'
+                    list_elements = list_str.split(', ')  # '0.2017' '0.1989' ... '0.2409' '0.2328'
+                    float_list = [float(element.replace("\'", "")) for element in list_elements]  # 0.2017 0.1989 ... 0.2409 0.2328
+                    lines[i] = float_list
+                layer_train_epochs[layer_index] = [int(element) for element in lines[0]]
+                layer_train_losses[layer_index] = lines[1]
+                layer_train_accs[layer_index] = lines[2]
+                layer_valid_epochs[layer_index] = [int(element) for element in lines[3]]
+                layer_valid_losses[layer_index] = lines[4]
+                layer_valid_accs[layer_index] = lines[5]
+
+        else:
+            pass
+
+    layer_num = max([key for key in layer_best_acc.keys()])
+    epoch_num = max(layer_valid_epochs[0]) + 1
+    train_step_per_epoch = len(layer_train_epochs[0]) // len(set(layer_train_epochs[0]))
+    valid_step_per_epoch = len(layer_valid_epochs[0]) // len(set(layer_valid_epochs[0]))
+    p = plotter()
+
+    # print(epoch_num)
+    # print(train_step_per_epoch)
+    # print(valid_step_per_epoch)
+
+    """收敛准确率——按层划分"""
+    p.add_figure("best_acc", xlabel="layers", ylabel="acc", title="best acc (avg {:.4f})".format(np.mean(list(layer_best_acc.values())).item()))
+    p.add_label("best_acc", "acc", dot=False)
+    for layer_index in range(layer_num):
+        if layer_index in layer_best_acc.keys():
+            p.add_data("best_acc", "acc", layer_index, layer_best_acc[layer_index])
+
+    """收敛步数——按层划分"""
+    p.add_figure("best_epoch", xlabel="layers", ylabel="epoch", title="best epoch (avg {:.1f})".format(np.mean(list(layer_best_epoch.values())).item()))
+    p.add_label("best_epoch", "epoch", dot=False)
+    for layer_index in range(layer_num):
+        if layer_index in layer_best_epoch.keys():
+            p.add_data("best_epoch", "epoch", layer_index, layer_best_epoch[layer_index])
+
+    """train准确率曲线——按epoch划分"""
+    p.add_figure("train_acc", xlabel="epoch", ylabel="acc", title="train acc")
+    for layer_index in layer_train_epochs.keys():
+        p.add_label("train_acc", "layer_{}".format(layer_index), markersize=4, dot=False)
+        for epoch in range(epoch_num):
+            p.add_data("train_acc", "layer_{}".format(layer_index),
+                       epoch, np.mean(layer_train_accs[layer_index][epoch * train_step_per_epoch:(epoch + 1) * train_step_per_epoch]).item())
+
+    """valid准确率曲线——按epoch划分"""
+    p.add_figure("valid_acc", xlabel="epoch", ylabel="acc", title="valid acc")
+    for layer_index in layer_valid_epochs.keys():
+        p.add_label("valid_acc", "layer_{}".format(layer_index), markersize=4, dot=False)
+        for epoch in range(epoch_num):
+            p.add_data("valid_acc", "layer_{}".format(layer_index),
+                       epoch, np.mean(layer_valid_accs[layer_index][epoch * valid_step_per_epoch:(epoch + 1) * valid_step_per_epoch]).item())
+
+    p.save(path=save_path)
+    print(f"Results saved to \"{save_path}\"!")
+    # fmt: on

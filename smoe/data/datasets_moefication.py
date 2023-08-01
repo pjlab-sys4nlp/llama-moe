@@ -12,11 +12,11 @@ from transformers import PreTrainedTokenizer
 
 class LineByLineJsonlTextDataset(Dataset):
     def __init__(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            file_path: str,
-            block_size: int,
-            num_threads=1,
+        self,
+        tokenizer: PreTrainedTokenizer,
+        file_path: str,
+        block_size: int,
+        num_threads=1,
     ):
         """numthreads should be set <=1, otherwise it will slow down the reading process by ~4 times"""
         if num_threads > 1:
@@ -93,7 +93,7 @@ class LineByLineJsonlTextDataset(Dataset):
 
     def split_list_by_n(self, list_collection, n):  # 将集合均分，每份n个元素
         for i in range(0, len(list_collection), n):
-            yield list_collection[i: i + n]
+            yield list_collection[i : i + n]
 
     def process_line(self, line, tokenizer, block_size):  # 多进程分词函数
         # fmt: off
@@ -134,12 +134,12 @@ class CommonDataset(Dataset):
 
 class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数据集读取
     def __init__(
-            self,
-            hidden_inputs_path,
-            hidden_outputs_path,
-            parallel_mode="shards",
-            file_load_index_range=None,
-            shards_in_memory=8,
+        self,
+        hidden_inputs_path,
+        hidden_outputs_path,
+        parallel_mode="shards",
+        file_load_index_range=None,
+        shards_in_memory=8,
     ):
         # fmt: off
         hidden_inputs_filename_list = os.listdir(hidden_inputs_path)
@@ -173,6 +173,89 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
             self.load_pos = -1
             self.now_epoch = 0
             self.load_shards()
+
+        # 适用于单个shard较小的情况
+        elif self.parallel_mode == "workers":  # 不提前读取shard到内存，而是运行时每个worker并行读取shard文件
+            self.hidden_inputs_filepath_list = [os.path.join(hidden_inputs_path, name) for name in hidden_inputs_filename_list]
+            self.hidden_outputs_filepath_list = [os.path.join(hidden_outputs_path, name) for name in hidden_outputs_filename_list]
+        # fmt: on
+
+    def __len__(self):
+        if self.parallel_mode == "shards":
+            return len(self.hidden_inputs_examples)
+
+        elif self.parallel_mode == "workers":
+            return len(self.hidden_inputs_filepath_list)
+
+    def __getitem__(self, i):
+        if self.parallel_mode == "shards":
+            return self.hidden_inputs_examples[i], self.hidden_outputs_examples[i]
+
+        elif self.parallel_mode == "workers":
+            hidden_inputs = torch.load(
+                self.hidden_inputs_filepath_list[i], map_location="cpu"
+            )
+            hidden_outputs = torch.load(
+                self.hidden_outputs_filepath_list[i], map_location="cpu"
+            )
+            return hidden_inputs, hidden_outputs
+
+    def load_shards(self):  # "shards"并行模式下使用
+        object_load_pos = self.now_epoch % len(self.chunked_hidden_inputs_filepath_list)
+
+        if self.load_pos != object_load_pos:
+            self.load_pos = object_load_pos
+            self.hidden_inputs_examples = []
+            self.hidden_outputs_examples = []
+
+            # fmt: off
+            for filepath in tqdm(self.chunked_hidden_inputs_filepath_list[self.load_pos], desc="loading hidden_inputs shards", leave=False):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+                tensor = torch.load(filepath, map_location="cpu")
+                tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
+                self.hidden_inputs_examples.extend(tensor_list)
+
+            for filepath in tqdm(self.chunked_hidden_outputs_filepath_list[self.load_pos], desc="loading hidden_outputs shards", leave=False):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+                tensor = torch.load(filepath, map_location="cpu")
+                tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
+                self.hidden_outputs_examples.extend(tensor_list)
+            # fmt: on
+
+            print("Loaded total {len(self.hidden_inputs_examples)} examples.")
+
+    def next_epoch(self):  # "shards"并行模式下使用
+        self.now_epoch += 1
+        self.load_shards()
+
+
+class ShardDatasetForMoEGateMultiLayers(Dataset):  # 从多个数据shard文件中进行数据集读取，一次性给出多层输出
+    def __init__(
+        self,
+        hidden_inputs_path,
+        hidden_outputs_path,
+        layer_indices,
+        parallel_mode="shards",
+        file_load_index_range=None,
+        shards_in_memory=8,
+    ):
+        # fmt: off
+        hidden_inputs_filename_list = os.listdir(hidden_inputs_path)
+        hidden_inputs_filename_list.sort()
+        hidden_outputs_filename_list = [os.listdir(os.path.join(hidden_outputs_path, "layer" + str(layer_idx)) for layer_idx in layer_indices)]
+        for filenames in hidden_outputs_filename_list:
+            filenames.sort()
+            assert len(hidden_inputs_filename_list) == len(filenames)
+
+        self.parallel_mode = parallel_mode
+        assert self.parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
+
+        if file_load_index_range is None:
+            file_load_index_range = [0, len(hidden_inputs_filename_list) - 1]  # 未指读取范围，则读取所有文件
+        hidden_inputs_filename_list = hidden_inputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
+        hidden_outputs_filename_list = hidden_outputs_filename_list[file_load_index_range[0]: file_load_index_range[1]]
+
+        # 适用于单个shard较大的情况
+        if self.parallel_mode == "shards":  # 提前读取shards_in_memory个shard文件到内存后合并，之后各个workers并行读取内存中的数据
+            raise Exception
 
         # 适用于单个shard较小的情况
         elif self.parallel_mode == "workers":  # 不提前读取shard到内存，而是运行时每个worker并行读取shard文件

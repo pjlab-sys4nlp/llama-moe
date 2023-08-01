@@ -13,7 +13,7 @@ data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_experts}Expert-Split-${split_type}
 select_file_path=${data_path}/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
-save_path=${data_path}/models/${convert_type}/${llama_size}_${num_experts}Select${num_selects}-${select_type}
+save_path=${data_path}/models/${convert_type}/${split_type}-${select_type}
 
 gpus=1
 cpus=16
@@ -28,4 +28,5 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --num_selects ${num_selects} \
   --convert_type ${convert_type}
 
+wait
 chmod -R 777 ${save_path}
