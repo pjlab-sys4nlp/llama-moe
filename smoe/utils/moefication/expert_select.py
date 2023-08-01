@@ -7,7 +7,7 @@ from sklearn.preprocessing import Normalizer
 from tqdm import tqdm
 from transformers import LlamaModel
 
-from smoe.modules.moefication.moe_gates import TopKBalancedNoisyGate
+from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
 
 torch.set_printoptions(precision=4, linewidth=140)
 

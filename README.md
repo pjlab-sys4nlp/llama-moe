@@ -1,19 +1,11 @@
 # train-moe
 
-[[MoEfication Docs]](docs/moefication/README.md)
+[[Installation Guide]](docs/Installation.md) | [[MoEfication Docs]](docs/moefication/README.md) | [[Continual Pre-training Docs]](docs/continual_pretraining/README.md)
 
 ## 🌴 Dependencies
 
-- Python >= 3.11
-    - scikit-learn>=1.3.0
-    - omegaconf>=2.0.6
-    - tqdm>=4.65.0
-    - datasets>=2.13.1
-    - transformers>=4.30.2
-    - peft>=0.4.0
-    - xformers>=0.0.20
-    - k_means_constrained==0.7.3
-    - install flash-attention followed by this instruction: https://github.com/Dao-AILab/flash-attention
+- Python==3.11.4
+  - Packages: please check `requirements.txt` (NOTE: `flash-attn` must be properly installed by following [their instructions](https://github.com/Dao-AILab/flash-attention))
 
 ## 🚀 QuickStart
 
@@ -26,6 +18,7 @@
 **NOTICE:** Please create `logs/` folder manually: `mkdir -p logs`
 
 - LLaMA MoEfication LoRA: `sbatch scripts/cpt/lora.sh`
+- LLaMA MoEfication Full-Parameter: `sbatch scripts/cpt/fpt.sh`
 
 ## 🤝 Contribution
 

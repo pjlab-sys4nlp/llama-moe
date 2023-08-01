@@ -19,7 +19,7 @@ from transformers.utils import logging
 
 from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
 from smoe.models.llama_moefication.outputs_llama_moe import BaseMoEModelOutputWithPast
-from smoe.modules.moefication.moe_layers import LinearGLUMoELayer
+from smoe.modules.moe.moe_layers import LinearGLUMoELayer
 
 logger = logging.get_logger(__name__)
 
@@ -113,7 +113,6 @@ class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, LlamaMoEModel):
             module.gradient_checkpointing = value
-
 
 
 class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):

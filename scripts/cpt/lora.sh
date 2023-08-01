@@ -11,7 +11,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 
-source ~/anaconda3/bin/activate torch
+source ~/anaconda3/bin/activate smoe
 
 num_nodes=1         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
@@ -29,7 +29,6 @@ lora_trainable="q_proj,v_proj,k_proj,o_proj,gate_proj,down_proj,up_proj"
 
 # model_type="llama"
 # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-# tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 model_type="llama_moe"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
