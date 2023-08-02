@@ -17,19 +17,24 @@ class plotter:
         plt.set_cmap(cmap)
         plt.cla()
 
-    def add_figure(self, figure_name, xlabel="", ylabel="", title="", legend="best"):
-        if figure_name not in self.data:
+    def add_figure(self, figure_name, xlabel="", ylabel="", title="", legend=None):
+        if not figure_name in self.data:
             self.data[figure_name] = {}, xlabel, ylabel, title, legend
 
     def add_label(self, figure_name, label, linewidth=2, linestyle="-", markersize=8, marker=".", dot=False, annotate=None):
         self.add_figure(figure_name)
-        if label not in self.data[figure_name][0]:
+        if not label in self.data[figure_name][0]:
             self.data[figure_name][0][label] = [], [], linewidth, linestyle, markersize, marker, dot, annotate
 
     def add_data(self, figure_name, label, x, y):
         self.add_label(figure_name, label)
         self.data[figure_name][0][label][0].append(x)
         self.data[figure_name][0][label][1].append(y)
+
+    def set_data(self, figure_name, label, x_list, y_list):
+        self.add_label(figure_name, label)
+        self.data[figure_name][0][label][0] = x_list
+        self.data[figure_name][0][label][1] = y_list
 
     def draw(self, show=False, save=False, path="", name_prefix=None, format="png", dpi=320):
         for figure_name in self.data.keys():
@@ -40,7 +45,7 @@ class plotter:
                 label_info = all_label_infos[label]
                 x_list, y_list, linewidth, linestyle, markersize, marker, dot, annotate = label_info
 
-                if dot is True:
+                if dot == True:
                     plt.scatter(x_list, y_list, label=label, s=markersize * markersize, marker=marker)
                 else:
                     plt.plot(x_list, y_list, label=label, linewidth=linewidth, linestyle=linestyle, markersize=markersize, marker=marker)
@@ -60,11 +65,15 @@ class plotter:
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)
             plt.title(title)
-            plt.legend(loc=legend)
+            if legend:
+                plt.legend(loc=legend)  # "best"
 
             if show:
                 fig.show()
+
             if save:
+                if not os.path.exists(path):
+                    os.makedirs(path)
                 if name_prefix is None:
                     fig.savefig(os.path.join(path, figure_name + "." + format), dpi=dpi)
                 else:

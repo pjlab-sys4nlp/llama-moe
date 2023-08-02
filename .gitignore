@@ -162,3 +162,5 @@ cython_debug/
 debug.py
 resources/
 outputs/
+/backups/
+/visualization-up-direct/
