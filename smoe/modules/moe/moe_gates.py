@@ -52,6 +52,12 @@ class TopKBalancedNoisyGate(nn.Module):
 
         # add_noise
         self.weight_noise = nn.Linear(input_size, num_experts, bias=False)
+        self.weight_noise.weight.data = torch.zeros(
+            (num_experts, input_size),
+            requires_grad=True,
+            device=self.weight_noise.weight.data.device,
+            dtype=self.weight_noise.weight.data.dtype,
+        )
         # print(self.weight_noise.weight.data)
         self.mean = torch.tensor([0.0], requires_grad=False)
         self.std = torch.tensor([1.0], requires_grad=False)
@@ -59,14 +65,6 @@ class TopKBalancedNoisyGate(nn.Module):
 
         # use_softmax
         self.softmax = nn.Softmax(1)
-
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        self.weight_noise.weight.data.zero_()
-        # nn.init.zeros_(self.weight_noise.weight)
-        # nn.init.zeros_(self.weight_noise)
-        # nn.init.constant_(self.weight_noise.weight, 0.0)
 
     def cv_squared(self, x, eps=1e-10):
         """The squared coefficient of variation of a sample.

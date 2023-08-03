@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from smoe.models.llama_moefication.modeling_llama_moe import (
     LlamaMoEForCausalLM,
@@ -24,6 +25,12 @@ if __name__ == "__main__":
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
 
     args = parser.parse_args()
+    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Select" + str(args.num_selects))
+    if "gate_proj" in args.templates:
+        args.save_path += "-gate_proj"
+    elif "up_proj" in args.templates:
+        args.save_path += "-up_proj"
+    print(args, "\n")
 
     if args.convert_type == "LlamaMoEModel":
         convert_llama_model(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)

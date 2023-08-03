@@ -55,11 +55,11 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
         mlp.now_epoch = -1
         mlp.hidden_dim = llama_model.config.hidden_size
         mlp.hidden_neurons = llama_model.config.intermediate_size
-        mlp.save_path_hidden_inputs = os.path.join(save_path, "hidden_inputs", "layer" + str(layer))
+        mlp.save_path_hidden_inputs = os.path.join(save_path, "hidden_inputs", "layer" + str(layer_idx))
         if "gate_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_gate_outputs", "layer" + str(layer))
+            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_gate_outputs", "layer" + str(layer_idx))
         elif "up_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_up_outputs", "layer" + str(layer))
+            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_up_outputs", "layer" + str(layer_idx))
         mlp.save_interval = save_interval
 
         if not os.path.exists(mlp.save_path_hidden_inputs):
