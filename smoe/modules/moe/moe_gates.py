@@ -53,7 +53,10 @@ class TopKBalancedNoisyGate(nn.Module):
         # add_noise
         self.weight_noise = nn.Linear(input_size, num_experts, bias=False)
         self.weight_noise.weight.data = torch.zeros(
-            (num_experts, input_size), requires_grad=True
+            (num_experts, input_size),
+            requires_grad=True,
+            device=self.weight_noise.weight.data.device,
+            dtype=self.weight_noise.weight.data.dtype,
         )
         # print(self.weight_noise.weight.data)
         self.mean = torch.tensor([0.0], requires_grad=False)

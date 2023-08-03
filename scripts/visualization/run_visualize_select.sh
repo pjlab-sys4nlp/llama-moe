@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-llama_size="llama_7B" #  7B  13B  30B  base
-num_experts=16
-split_type=Clustering-l2 #  Clustering-l2  Clustering-cos  Random
+llama_size="llama_7B"    #  7B  13B  30B  base
+num_experts=16           #  8  16
+split_type=Random #  Clustering-l2  Clustering-cos  Random
 select_type=l2_norm      #  plain  positive  l2_norm
 
 result_path=/mnt/petrelfs/share_data/quxiaoye/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}

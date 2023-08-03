@@ -47,7 +47,7 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
             cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
-        zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device)
+        zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
         # add eps to all zero values in order to avoid nans when going back to log space
         # combined[combined == 0] = np.finfo(float).eps
