@@ -1,6 +1,7 @@
 import os
 
 import torch
+from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -44,6 +45,7 @@ CONFIG_MAPPING.update(
 )
 
 
+@record
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments

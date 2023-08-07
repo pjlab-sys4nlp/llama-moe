@@ -2,8 +2,6 @@
 
 LLaMA参考代码：**transformers**库，引用路径`transformers.models.llama`
 
-Moefication参考代码：https://github.com/thunlp/MoEfication
-
 <br />
 
 ## 文件结构

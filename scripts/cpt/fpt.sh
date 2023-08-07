@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-debug-dataworker0
+#SBATCH --job-name=cpt-moe-fpt-64gpus-test
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -8,12 +8,12 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 
-#SBATCH --nodes=2
+#SBATCH --nodes=8
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=2         # should match with --nodes
+num_nodes=8         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
