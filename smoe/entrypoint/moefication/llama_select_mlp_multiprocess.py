@@ -29,6 +29,8 @@ def train_layer(args, train_layers, train_percent, batch_size, epochs, lr, devic
             hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_gate_outputs", "layer" + str(layer))
         elif "up_proj" in args.template:
             hidden_outputs_path = os.path.join(args.hidden_features_path, "hidden_up_outputs", "layer" + str(layer))
+        else:
+            raise ValueError
 
         train_dataset = ShardDatasetForMoEGate(hidden_inputs_path, hidden_outputs_path,
                                                parallel_mode="workers", file_load_index_range=[0, int(train_percent * len(hidden_inputs_path))])
@@ -37,7 +39,7 @@ def train_layer(args, train_layers, train_percent, batch_size, epochs, lr, devic
 
         """prepare dataloader"""
         train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True, collate_fn=separate_collater, num_workers=16, pin_memory=True, persistent_workers=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, collate_fn=separate_collater, num_workers=16, pin_memory=True, persistent_workers=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=1, shuffle=False, collate_fn=separate_collater, num_workers=8, pin_memory=True, persistent_workers=True)
 
         """prepare expert indices"""
         expert_indices = torch_load_template_file(args.split_file_path, args.template, layer)
@@ -62,17 +64,23 @@ if __name__ == "__main__":
     print("CUDA is_available: " + str(torch.cuda.is_available()), "\n")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default="/home/data/models/llama-transformers/7B")
-    parser.add_argument('--split_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering/")
-    parser.add_argument('--hidden_features_path', type=str, default="/home/dongdz/workspace/moefication/llama_data/")
-    parser.add_argument('--save_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/")
+    parser.add_argument('--model_path', type=str)
+    parser.add_argument('--split_file_path', type=str)
+    parser.add_argument('--hidden_features_path', type=str)
+    parser.add_argument('--save_path', type=str)
+    parser.add_argument('--save_visualization_path', type=str, default="")
+    parser.add_argument('--specify_layer', nargs='+', help='used to specify train layers, example \"--specify_layer 0 1 2 3\"')
+
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--select_criterion', type=str, default='l2_norm', choices=["plain", "positive", "l2_norm"])
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
-    parser.add_argument('--specify_layer', nargs='+', help='used to specify train layers, example \"--specify_layer 0 1 2 3\"')
-    parser.add_argument('--num_threads', type=int, default=1, help='number of processes to run')
     parser.add_argument('--use_softmax', action='store_true')  # MLP Gate输出是否使用softmax激活
+
+    parser.add_argument('--train_percent', type=float, default=0.95, help="percentage of training data")
+    parser.add_argument('--batch_size', type=int, default=1024)
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--lr', type=float, default=0.01)
 
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
@@ -85,10 +93,6 @@ if __name__ == "__main__":
     config = LlamaConfig.from_pretrained(args.model_path)
 
     """training configs"""
-    train_percent = 0.95
-    batch_size = 1024
-    epochs = 100
-    lr = 0.01
     devices = ["cuda:" + str(i) for i in range(torch.cuda.device_count())]
     devices = (devices * args.num_threads)[:args.num_threads]  # 平均分配gpu到各个进程
     print(devices)
@@ -104,20 +108,22 @@ if __name__ == "__main__":
         train_layers_list.append(all_train_layers[:layers_per_process])
         all_train_layers = all_train_layers[layers_per_process:]
     print(train_layers_list)
+    # fmt: on
 
     """train"""
     print("Training... (could be hours, please wait)")
     process_bar = tqdm(range(args.num_threads), desc="training process...")
     with ProcessPool(max_workers=args.num_threads) as pool:
-        future = pool.map(train_layer,
-                          [args] * args.num_threads,
-                          train_layers_list,
-                          [train_percent] * args.num_threads,
-                          [batch_size] * args.num_threads,
-                          [epochs] * args.num_threads,
-                          [lr] * args.num_threads,
-                          devices
-                          )
+        future = pool.map(
+            train_layer,
+            [args] * args.num_threads,
+            train_layers_list,
+            [args.train_percent] * args.num_threads,
+            [args.batch_size] * args.num_threads,
+            [args.epochs] * args.num_threads,
+            [args.lr] * args.num_threads,
+            devices,
+        )
         iterator = future.result()
         while True:
             try:
@@ -138,4 +144,3 @@ if __name__ == "__main__":
                 print("Exception:", error)
     process_bar.close()
     print("Done.")
-    # fmt: on

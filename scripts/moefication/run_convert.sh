@@ -1,9 +1,11 @@
 #!/usr/bin/bash
 
-llama_size="llama_7B" #  7B  13B  30B  base
+#  llama_7B  llama_13B  llama_30B  llama_base
+#  llama2_7B  llama2_13B  llama2_30B  llama2_base
+llama_size="llama_7B"
+
 num_experts=16
 num_selects=4
-
 split_type=Random                     #  Clustering-l2  Clustering-cos  Random
 select_type=l2_norm                   #  plain  positive  l2_norm
 convert_type=LlamaMoEForCausalLM      #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification

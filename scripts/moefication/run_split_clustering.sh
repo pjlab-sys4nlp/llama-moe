@@ -1,9 +1,12 @@
 #!/usr/bin/bash
 
-llama_size="llama_7B"                   #  7B  13B  30B  base
+#  llama_7B  llama_13B  llama_30B  llama_base
+#  llama2_7B  llama2_13B  llama2_30B  llama2_base
+llama_size="llama2_7B"
+
 num_experts=8                           #  8  16
 metric=cos                              #  l2  cos
-template=layers.{}.mlp.gate_proj.weight #  gate_proj  up_proj
+template=layers.{}.mlp.up_proj.weight #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}

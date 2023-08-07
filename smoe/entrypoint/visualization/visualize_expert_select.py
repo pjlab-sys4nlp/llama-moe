@@ -1,6 +1,6 @@
 import argparse
 
-from smoe.utils.moefication.expert_select import results_summarizer
+from smoe.utils.moefication.expert_select import summarize_select_result
 
 # fmt: off
 if __name__ == "__main__":
@@ -11,4 +11,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args, "\n")
 
-    results_summarizer(args.result_path, args.save_path)
+    summarize_select_result(args.result_path, args.save_path)
