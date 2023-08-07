@@ -16,7 +16,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-from smoe.callbacks.save_model import SaveModelCallback
+from smoe.callbacks.save_model import SavePeftModelCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
@@ -208,12 +208,12 @@ def main():
         )
         # train an MoE model from scratch 👇
         # model: LlamaMoEForCausalLM = LlamaMoEForCausalLM(config)
-        if isinstance(model, LlamaMoEForCausalLM):
-            for name, param in model.named_parameters():
-                if "weight_noise.weight" in name:
-                    nn.init.zeros_(param)
-            model.change_moe_gate_add_noise(False)
-            model.change_moe_gate_use_balance(False)
+        # if isinstance(model, LlamaMoEForCausalLM):
+        #     for name, param in model.named_parameters():
+        #         if "weight_noise.weight" in name:
+        #             nn.init.zeros_(param)
+        #     model.change_moe_gate_add_noise(False)
+        #     model.change_moe_gate_use_balance(False)
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)
@@ -285,7 +285,7 @@ def main():
             else None
         ),
     )
-    trainer.add_callback(SaveModelCallback)
+    trainer.add_callback(SavePeftModelCallback)
     # Training
     if training_args.do_train:
         checkpoint = None

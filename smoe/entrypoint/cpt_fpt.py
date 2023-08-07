@@ -1,6 +1,7 @@
 import os
 
 import torch
+from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -14,7 +15,6 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
-from smoe.callbacks.save_model import SaveModelCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
@@ -45,6 +45,7 @@ CONFIG_MAPPING.update(
 )
 
 
+@record
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -250,7 +251,6 @@ def main():
             else None
         ),
     )
-    trainer.add_callback(SaveModelCallback)
     # Training
     if training_args.do_train:
         checkpoint = None

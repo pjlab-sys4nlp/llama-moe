@@ -78,7 +78,7 @@ class TopKBalancedNoisyGate(nn.Module):
         """
         # if only num_experts = 1
         if x.shape[0] == 1:
-            return torch.tensor(0.0).to(x.device)
+            return torch.tensor(0.0, device=x.device)
         return x.float().var() / (x.float().mean() ** 2 + eps)
 
     # fmt: off
@@ -116,19 +116,19 @@ class TopKBalancedNoisyGate(nn.Module):
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
 
-                if not self.mean.device == x.device:
+                if self.mean.device != x.device:
                     self.mean = self.mean.to(x.device)
                     self.std = self.std.to(x.device)
                 normal = Normal(self.mean, self.std)
 
-                threshold_positions_if_in = torch.arange(batch_size).to(x.device) * m + self.num_selects
+                threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
                 threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
                 is_in = torch.gt(logits_noise, threshold_if_in)
                 threshold_positions_if_out = threshold_positions_if_in - 1
                 threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
                 # is each value currently in the top k.
-                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control).to(x.device)
-                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control).to(x.device)
+                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control)
+                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control)
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
                 load = prob.sum(0)
             else:
@@ -184,19 +184,19 @@ class TopKBalancedNoisyGate(nn.Module):
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
 
-                if not self.mean.device == x.device:
+                if self.mean.device != x.device:
                     self.mean = self.mean.to(x.device)
                     self.std = self.std.to(x.device)
                 normal = Normal(self.mean, self.std)
 
-                threshold_positions_if_in = torch.arange(batch_size).to(x.device) * m + self.num_selects
+                threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
                 threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
                 is_in = torch.gt(logits_noise, threshold_if_in)
                 threshold_positions_if_out = threshold_positions_if_in - 1
                 threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
                 # is each value currently in the top k.
-                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control).to(x.device)
-                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control).to(x.device)
+                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control)
+                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control)
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
                 load = prob.sum(0)
             else:

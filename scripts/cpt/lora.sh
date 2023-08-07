@@ -1,19 +1,19 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-llama-moe-scratch-lora-bs16
+#SBATCH --job-name=cpt-llama-moe-lora-bs16
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=64
 
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=1         # should match with --nodes
+num_nodes=2         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
@@ -96,7 +96,7 @@ srun torchrun \
         --save_strategy steps \
         --save_total_limit 3 \
         --save_steps 1000 \
-        --dataloader_num_workers 1 \
+        --dataloader_num_workers 0 \
         --gradient_accumulation_steps ${gradient_accumulation_steps} \
         --block_size ${block_size} \
         --output_dir ${output_dir} \

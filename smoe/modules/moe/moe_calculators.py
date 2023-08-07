@@ -23,7 +23,7 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
-        batch_indices = torch.arange(batch_size).repeat_interleave(num_selects).to(topK_scores.device)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
+        batch_indices = torch.arange(batch_size, device=topK_scores.device).repeat_interleave(num_selects)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
 
         """按照专家序号从小到大的顺序，生成专家索引"""
         _, index_sorted_topK_indices = topK_indices.sort(0)
