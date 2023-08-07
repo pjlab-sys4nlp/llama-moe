@@ -14,9 +14,8 @@ from smoe.utils.io import torch_load_template_file
 from smoe.utils.moefication.expert_select import MLPGate
 
 
-def train_layer(
-    args, train_layers, train_percent, batch_size, epochs, lr, device
-):  # 多进程分词函数
+# 多进程分词函数
+def train_layer(args, train_layers, train_percent, batch_size, epochs, lr, device):
     # fmt: off
     print("Loading llama model...")
     model = LlamaModel.from_pretrained(args.model_path)
