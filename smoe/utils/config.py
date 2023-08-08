@@ -238,6 +238,7 @@ class EnhancedTrainingArguments(TrainingArguments):
         },
     )
     debug_mode: Optional[bool] = field(default=False)
+    num_tokens_per_batch: Optional[int] = field(default=1)
 
 
 @dataclass

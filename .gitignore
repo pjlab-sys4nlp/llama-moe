@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 debug.py
+debug.txt
 resources/
 outputs/
 /backups/
