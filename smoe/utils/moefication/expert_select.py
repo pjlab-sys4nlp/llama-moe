@@ -15,13 +15,13 @@ from smoe.utils.visualization.plotter import plotter
 
 class BaseGate:
     def __init__(
-            self,
-            config,
-            llama_model,
-            train_loader,
-            valid_loader,
-            expert_indices,
-            layer_index,
+        self,
+        config,
+        llama_model,
+        train_loader,
+        valid_loader,
+        expert_indices,
+        layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -41,15 +41,15 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-            self,
-            config,
-            llama_model,
-            train_loader,
-            valid_loader,
-            expert_indices,
-            layer_index,
-            select_criterion="plain",
-            criterion_config=None,
+        self,
+        config,
+        llama_model,
+        train_loader,
+        valid_loader,
+        expert_indices,
+        layer_index,
+        select_criterion="plain",
+        criterion_config=None,
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -104,16 +104,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-            self,
-            device,
-            batch_size=1024,
-            train_epochs=100,
-            lr=0.01,
-            accumulate_steps=1,
-            use_balance=False,
-            add_noise=False,
-            use_softmax=False,
-            balance_loss_lambda=0.0005,
+        self,
+        device,
+        batch_size=1024,
+        train_epochs=100,
+        lr=0.01,
+        accumulate_steps=1,
+        use_balance=False,
+        add_noise=False,
+        use_softmax=False,
+        balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层

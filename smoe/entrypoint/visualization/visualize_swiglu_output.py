@@ -48,7 +48,7 @@ if __name__ == "__main__":
         elif args.visualize_criterion == "l1_norm":
             edge = (0, 0.5)
         elif args.visualize_criterion == "l2_norm":
-            edge = (0, 0.25)
+            edge = (0, 0.1)
         else:
             raise ValueError
 

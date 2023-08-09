@@ -6,7 +6,6 @@ from transformers import LlamaConfig
 
 from smoe.utils.moefication.expert_split import RandomSplit
 
-
 if __name__ == "__main__":
     # fmt: off
     parser = argparse.ArgumentParser()

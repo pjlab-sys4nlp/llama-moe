@@ -86,7 +86,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
     if args.save_visualization_path != "":
-        args.save_visualization_path = os.path.join(args.save_visualization_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
+        args.save_visualization_path = os.path.join(args.save_visualization_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.template.split(".")[3])
     if len(args.specify_layer) > torch.cuda.device_count():
         Warning(f"Number of GPUs({torch.cuda.device_count()}) is larger than number of layers({len(args.specify_layer)}), which will result in redundancy.")
     print(args, "\n")

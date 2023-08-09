@@ -167,3 +167,4 @@ outputs/
 /visualization/
 /visualization-test-act/
 /visualization-scheduler-train/
+/visualization-swiglu-output/

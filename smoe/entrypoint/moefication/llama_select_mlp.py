@@ -36,8 +36,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
-    if args.save_visualization_path != "":
-        args.save_visualization_path = os.path.join(args.save_visualization_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
     print(args, "\n")
 
     """load model"""

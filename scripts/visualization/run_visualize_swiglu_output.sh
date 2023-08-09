@@ -4,14 +4,14 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama2_7B"
 
-proj_type=up_proj       #  gate_proj  up_proj
+proj_type=gate_proj         #  gate_proj  up_proj
 visualize_criterion=l2_norm #  plain  l1_norm  l2_norm
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 hidden_features_path=${data_path}/moefication_results/features/${llama_size}-Hidden-Features
 
-save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/${llama_size}/${proj_type}-${visualize_criterion}
+save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization-swiglu-output/${llama_size}/${proj_type}-${visualize_criterion}
 
 gpus=1
 cpus=16
