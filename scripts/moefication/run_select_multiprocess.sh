@@ -23,14 +23,14 @@ for specify_layer in "0 1 2 3 4 5 6 7" "8 9 10 11 12 13 14 15" "16 17 18 19 20 2
     --split_file_path ${split_file_path} \
     --hidden_features_path ${hidden_features_path} \
     --save_path ${save_path} \
+    --specify_layer ${specify_layer} \
     --template ${template} \
     --num_experts ${num_experts} \
     --num_selects ${num_selects} \
     --select_criterion ${select_type} \
-    --specify_layer ${specify_layer} \
     --num_threads ${gpus} \
     --use_softmax & # 并行运行下一命令
-  sleep 1s
+  sleep 0.5 # 等待0.5s
 done
 # "0 1" "2 3" "4 5" "6 7" "8 9" "10 11" "12 13" "14 15" "16 17" "18 19" "20 21" "22 23" "24 25" "26 27" "28 29" "30 31"
 # "0 1 2 3" "4 5 6 7" "8 9 10 11" "12 13 14 15" "16 17 18 19" "20 21 22 23" "24 25 26 27" "28 29 30 31"

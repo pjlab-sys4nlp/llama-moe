@@ -165,3 +165,5 @@ outputs/
 /backups/
 /visualization-up-direct/
 /visualization/
+/visualization-test-act/
+/visualization-scheduler-train/

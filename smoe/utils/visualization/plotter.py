@@ -74,22 +74,23 @@ class plotter:
 
             self.figures[figure_name] = fig
 
-    def show(self, names=None):
+    def show(self, names=None, close_graph=False):
         names = self.data.keys() if names is None else names
         for figure_name in names:
             self.draw(names=[figure_name])
             self.figures[figure_name].show()
+            if close_graph:
+                plt.close(self.figures[figure_name])
 
-    def save(self, names=None, path="", name_prefix=None, format="png", dpi=320):
+    def save(self, path="", name_format="{}.{}", format="png", dpi=320, names=None, close_graph=False):
         names = self.data.keys() if names is None else names
         for figure_name in names:
             self.draw(names=[figure_name])
             if not os.path.exists(path):
                 os.makedirs(path)
-            if name_prefix is None:
-                self.figures[figure_name].savefig(os.path.join(path, figure_name + "." + format), dpi=dpi)
-            else:
-                self.figures[figure_name].savefig(os.path.join(path, name_prefix + "-" + figure_name + "." + format), dpi=dpi)
+            self.figures[figure_name].savefig(os.path.join(path, name_format.format(figure_name, format)), dpi=dpi)
+            if close_graph:
+                plt.close(self.figures[figure_name])
 
 
 if __name__ == "__main__":
@@ -114,4 +115,4 @@ if __name__ == "__main__":
     print(p.data)
 
     p.show()
-    p.save(path="../")
+    p.save(path="../", name_format="{}-TESTFIG.{}", close_graph=True)
