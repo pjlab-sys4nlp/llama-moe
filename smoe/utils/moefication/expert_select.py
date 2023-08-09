@@ -9,18 +9,19 @@ from tqdm import tqdm
 from transformers import LlamaModel
 
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
+from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.visualization.plotter import plotter
 
 
 class BaseGate:
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -40,15 +41,15 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
-        select_criterion="plain",
-        criterion_config=None,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
+            select_criterion="plain",
+            criterion_config=None,
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -89,7 +90,7 @@ class MLPGate(BaseGate):
             elif self.select_criterion == "l2_norm":
                 threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
 
-                hidden_outputs_l2 = hidden_outputs * hidden_outputs  # 输出值L2范数
+                hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
                 hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
                 hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
 
@@ -103,16 +104,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-        self,
-        device,
-        batch_size=1024,
-        train_epochs=100,
-        lr=0.01,
-        accumulate_steps=1,
-        use_balance=False,
-        add_noise=False,
-        use_softmax=False,
-        balance_loss_lambda=0.0005,
+            self,
+            device,
+            batch_size=1024,
+            train_epochs=100,
+            lr=0.01,
+            accumulate_steps=1,
+            use_balance=False,
+            add_noise=False,
+            use_softmax=False,
+            balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层
@@ -165,6 +166,7 @@ class MLPGate(BaseGate):
             "acc": [],
             "epochs": []
         }
+        self.save_loss = 1000000
         self.save_acc = 0
         self.save_epoch = -1
 
@@ -287,8 +289,10 @@ class MLPGate(BaseGate):
 
             """Save best models"""
             cur_acc = sum(valid_acc_this_epoch) / len(valid_acc_this_epoch)
+            cur_loss = sum(valid_loss_this_epoch) / len(valid_loss_this_epoch)
             if cur_acc > self.save_acc:
                 self.save_acc = cur_acc
+                self.save_loss = cur_loss
                 self.save_epoch = epoch
                 self.save()
                 self.mlp_model = self.mlp_model.to(device)
@@ -304,7 +308,7 @@ class MLPGate(BaseGate):
         """Save training statistics"""
         # Save loss and acc
         save_file_name = os.path.join(self.config.save_path, self.config.template.format(self.layer_index))
-        with open("{}.log".format(save_file_name), 'a+') as fout:
+        with open("{}.log".format(save_file_name), 'w') as fout:
             fout.write("train_epochs: " + str(self.train_loss["epochs"]) + "\n")
             fout.write("train_loss: " + str([format(loss, '.4f') for loss in self.train_loss["loss"]]) + "\n")
             fout.write("train_acc: " + str([format(loss, '.4f') for loss in self.train_acc["acc"]]) + "\n")
@@ -324,110 +328,6 @@ class MLPGate(BaseGate):
         # Save acc
         with open("{}.acc".format(save_file_name), 'w') as fout:
             fout.write("best_acc: " + str(self.save_acc) + "\n")
+            fout.write("best_loss: " + str(self.save_loss) + "\n")
             fout.write("save_epoch: " + str(self.save_epoch) + "\n")
         # fmt: on
-
-
-def summarize_select_result(result_path, save_path):
-    # fmt: off
-    """从acc与log文件中汇总结果，给出训练曲线"""
-    layer_best_acc = {}
-    layer_best_epoch = {}
-
-    layer_train_epochs = {}
-    layer_train_losses = {}
-    layer_train_accs = {}
-    layer_valid_epochs = {}
-    layer_valid_losses = {}
-    layer_valid_accs = {}
-
-    for filename in tqdm(os.listdir(result_path), desc="loading files..."):
-
-        layer_index = -1  # 层号
-        for split_part in filename.split("."):  # layers.0.mlp.up_proj.weight
-            try:
-                layer_index = int(split_part)
-            except:
-                pass
-
-        if filename.endswith(".acc"):
-            with open(os.path.join(result_path, filename), "r", encoding="UTF-8") as file:
-                lines = file.readlines()
-                layer_best_acc[layer_index] = float(lines[0].split(" ")[1])  # best_acc: 0.352923583984375
-                layer_best_epoch[layer_index] = float(lines[1].split(" ")[1])  # save_epoch: 79
-
-        elif filename.endswith(".log"):
-            with open(os.path.join(result_path, filename), "r", encoding="UTF-8") as file:
-                lines = file.readlines()
-                for i in range(len(lines)):
-                    line = lines[i]  # train_acc: ['0.2017', '0.1989', ..., '0.2409', '0.2328']
-                    list_str = line.split(": ")[1].strip()  # ['0.2017', '0.1989', ..., '0.2409', '0.2328']
-                    list_str = list_str[1:-1]  # '0.2017', '0.1989', ..., '0.2409', '0.2328'
-                    list_elements = list_str.split(', ')  # '0.2017' '0.1989' ... '0.2409' '0.2328'
-                    float_list = [float(element.replace("\'", "")) for element in list_elements]  # 0.2017 0.1989 ... 0.2409 0.2328
-                    lines[i] = float_list
-                layer_train_epochs[layer_index] = [int(element) for element in lines[0]]
-                layer_train_losses[layer_index] = lines[1]
-                layer_train_accs[layer_index] = lines[2]
-                layer_valid_epochs[layer_index] = [int(element) for element in lines[3]]
-                layer_valid_losses[layer_index] = lines[4]
-                layer_valid_accs[layer_index] = lines[5]
-
-        else:
-            pass
-
-    layer_num = max([key for key in layer_best_acc.keys()])
-    epoch_num = max(layer_valid_epochs[0]) + 1
-    train_step_per_epoch = len(layer_train_epochs[0]) // len(set(layer_train_epochs[0]))
-    valid_step_per_epoch = len(layer_valid_epochs[0]) // len(set(layer_valid_epochs[0]))
-    p = plotter()
-
-    """收敛准确率——按层划分"""
-    p.add_figure("best_acc", xlabel="layers", ylabel="acc", title="best acc (avg {:.4f})".format(np.mean(list(layer_best_acc.values())).item()))
-    p.add_label("best_acc", "acc", dot_map=False)
-    for layer_index in range(layer_num):
-        if layer_index in layer_best_acc.keys():
-            p.add_data("best_acc", "acc", layer_index, layer_best_acc[layer_index])
-
-    """收敛步数——按层划分"""
-    p.add_figure("best_epoch", xlabel="layers", ylabel="epoch", title="best epoch (avg {:.1f})".format(np.mean(list(layer_best_epoch.values())).item()))
-    p.add_label("best_epoch", "epoch", dot_map=False)
-    for layer_index in range(layer_num):
-        if layer_index in layer_best_epoch.keys():
-            p.add_data("best_epoch", "epoch", layer_index, layer_best_epoch[layer_index])
-
-    """train准确率曲线——按epoch划分"""
-    p.add_figure("train_acc", xlabel="epoch", ylabel="acc", title="train acc")
-    for layer_index in layer_train_epochs.keys():
-        p.add_label("train_acc", "layer_{}".format(layer_index), markersize=4, dot_map=False)
-        for epoch in range(epoch_num):
-            p.add_data("train_acc", "layer_{}".format(layer_index),
-                       epoch, np.mean(layer_train_accs[layer_index][epoch * train_step_per_epoch:(epoch + 1) * train_step_per_epoch]).item())
-
-    """valid准确率曲线——按epoch划分"""
-    p.add_figure("valid_acc", xlabel="epoch", ylabel="acc", title="valid acc")
-    for layer_index in layer_valid_epochs.keys():
-        p.add_label("valid_acc", "layer_{}".format(layer_index), markersize=4, dot_map=False)
-        for epoch in range(epoch_num):
-            p.add_data("valid_acc", "layer_{}".format(layer_index),
-                       epoch, np.mean(layer_valid_accs[layer_index][epoch * valid_step_per_epoch:(epoch + 1) * valid_step_per_epoch]).item())
-
-    """train loss曲线——按epoch划分"""
-    p.add_figure("train_loss", xlabel="epoch", ylabel="loss", title="train loss")
-    for layer_index in layer_train_epochs.keys():
-        p.add_label("train_loss", "layer_{}".format(layer_index), markersize=4, dot_map=False)
-        for epoch in range(epoch_num):
-            p.add_data("train_loss", "layer_{}".format(layer_index),
-                       epoch, np.mean(layer_train_losses[layer_index][epoch * train_step_per_epoch:(epoch + 1) * train_step_per_epoch]).item())
-
-    """valid loss曲线——按epoch划分"""
-    p.add_figure("valid_loss", xlabel="epoch", ylabel="loss", title="valid loss")
-    for layer_index in layer_valid_epochs.keys():
-        p.add_label("valid_loss", "layer_{}".format(layer_index), markersize=4, dot_map=False)
-        for epoch in range(epoch_num):
-            p.add_data("valid_loss", "layer_{}".format(layer_index),
-                       epoch, np.mean(layer_valid_losses[layer_index][epoch * valid_step_per_epoch:(epoch + 1) * valid_step_per_epoch]).item())
-
-    p.save(path=save_path, close_graph=True)
-    print(f"Results saved to \"{save_path}\"!")
-    # fmt: on

@@ -12,6 +12,7 @@ from smoe.data.collate_fn import separate_collater
 from smoe.data.datasets_moefication import ShardDatasetForMoEGate
 from smoe.utils.io import torch_load_template_file
 from smoe.utils.moefication.expert_select import MLPGate
+from smoe.utils.moefication.visualize import visualize_expert_select_mlp
 
 
 # 多进程分词函数
@@ -84,6 +85,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
+    if args.save_visualization_path != "":
+        args.save_visualization_path = os.path.join(args.save_visualization_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
     if len(args.specify_layer) > torch.cuda.device_count():
         Warning(f"Number of GPUs({torch.cuda.device_count()}) is larger than number of layers({len(args.specify_layer)}), which will result in redundancy.")
     print(args, "\n")
@@ -143,4 +146,7 @@ if __name__ == "__main__":
                 process_bar.update()
                 print("Exception:", error)
     process_bar.close()
+
+    if args.save_visualization_path != "":
+        visualize_expert_select_mlp(args.save_path, args.save_visualization_path)
     print("Done.")

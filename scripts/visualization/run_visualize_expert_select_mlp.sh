@@ -14,6 +14,6 @@ save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/${split_ty
 gpus=0
 cpus=4
 OMP_NUM_THREADS=8 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
-  python -m smoe.entrypoint.visualization.visualize_expert_select \
+  python -m smoe.entrypoint.visualization.visualize_expert_select_mlp \
   --result_path ${result_path} \
   --save_path ${save_path}

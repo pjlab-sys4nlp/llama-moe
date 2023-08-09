@@ -8,7 +8,8 @@ from transformers import LlamaForCausalLM
 from smoe.data.collate_fn import separate_collater
 from smoe.data.datasets_moefication import ShardDatasetForMoEGate
 from smoe.utils.io import torch_load_template_file
-from smoe.utils.moefication.expert_select import MLPGate, summarize_select_result
+from smoe.utils.moefication.expert_select import MLPGate
+from smoe.utils.moefication.visualize import visualize_expert_select_mlp
 
 # fmt: off
 if __name__ == "__main__":
@@ -87,6 +88,6 @@ if __name__ == "__main__":
         center.train(device, batch_size=args.batch_size, train_epochs=args.epochs, lr=args.lr, accumulate_steps=1,
                      use_balance=True, add_noise=False, use_softmax=args.use_softmax, balance_loss_lambda=0.0001)
 
-        if args.save_visualization_path != "":
-            summarize_select_result(args.save_path, args.save_visualization_path)
+    if args.save_visualization_path != "":
+        visualize_expert_select_mlp(args.save_path, args.save_visualization_path)
     print("Done.")

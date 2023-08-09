@@ -13,10 +13,10 @@ for num_experts in 8 16; do
     for select_type in "plain" "positive" "l2_norm"; do
 
       result_path=/mnt/petrelfs/share_data/quxiaoye/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
-      save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
+      save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization-scheduler-train/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
 
       OMP_NUM_THREADS=8 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
-        python -m smoe.entrypoint.visualization.visualize_expert_select \
+        python -m smoe.entrypoint.visualization.visualize_expert_select_mlp \
         --result_path ${result_path} \
         --save_path ${save_path} & # 并行运行下一命令
       sleep 0.5 # 等待0.5s

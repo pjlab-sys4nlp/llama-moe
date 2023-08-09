@@ -133,6 +133,62 @@ class CommonDataset(Dataset):
 """for moe gate training"""
 
 
+class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读取
+    def __init__(self, path, parallel_mode="shards", file_load_index_range=None, shards_in_memory=8):  # shards_in_memory只在"shards"模式下有效
+        assert parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
+        self.parallel_mode = parallel_mode
+
+        filename_list = os.listdir(path)
+        filename_list.sort()
+
+        if file_load_index_range is None:  # 指定读取文件的范围
+            file_load_index_range = (0, len(filename_list) - 1)
+        filename_list = filename_list[file_load_index_range[0]: file_load_index_range[1]]
+
+        # 适用于单个shard较大的情况
+        if self.parallel_mode == "shards":  # 提前读取shards_in_memory个shard到内存并合并，之后各个workers并行读取内存中的数据
+            self.filepath_list = [os.path.join(path, name) for name in filename_list]
+            self.chunked_filepath_list = []
+            while len(self.filepath_list) > 0:
+                self.chunked_filepath_list.append(self.filepath_list[:shards_in_memory])
+            self.load_pos = -1
+            self.now_epoch = 0
+            self.load_shards()
+
+        # 适用于单个shard较小的情况
+        elif self.parallel_mode == "workers":  # 不提前读取shard到内存，而是运行时每个worker并行读取shard
+            self.filepath_list = [os.path.join(path, name) for name in filename_list]
+
+    def __len__(self):
+        if self.parallel_mode == "shards":
+            return len(self.examples)
+
+        elif self.parallel_mode == "workers":
+            return len(self.filepath_list)
+
+    def __getitem__(self, i):
+        if self.parallel_mode == "shards":
+            return self.examples[i]
+
+        elif self.parallel_mode == "workers":
+            return torch.load(self.filepath_list[i])
+
+    def load_shards(self):  # "shards"并行模式使用
+        object_load_pos = self.now_epoch % len(self.chunked_filepath_list)
+        if self.load_pos != object_load_pos:
+            self.load_pos = object_load_pos
+            self.examples = []
+            for filepath in tqdm(self.chunked_filepath_list[self.load_pos], desc="loading shards", leave=False):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+                tensor = torch.load(filepath)
+                tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
+                self.examples.extend(tensor_list)
+            print("Loaded total {len(self.examples)} examples.")
+
+    def next_epoch(self):  # "shards"并行模式使用
+        self.now_epoch += 1
+        self.load_shards()
+
+
 class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数据集读取
     def __init__(
         self,

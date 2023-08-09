@@ -1,6 +1,6 @@
 import argparse
 
-from smoe.utils.moefication.expert_select import summarize_select_result
+from smoe.utils.moefication.visualize import visualize_expert_select_mlp
 
 # fmt: off
 if __name__ == "__main__":
@@ -11,4 +11,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args, "\n")
 
-    summarize_select_result(args.result_path, args.save_path)
+    visualize_expert_select_mlp(args.result_path, args.save_path)
