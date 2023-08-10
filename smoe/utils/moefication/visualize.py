@@ -145,18 +145,15 @@ def visualize_swiglu_output(
     edge=(-1.0, 1.0),
     device="cpu",
 ):
+    # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
 
     # 划分 bin
-    bin_edges = torch.linspace(
-        edge[0], edge[1], num_bins + 1, device="cpu"
-    )  # 自定义 bin 的范围和数量
+    bin_edges = torch.linspace(edge[0], edge[1], num_bins + 1, device="cpu")  # 自定义 bin 的范围和数量
 
     # 准备数据集
     dataset = ShardDataset(hidden_outputs_path, parallel_mode="workers")
-    dataloader = DataLoader(
-        dataset, batch_size=1, shuffle=False, num_workers=16, pin_memory=True
-    )
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=16, pin_memory=True)
     iterator = iter(dataloader)
 
     # 读取数据
@@ -165,12 +162,8 @@ def visualize_swiglu_output(
         if step >= len(dataloader):
             break
         hidden_outputs = next(iterator).float().squeeze(0).to(device)
-        hidden_outputs = pass_kernel_function(
-            hidden_outputs, criterion=criterion
-        )  # 按照指标转化
-        bin_counts = torch.histc(
-            hidden_outputs, bins=num_bins, min=edge[0], max=edge[1]
-        )  # 使用 torch.histc 进行 bin 统计
+        hidden_outputs = pass_kernel_function(hidden_outputs, criterion=criterion)  # 按照指标转化
+        bin_counts = torch.histc(hidden_outputs, bins=num_bins, min=edge[0], max=edge[1])  # 使用 torch.histc 进行 bin 统计
         total_bin_counts += bin_counts.cpu().numpy()
 
     # 使用Matplotlib绘制柱状图
@@ -178,13 +171,7 @@ def visualize_swiglu_output(
     fig = plt.figure(fig_name)
     ax = fig.add_subplot(1, 1, 1)
 
-    ax.bar(
-        bin_edges[:-1],
-        total_bin_counts,
-        width=(bin_edges[1] - bin_edges[0]),
-        align="edge",
-        alpha=0.7,
-    )
+    ax.bar(bin_edges[:-1], total_bin_counts, width=(bin_edges[1] - bin_edges[0]), align="edge", alpha=0.7)
     ax.set_xlabel("SiwGLU Output")
     ax.set_ylabel("Density")
     ax.set_title(f"Distribution of SiwGLU Output ({neuron_type}) ({criterion})")
@@ -194,3 +181,4 @@ def visualize_swiglu_output(
     fig.savefig(os.path.join(save_path, fig_name + ".png"), dpi=640)
     plt.close(fig)
     print(f'Results saved to "{save_path}"!')
+    # fmt: on
