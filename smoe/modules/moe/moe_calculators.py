@@ -41,7 +41,6 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
 
         """各专家分别正向传播"""  # 此处应该有并行优化的空间 (如果单次forward不足以占满显卡利用率)
         expert_outputs = [self.experts(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
-        self.experts(split_x[i])
 
         """重组各个专家的输出，并进行加权"""
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出

@@ -6,9 +6,14 @@ import numpy as np
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
+from sklearn.preprocessing import MultiLabelBinarizer, Normalizer
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
+
+from smoe.data.collate_fn import separate_collater
+from smoe.data.datasets_moefication import ShardDataset
+from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
-from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.preprocessing import Normalizer
 
 
 def load_ffn_weight(model, template, layer):
@@ -89,3 +94,94 @@ class RandomSplit(LayerSplit):
         self.labels = np.arange(0, self.config.num_experts, dtype=int).tolist()  # list
         self.labels = self.labels * self.split_size
         random.shuffle(self.labels)
+
+
+class GraphSplit(LayerSplit):
+    def __init__(self, config, model, template, layer):
+        super().__init__(config, template, layer)
+        self.device = "cpu"
+        self.config = config
+        self.threshold = config.threshold  # 1 # threshold
+        self.template = template
+        self.save_path = config.save_path
+        self.model = model
+        self.model_dict = model.state_dict()
+        self.metric = config.metric
+        hidden_features_path = config.hidden_features_path
+        if "gate_proj" in template:
+            hidden_outputs_path = os.path.join(
+                hidden_features_path, "hidden_gate_outputs", "layer" + str(layer)
+            )
+        elif "up_proj" in template:
+            hidden_outputs_path = os.path.join(
+                hidden_features_path, "hidden_up_outputs", "layer" + str(layer)
+            )
+
+        dataset = ShardDataset(hidden_outputs_path, parallel_mode="workers")
+        self.dataloader = DataLoader(
+            dataset, batch_size=1, shuffle=False, num_workers=16, pin_memory=True
+        )
+
+    def load_param(self):
+        self.ffn_weight = load_ffn_weight(self.model_dict, self.template, self.layer)
+        self.neuron_num = self.ffn_weight.shape[0]
+        self.split_size = self.neuron_num // self.config.num_experts
+        assert self.split_size * self.config.num_experts == self.neuron_num
+
+    def split_and_save(self):
+        self.load_param()
+        ffn = torch.tensor(self.ffn_weight)
+
+        cnt = 0
+        adj = torch.zeros(ffn.shape[0], ffn.shape[0], device=self.device).float()
+        ffn = torch.tensor(ffn).to(self.device).transpose(0, 1)
+        iter_train = iter(self.dataloader)
+
+        for indx in tqdm(range(len(self.dataloader))):
+            hidden = next(iter_train)
+            hidden = hidden.to(self.device).float()
+            # res = hidden * hidden # 8192
+            res = pass_kernel_function(hidden, self.metric)
+            res = torch.clamp(
+                torch.bmm(res.transpose(1, 2), res).sum(0), max=self.threshold
+            )
+            print(self.layer, indx, torch.nonzero(torch.isnan(res)), flush=True)
+            # tqdm.write(f"{self.layer} {indx} {torch.nonzero(torch.isnan(res))}")
+            adj = adj + res
+
+        del hidden
+
+        adj = adj.cpu().numpy()
+        target = os.path.join(self.save_path, self.template.format(self.layer))
+
+        threshold = 0
+        pos = 10
+        while threshold == 0:
+            assert pos != 110
+            threshold = np.percentile(adj.reshape(-1), pos)
+            pos += 10
+        print("threshold", threshold, pos, adj.max())
+        threshold = threshold * 0.99
+        adj /= threshold
+
+        with open(target, "w") as fout:
+            edges = 0
+            for i in range(adj.shape[0]):
+                cnt = 0
+                for j in range(adj.shape[1]):
+                    if i == j or adj[i, j] < 1:
+                        pass
+                    else:
+                        cnt += 1
+                edges += cnt
+            assert edges > 0
+            fout.write("{} {} {}\n".format(adj.shape[0], edges // 2, "001"))
+            for i in range(adj.shape[0]):
+                vec = []
+                for j in range(adj.shape[1]):
+                    if i == j or adj[i, j] < 1:
+                        pass
+                    else:
+                        val = int(adj[i, j])
+                        vec.append([j + 1, val])
+                fout.write(" ".join(["{} {}".format(x[0], x[1]) for x in vec]) + "\n")
