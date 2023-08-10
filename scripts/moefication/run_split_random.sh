@@ -4,8 +4,8 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama2_7B"
 
-num_experts=8                         #  8  16
-template=layers.{}.mlp.gate_proj.weight #  gate_proj  up_proj
+num_experts=8       #  8  16
+proj_type=gate_proj #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
@@ -17,7 +17,7 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   python -m smoe.entrypoint.moefication.llama_split_random \
   --model_path ${model_path} \
   --save_path ${save_path} \
-  --template ${template} \
+  --template layers.{}.mlp.${proj_type}.weight \
   --num_experts ${num_experts}
 
 wait

@@ -15,13 +15,13 @@ from smoe.utils.visualization.plotter import plotter
 
 class BaseGate:
     def __init__(
-            self,
-            config,
-            llama_model,
-            train_loader,
-            valid_loader,
-            expert_indices,
-            layer_index,
+        self,
+        config,
+        llama_model,
+        train_loader,
+        valid_loader,
+        expert_indices,
+        layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -41,15 +41,15 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-            self,
-            config,
-            llama_model,
-            train_loader,
-            valid_loader,
-            expert_indices,
-            layer_index,
-            select_criterion="plain",
-            criterion_config=None,
+        self,
+        config,
+        llama_model,
+        train_loader,
+        valid_loader,
+        expert_indices,
+        layer_index,
+        select_criterion="plain",
+        criterion_config=None,
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -104,16 +104,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-            self,
-            device,
-            batch_size=1024,
-            train_epochs=100,
-            lr=0.01,
-            accumulate_steps=1,
-            use_balance=False,
-            add_noise=False,
-            use_softmax=False,
-            balance_loss_lambda=0.0005,
+        self,
+        device,
+        batch_size=1024,
+        train_epochs=100,
+        lr=0.01,
+        accumulate_steps=1,
+        use_balance=False,
+        add_noise=False,
+        use_softmax=False,
+        balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层
@@ -147,6 +147,7 @@ class MLPGate(BaseGate):
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
         # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, train_epochs)
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.01, patience=5)
+        # loss_function = torch.nn.BCEWithLogitsLoss()
         loss_function = torch.nn.KLDivLoss(reduction="batchmean")
 
         """Initialize training configs"""
