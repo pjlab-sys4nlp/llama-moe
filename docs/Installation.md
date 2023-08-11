@@ -12,5 +12,8 @@
 4. Install PyTorch (CUDA-11.8): `pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
 5. Install dependencies: `pip install -r requirements.txt`
 6. Install `flash-attn`: `pip install flash-attn==2.0.1 --no-build-isolation`
-7. Install `smoe` in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e): `pip install -e .[dev]`
-8. Setup `pre-commit` hooks: `pre-commit install`
+7. Install the latest Git: `conda install git`
+8. Clone the repo: `git clone git@github.com:pjlab-sys4nlp/train-moe.git` (If you don't setup the ssh key to GitHub, you may not able to clone through ssh. Check the [docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) about it.)
+9. Change current directory: `cd train-moe`
+10. Install `smoe` in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e): `pip install -e .[dev]`
+11. Setup `pre-commit` hooks: `pre-commit install`

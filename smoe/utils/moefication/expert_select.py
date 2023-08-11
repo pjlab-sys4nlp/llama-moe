@@ -147,6 +147,7 @@ class MLPGate(BaseGate):
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
         # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, train_epochs)
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.01, patience=5)
+        # loss_function = torch.nn.BCEWithLogitsLoss()
         loss_function = torch.nn.KLDivLoss(reduction="batchmean")
 
         """Initialize training configs"""

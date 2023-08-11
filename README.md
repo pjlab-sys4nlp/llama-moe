@@ -31,8 +31,3 @@ $ cd train-moe
 $ pip install -e .[dev]
 $ pre-commit install
 ```
-
-## 🔗 Experiments
-
-- CPT
-  - [MoEfication L2-norm 8选4 继续预训练实验](https://m04hsypyylv.feishu.cn/docx/R9Tid61U0oOuQ4xwrbGcyCyvnMf)

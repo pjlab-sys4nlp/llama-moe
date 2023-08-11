@@ -55,11 +55,11 @@ def change_forward(llama_model, device_id, save_path, template, save_interval=1)
         mlp.now_epoch = -1
         mlp.hidden_dim = llama_model.config.hidden_size
         mlp.hidden_neurons = llama_model.config.intermediate_size
-        mlp.save_path_hidden_inputs = os.path.join(save_path, "hidden_inputs", "layer" + str(layer))
+        mlp.save_path_hidden_inputs = os.path.join(save_path, "hidden_inputs", "layer" + str(layer_idx))
         if "gate_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_gate_outputs", "layer" + str(layer))
+            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_gate_outputs", "layer" + str(layer_idx))
         elif "up_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_up_outputs", "layer" + str(layer))
+            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_up_outputs", "layer" + str(layer_idx))
         mlp.save_interval = save_interval
 
         if not os.path.exists(mlp.save_path_hidden_inputs):
@@ -79,11 +79,10 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=4)  # 单次evaluate的batch_size
     parser.add_argument('--save_interval', type=int, default=1)  # 保存参数的batch间隔，调大会影响显存占用，但可以减少保存的文件个数
 
-    parser.add_argument('--local_rank', default=-1, type=int, help='node rank for distributed training')
-    parser.add_argument('--local-rank', default=-1, type=int, help='node rank for distributed training')
-
     args = parser.parse_args()
+    args.local_rank = int(os.environ["LOCAL_RANK"])
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-Hidden-Features")
+    print(args, "\n")
 
     print("cuda is_available: " + str(torch.cuda.is_available()))
     dist.init_process_group(backend='nccl')

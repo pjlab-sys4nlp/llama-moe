@@ -6,13 +6,8 @@ import numpy as np
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
-from sklearn.preprocessing import MultiLabelBinarizer, Normalizer
-from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
+from sklearn.preprocessing import MultiLabelBinarizer, Normalizer  # noqa: F401
 
-from smoe.data.collate_fn import separate_collater
-from smoe.data.datasets_moefication import ShardDataset
-from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
 
 

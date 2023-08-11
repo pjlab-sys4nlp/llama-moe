@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from smoe.models.llama_moefication.modeling_llama_moe import (
     LlamaMoEForCausalLM,
@@ -24,6 +25,12 @@ if __name__ == "__main__":
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
 
     args = parser.parse_args()
+    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Select" + str(args.num_selects))
+    if "gate_proj" in args.templates:
+        args.save_path += "-gate_proj"
+    elif "up_proj" in args.templates:
+        args.save_path += "-up_proj"
+    print(args, "\n")
 
     if args.convert_type == "LlamaMoEModel":
         convert_llama_model(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)
@@ -31,6 +38,8 @@ if __name__ == "__main__":
         convert_llama_model_for_causal_lm(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         convert_llama_model_for_sequence_classificaiton(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)
+    else:
+        raise ValueError
 
     # load test
     print("Loading converted LLaMA-MoE file for test...")
@@ -40,4 +49,6 @@ if __name__ == "__main__":
         model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.save_path)
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(args.save_path)
+    else:
+        raise ValueError
     print("Done.")

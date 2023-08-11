@@ -168,7 +168,7 @@ def _tsne(
     if isinstance(X, np.ndarray):
         X = torch.tensor(X, device=device)
 
-    if device == None:
+    if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if verbose:
