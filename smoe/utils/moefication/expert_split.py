@@ -6,8 +6,10 @@ import numpy as np
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
-from sklearn.preprocessing import MultiLabelBinarizer, Normalizer  # noqa: F401
+from tqdm import tqdm
 
+from smoe.data.datasets_moefication import ShardDataset
+from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
 
 
