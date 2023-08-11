@@ -64,14 +64,6 @@ def main():
     logger.info(f"Data args: {data_args}")
     logger.info(f"Training args: {training_args.to_json_string()}")
 
-    # HACK(tzhu): update num_tokens_per_batch ugly
-    training_args.num_tokens_per_batch = (
-        data_args.block_size
-        * training_args.per_device_train_batch_size
-        * training_args.gradient_accumulation_steps
-        * training_args.world_size
-    )
-
     # Detecting last checkpoint.
     last_checkpoint = None
     if (
