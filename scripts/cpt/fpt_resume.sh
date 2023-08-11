@@ -1,8 +1,10 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-64gpus-bs16_2-zero1default
-#SBATCH --output=logs/%x-%j.log
-#SBATCH --error=logs/%x-%j.log
+set -vx
+
+#SBATCH --job-name=cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316
+#SBATCH --output=logs/%x-part2-%j.log
+#SBATCH --error=logs/%x-part2-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -50,7 +52,8 @@ export LOGLEVEL=INFO
     echo "#tokens/batch: $tokens_per_batch"
 
     data_cache=resources/cache
-    output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    # output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    output_dir=outputs/$SLURM_JOB_NAME
     echo "output_dir: $output_dir"
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
@@ -69,6 +72,7 @@ export LOGLEVEL=INFO
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
+            --resume_from_checkpoint outputs/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-6000 \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
