@@ -16,17 +16,22 @@ if __name__ == "__main__":
     parser.add_argument('--metric', type=str, default="l2", choices=("l2", "cos"))
 
     args = parser.parse_args()
-    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Split-Clustering-" + args.metric)
-    print(args, "\n")
+    args.save_path = os.path.join(
+        args.save_path,
+        os.path.split(args.model_path)[1]
+        + "-"
+        + str(args.num_experts)
+        + "Expert-Split-Clustering",
+    )
 
     print("Loading llama model...")
     model = LlamaForCausalLM.from_pretrained(args.model_path).model
 
-    templates = args.templates.split(',')
+    templates = args.templates.split(",")
     for template in templates:
         for i in tqdm.tqdm(range(model.config.num_hidden_layers)):
-            split = ClusteringSplit(args, model, template, i, distance=args.metric)
-            split.split(cpu_threads=32)
+            split = ClusteringSplit(args, model, template, i)
+            split.split()
             split.cnt()
             split.save()
     print("Done.")

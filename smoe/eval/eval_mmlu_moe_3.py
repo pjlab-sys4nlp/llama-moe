@@ -6,13 +6,14 @@ import time
 import numpy as np
 import pandas as pd
 import torch
-from crop import crop
 from datasets import load_dataset
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 from transformers import LlamaTokenizer
 
 from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.utils.eval.crop import crop
+from smoe.utils.eval.gather_results import gather_results
 
 choices = ["A", "B", "C", "D"]
 
@@ -156,6 +157,7 @@ def main(args):
 
     weighted_acc = np.mean(np.concatenate(all_cors))
     print("Average accuracy: {:.3f}".format(weighted_acc))
+    gather_results(args)
 
 
 if __name__ == "__main__":
