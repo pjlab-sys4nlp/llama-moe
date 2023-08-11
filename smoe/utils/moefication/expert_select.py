@@ -1,4 +1,3 @@
-import ast
 import os
 
 import numpy as np
@@ -10,7 +9,6 @@ from transformers import LlamaModel
 
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
 from smoe.utils.kernel_function import pass_kernel_function
-from smoe.utils.visualization.plotter import plotter
 
 
 class BaseGate:
@@ -146,7 +144,7 @@ class MLPGate(BaseGate):
 
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
         # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, train_epochs)
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.01, patience=5)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.03, patience=5)
         # loss_function = torch.nn.BCEWithLogitsLoss()
         loss_function = torch.nn.KLDivLoss(reduction="batchmean")
 
