@@ -310,7 +310,6 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
             hidden_outputs_filepath_list = [os.path.join(hidden_outputs_path, name) for name in hidden_outputs_filename_list]
 
             self.chunked_hidden_inputs_filepath_list = []
-
             self.chunked_hidden_outputs_filepath_list = []
 
             while len(hidden_inputs_filepath_list) > 0:

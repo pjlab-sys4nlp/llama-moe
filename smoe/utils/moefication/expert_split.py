@@ -52,8 +52,8 @@ class ClusteringSplit(LayerSplit):
 
     def split(self, cpu_threads=-1):
         self.load_param()
-        ffn_weight_norm = sklearn.preprocessing.normalize(self.ffn_weight)
-        # ffn_weight_norm = Normalizer().transform(self.ffn_weight)
+        # ffn_weight_norm = sklearn.preprocessing.normalize(self.ffn_weight)
+        ffn_weight_norm = Normalizer().transform(self.ffn_weight)
 
         if self.distance.lower() == "l2":
             kmeans = KMeansConstrained(

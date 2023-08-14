@@ -12,7 +12,7 @@ hidden_features_path=${data_path}/moefication_results/features/${llama_size}-Hid
 gpus=1
 cpus=16
 for visualize_criterion in "plain" "l1_norm" "l2_norm"; do
-  for proj_type in "up_proj"; do
+  for proj_type in "gate_proj" "up_proj"; do
 
     save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/swiglu-output/${llama_size}/${proj_type}-${visualize_criterion}
 

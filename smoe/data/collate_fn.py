@@ -66,10 +66,7 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
 
 
 def separate_collater(batch):
-    return (
-        torch.cat([item[0] for item in batch], dim=0),
-        torch.cat([item[1] for item in batch], dim=0),
-    )
+    return [torch.cat([item[i] for item in batch], dim=0) for i in range(len(batch[0]))]
 
 
 class padding_collater:

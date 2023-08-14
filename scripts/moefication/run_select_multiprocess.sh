@@ -21,7 +21,7 @@ split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_exper
 hidden_features_path=${data_path}/moefication_results/features/${llama_size}-Hidden-Features
 save_path=${data_path}/moefication_results/select/${split_type}
 
-save_visualization_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization-scheduler-train2/${split_type}-${select_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}
+save_visualization_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/expert-select/${split_type}-${select_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}
 
 gpus=4
 cpus=$((gpus * 16))
