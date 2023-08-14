@@ -15,14 +15,9 @@ batch_size=1024
 epochs=200
 lr=0.01
 
-train_percent=0.95
-batch_size=1024
-epochs=200
-lr=0.01
-
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
-split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_experts}Expert-Split-${split_type}-${select_type}
+split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_experts}Expert-Split-${split_type}
 hidden_features_path=${data_path}/moefication_results/features/${llama_size}-Hidden-Features
 save_path=${data_path}/moefication_results/select/${split_type}
 
