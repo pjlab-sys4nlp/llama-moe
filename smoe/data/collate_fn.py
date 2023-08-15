@@ -2,6 +2,7 @@ from typing import Any, Mapping
 
 import numpy as np
 import torch
+import torch.nn.utils.rnn as rnn_utils
 
 
 def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
@@ -38,9 +39,9 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
     try:
         for k, v in first.items():
             if (
-                k not in ("label", "label_ids")
-                and v is not None
-                and not isinstance(v, str)
+                    k not in ("label", "label_ids")
+                    and v is not None
+                    and not isinstance(v, str)
             ):
                 if isinstance(v, torch.Tensor):
                     batch[k] = torch.stack([f[k] for f in features])
@@ -51,9 +52,9 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
     except ValueError:  # quick fix by simply take the first example
         for k, v in first.items():
             if (
-                k not in ("label", "label_ids")
-                and v is not None
-                and not isinstance(v, str)
+                    k not in ("label", "label_ids")
+                    and v is not None
+                    and not isinstance(v, str)
             ):
                 if isinstance(v, torch.Tensor):
                     batch[k] = torch.stack([features[0][k]] * len(features))
@@ -65,14 +66,29 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
     return batch
 
 
-def separate_collater(batch):
-    return [torch.cat([item[i] for item in batch], dim=0) for i in range(len(batch[0]))]
+def identity_collator(examples):  # 不对数据进行处理
+    return examples
 
 
-class padding_collater:
-    # 自动padding到最大长度的collate_fn
-    def __init__(self, tokenizer):
-        self.tokenizer = tokenizer
+def tensor_cat_collator(examples):  # 拼接tensor
+    return torch.cat(examples, dim=0)
 
-    def __call__(self, batch):
-        return self.tokenizer.pad(batch, return_tensors="pt")
+
+class tensor_cat_padding_collater:  # 拼接tensor，并padding到最大长度
+    def __init__(self, padding_id):
+        self.padding_id = padding_id
+
+    def __call__(self, examples):
+        return rnn_utils.pad_sequence(examples, batch_first=True, padding_value=self.padding_id)
+
+
+def tensor_list_cat_collator(examples):  # 拼接list中对应位置的tensor，返回list
+    return [torch.cat([tensor[i] for tensor in examples], dim=0) for i in range(len(examples[0]))]
+
+
+class tensor_list_cat_padding_collater:  # 拼接list中对应位置的tensor，并padding到最大长度，返回list
+    def __init__(self, padding_id):
+        self.padding_id = padding_id
+
+    def __call__(self, examples):
+        return [torch.cat([rnn_utils.pad_sequence(tensor[i], batch_first=True, padding_value=self.padding_id) for tensor in examples], dim=0) for i in range(len(examples[0]))]

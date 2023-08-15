@@ -6,6 +6,8 @@ import numpy as np
 import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
+from sklearn.preprocessing import Normalizer
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from smoe.data.datasets_moefication import ShardDataset
@@ -113,6 +115,8 @@ class GraphSplit(LayerSplit):
             hidden_outputs_path = os.path.join(
                 hidden_features_path, "hidden_up_outputs", "layer" + str(layer)
             )
+        else:
+            raise ValueError
 
         dataset = ShardDataset(hidden_outputs_path, parallel_mode="workers")
         self.dataloader = DataLoader(

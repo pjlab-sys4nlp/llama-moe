@@ -13,13 +13,13 @@ from smoe.utils.kernel_function import pass_kernel_function
 
 class BaseGate:
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -39,15 +39,15 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
-        select_criterion="plain",
-        criterion_config=None,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
+            select_criterion="plain",
+            criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -85,12 +85,22 @@ class MLPGate(BaseGate):
                 scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
                 # scores /= scores.max()  # 归一化
 
+            elif self.select_criterion == "l1_norm":
+                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+
+                hidden_outputs_l1 = pass_kernel_function(hidden_outputs, criterion="l1_norm")  # 输出值L1范数
+                # hidden_outputs_mask = (hidden_outputs_l1 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+                # hidden_outputs_l1[hidden_outputs_mask] = 0  # 死神经元的输出置零
+
+                scores = torch.matmul(hidden_outputs_l1, expert_masks)  # 各个专家所对应神经元的输出值L1范数总值，shape(batch_size, expert_num)
+                # scores /= scores.max()  # 归一化
+
             elif self.select_criterion == "l2_norm":
-                threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
 
                 hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
-                hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
-                hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
+                # hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+                # hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
 
                 scores = torch.matmul(hidden_outputs_l2, expert_masks)  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
                 # scores /= scores.max()  # 归一化
@@ -102,16 +112,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-        self,
-        device,
-        batch_size=1024,
-        train_epochs=100,
-        lr=0.01,
-        accumulate_steps=1,
-        use_balance=False,
-        add_noise=False,
-        use_softmax=False,
-        balance_loss_lambda=0.0005,
+            self,
+            device,
+            batch_size=1024,
+            train_epochs=100,
+            lr=0.01,
+            accumulate_steps=1,
+            use_balance=False,
+            add_noise=False,
+            use_softmax=False,
+            balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层

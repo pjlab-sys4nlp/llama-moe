@@ -6,10 +6,11 @@ llama_size="llama_7B"
 
 num_experts=16           #  8  16
 num_selects=4            #  2  4
-split_type=Clustering-l2 #  Clustering-l2  Clustering-cos  Random
-select_type=l2_norm      #  plain  positive  l2_norm
+split_type=Clustering-l2 #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+select_type=l2_norm      #  plain  positive  l1_norm  l2_norm
 proj_type=gate_proj      #  gate_proj  up_proj
 
+data_use_percent=1.0
 train_percent=0.95
 batch_size=1024
 epochs=200
@@ -40,6 +41,7 @@ for specify_layer in "0 1 2 3 4 5 6 7" "8 9 10 11 12 13 14 15" "16 17 18 19 20 2
     --select_criterion ${select_type} \
     --num_threads ${gpus} \
     --use_softmax \
+    --data_use_percent ${data_use_percent} \
     --train_percent ${train_percent} \
     --batch_size ${batch_size} \
     --epochs ${epochs} \
