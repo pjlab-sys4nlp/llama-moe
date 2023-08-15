@@ -2,8 +2,9 @@ import torch
 from torch import nn
 
 
-# fmt: off
-class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $num_experts$ times with re-batch optimization
+class UniversalCalculator(
+    nn.Module
+):  # traditional calculation mode, forward $num_experts$ times with re-batch optimization
     """
     https://github.com/YeonwooSung/Pytorch_mixture-of-experts
     接收topK scores的DisPatcher，相比原版的SparseDispatcher进行了计算上的优化
@@ -17,6 +18,7 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         self.num_experts = experts.num_experts
 
     def forward(self, x, topK_indices, topK_scores):
+        # fmt: off
         """正向传播"""
         """临时变量"""
         batch_size = topK_indices.size(0)
@@ -53,6 +55,7 @@ class UniversalCalculator(nn.Module):  # traditional calculation mode, forward $
         # combined[combined == 0] = np.finfo(float).eps
         # back to log space
         return y
+        # fmt: on
 
 
 """下述代码为失败方案，不要启用"""

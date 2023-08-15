@@ -47,7 +47,7 @@ class MLPGate(BaseGate):
         expert_indices,
         layer_index,
         select_criterion="plain",
-        criterion_config=None,
+        criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -85,12 +85,22 @@ class MLPGate(BaseGate):
                 scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
                 # scores /= scores.max()  # 归一化
 
+            elif self.select_criterion == "l1_norm":
+                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+
+                hidden_outputs_l1 = pass_kernel_function(hidden_outputs, criterion="l1_norm")  # 输出值L1范数
+                # hidden_outputs_mask = (hidden_outputs_l1 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+                # hidden_outputs_l1[hidden_outputs_mask] = 0  # 死神经元的输出置零
+
+                scores = torch.matmul(hidden_outputs_l1, expert_masks)  # 各个专家所对应神经元的输出值L1范数总值，shape(batch_size, expert_num)
+                # scores /= scores.max()  # 归一化
+
             elif self.select_criterion == "l2_norm":
-                threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
 
                 hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
-                hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
-                hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
+                # hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+                # hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
 
                 scores = torch.matmul(hidden_outputs_l2, expert_masks)  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
                 # scores /= scores.max()  # 归一化
