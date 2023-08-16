@@ -5,7 +5,6 @@ import random
 import torch
 import torch.distributed as dist
 from torch.utils.data import ConcatDataset
-
 from tqdm import tqdm
 from transformers import LlamaForCausalLM
 from transformers.models.llama.tokenization_llama_fast import LlamaTokenizer

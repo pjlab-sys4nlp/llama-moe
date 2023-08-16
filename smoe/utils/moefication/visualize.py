@@ -140,14 +140,14 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
 
 def visualize_swiglu_output(
-        hidden_outputs_path,
-        save_path,
-        neuron_type,
-        layer_idx,
-        criterion="plain",
-        num_bins=1000,
-        edge=(-1.0, 1.0),
-        device="cpu",
+    hidden_outputs_path,
+    save_path,
+    neuron_type,
+    layer_idx,
+    criterion="plain",
+    num_bins=1000,
+    edge=(-1.0, 1.0),
+    device="cpu",
 ):
     # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
