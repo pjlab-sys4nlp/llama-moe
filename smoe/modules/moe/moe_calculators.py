@@ -2,9 +2,8 @@ import torch
 from torch import nn
 
 
-class UniversalCalculator(
-    nn.Module
-):  # traditional calculation mode, forward $num_experts$ times with re-batch optimization
+class UniversalCalculator(nn.Module):
+    # traditional calculation mode, forward $num_experts$ times with re-batch optimization
     """
     https://github.com/YeonwooSung/Pytorch_mixture-of-experts
     接收topK scores的DisPatcher，相比原版的SparseDispatcher进行了计算上的优化

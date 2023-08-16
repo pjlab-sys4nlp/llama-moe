@@ -13,13 +13,13 @@ from smoe.utils.kernel_function import pass_kernel_function
 
 class BaseGate:
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -39,32 +39,39 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
-        select_criterion="plain",
-        criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
+            select_criterion="plain",
+            mlp_init_criterion="weight",
+            criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
         )
-        self.available_criterion = ("plain", "positive", "l2_norm")
-        assert select_criterion in self.available_criterion
+        self.available_select_criterion = ("plain", "positive", "l1_norm", "l2_norm")
+        self.available_mlp_init_criterion = ("random", "weight")
+        assert select_criterion in self.available_select_criterion
+        assert mlp_init_criterion in self.available_mlp_init_criterion
 
         self.type = "select_mlp"
 
         self.select_criterion = select_criterion
+        self.mlp_init_criterion = mlp_init_criterion
         self.criterion_config = criterion_config
 
     def mlp_gate_weights_init(self, module):
         # fmt: off
         if isinstance(module, torch.nn.Linear):
             if module.weight.shape[-1] == self.hidden_dim:  # 第一层，用所有专家权重的中心点初始化，shape(expert_num, input_dim)
-                module.weight.data = torch.from_numpy(self.centers).float()  # 不理解有什么道理，这样会使gate初始偏向选择与权重方向最相似的输入，使其缺乏变换能力
+                if self.available_mlp_init_criterion == "weight":
+                    module.weight.data = torch.from_numpy(self.centers).float()  # 不理解有什么道理，这样会使gate初始偏向选择与权重方向最相似的输入，使其缺乏变换能力
+                elif self.available_mlp_init_criterion == "random":
+                    module.weight.data = torch.normal(0, 1.0, module.weight.data.shape)
             else:  # 第二层，使用对角矩阵初始化，意图平衡专家间的知识
                 module.weight.data = torch.eye(module.weight.data.shape[0])
                 # torch.nn.init.normal_(m.weight.data)
@@ -112,16 +119,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-        self,
-        device,
-        batch_size=1024,
-        train_epochs=100,
-        lr=0.01,
-        accumulate_steps=1,
-        use_balance=False,
-        add_noise=False,
-        use_softmax=False,
-        balance_loss_lambda=0.0005,
+            self,
+            device,
+            batch_size=1024,
+            train_epochs=100,
+            lr=0.01,
+            accumulate_steps=1,
+            use_balance=False,
+            add_noise=False,
+            use_softmax=False,
+            balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层

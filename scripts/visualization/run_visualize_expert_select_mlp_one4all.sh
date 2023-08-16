@@ -2,7 +2,7 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama2_7B"
+llama_size="llama_7B"
 
 # 定义 num_selects 数组，与 num_experts 一一对应
 declare -a num_experts_array=(8 16)
@@ -14,8 +14,8 @@ cpus=4
 for idx in "${!num_selects_array[@]}"; do
   num_experts="${num_experts_array[$idx]}"
   num_selects="${num_selects_array[$idx]}"
-  for split_type in "Clustering-l2" "Clustering-cos" "Random"; do
-    for select_type in "plain" "positive" "l2_norm"; do
+  for split_type in "Graph-l1_norm" "Graph-l2_norm" "Clustering-l2" "Clustering-cos" "Random"; do
+    for select_type in "plain" "positive" "l1_norm" "l2_norm"; do
       for proj_type in "gate_proj" "up_proj"; do
 
         result_path=/mnt/petrelfs/share_data/quxiaoye/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}

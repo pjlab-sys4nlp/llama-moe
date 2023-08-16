@@ -66,9 +66,9 @@ def main():
     # Detecting last checkpoint.
     last_checkpoint = None
     if (
-        os.path.isdir(training_args.output_dir)
-        and training_args.do_train
-        and not training_args.overwrite_output_dir
+            os.path.isdir(training_args.output_dir)
+            and training_args.do_train
+            and not training_args.overwrite_output_dir
     ):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
@@ -77,7 +77,7 @@ def main():
                 " not empty. Use --overwrite_output_dir to overcome."
             )
         elif (
-            last_checkpoint is not None and training_args.resume_from_checkpoint is None
+                last_checkpoint is not None and training_args.resume_from_checkpoint is None
         ):
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid"
@@ -219,7 +219,7 @@ def main():
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
         logger.info(
-            f"Training new model from scratch - Total size={n_params/2**20:.2f}M params"
+            f"Training new model from scratch - Total size={n_params / 2 ** 20:.2f}M params"
         )
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
@@ -251,6 +251,7 @@ def main():
             else None
         ),
     )
+
     # Training
     if training_args.do_train:
         checkpoint = None

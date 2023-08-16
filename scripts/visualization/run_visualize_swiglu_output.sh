@@ -4,7 +4,7 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama_7B"
 
-proj_type=up_proj         #  gate_proj  up_proj
+proj_type=up_proj           #  gate_proj  up_proj
 visualize_criterion=l2_norm #  plain  l1_norm  l2_norm
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
