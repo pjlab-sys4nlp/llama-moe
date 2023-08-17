@@ -2,11 +2,11 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama2_7B"
+llama_size="llama_13B"
 
 num_experts=8       #  8  16
 metric=cos          #  l2  cos
-proj_type=gate_proj #  gate_proj  up_proj
+proj_type=up_proj #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}

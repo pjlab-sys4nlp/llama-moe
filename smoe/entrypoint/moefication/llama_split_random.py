@@ -1,7 +1,7 @@
 import argparse
 import os
 
-import tqdm
+from tqdm import tqdm
 from transformers import LlamaConfig
 
 from smoe.utils.moefication.expert_split import RandomSplit
@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     templates = args.templates.split(',')
     for template in templates:
-        for i in tqdm.tqdm(range(config.num_hidden_layers)):
+        for i in tqdm(range(config.num_hidden_layers)):
             split = RandomSplit(args, config, template, i)
             split.split()
             split.cnt()

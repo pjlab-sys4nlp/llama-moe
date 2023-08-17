@@ -38,6 +38,19 @@ class LayerSplit:
         print(Counter(self.labels))
 
 
+class RandomSplit(LayerSplit):
+    def __init__(self, config, model_config, template, layer):
+        super().__init__(config, template, layer)
+        self.model_config = model_config
+        self.neuron_num = model_config.intermediate_size
+        self.split_size = self.neuron_num // self.config.num_experts
+
+    def split(self):
+        self.labels = np.arange(0, self.config.num_experts, dtype=int).tolist()  # list
+        self.labels = self.labels * self.split_size
+        random.shuffle(self.labels)
+
+
 class ClusteringSplit(LayerSplit):
     def __init__(self, config, model, template, layer, distance="l2"):
         super().__init__(config, template, layer)
@@ -80,19 +93,6 @@ class ClusteringSplit(LayerSplit):
             ).fit(ffn_weight_norm, None)
 
         self.labels = [x for x in kmeans.labels_]
-
-
-class RandomSplit(LayerSplit):
-    def __init__(self, config, model_config, template, layer):
-        super().__init__(config, template, layer)
-        self.model_config = model_config
-        self.neuron_num = model_config.intermediate_size
-        self.split_size = self.neuron_num // self.config.num_experts
-
-    def split(self):
-        self.labels = np.arange(0, self.config.num_experts, dtype=int).tolist()  # list
-        self.labels = self.labels * self.split_size
-        random.shuffle(self.labels)
 
 
 class GraphSplit(LayerSplit):
@@ -186,3 +186,14 @@ class GraphSplit(LayerSplit):
                         val = int(adj[i, j])
                         vec.append([j + 1, val])
                 fout.write(" ".join(["{} {}".format(x[0], x[1]) for x in vec]) + "\n")
+
+
+class GradientSplit(LayerSplit):
+    def __init__(self, config, model, template, layer):
+        super().__init__(config, template, layer)
+        self.model = model
+        self.neuron_num = model.config.intermediate_size
+        self.split_size = self.neuron_num // self.config.num_experts
+
+    def split(self):
+        raise NotImplementedError

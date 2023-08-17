@@ -219,7 +219,7 @@ def main():
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
         logger.info(
-            f"Training new model from scratch - Total size={n_params/2**20:.2f}M params"
+            f"Training new model from scratch - Total size={n_params / 2 ** 20:.2f}M params"
         )
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
@@ -251,6 +251,7 @@ def main():
             else None
         ),
     )
+
     # Training
     if training_args.do_train:
         checkpoint = None

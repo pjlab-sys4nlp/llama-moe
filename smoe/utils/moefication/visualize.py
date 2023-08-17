@@ -71,6 +71,10 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
             else:
                 pass
 
+    if len(layer_best_acc) == 0:
+        print(f"No selection results in \"{result_path}\" for \"{proj_type}\"")
+        return
+
     layer_num = max([key for key in layer_best_acc.keys()])
     epoch_num = max([max(layer_valid_epochs[key]) + 1 for key in layer_valid_epochs.keys()])
     train_step_per_epoch = len(layer_train_epochs[0]) // len(set(layer_train_epochs[0]))
@@ -79,21 +83,21 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
     """收敛时valid 准确率——按层划分"""
     p.add_figure("best_acc", xlabel="layers", ylabel="acc", title="best acc (avg {:.4f})".format(np.mean(list(layer_best_acc.values())).item()))
-    p.add_label("best_acc", "acc", dot_map=False)
+    p.add_label("best_acc", "acc", dot_graph=False)
     for layer_index in range(layer_num):
         if layer_index in layer_best_acc.keys():
             p.add_data("best_acc", "acc", layer_index, layer_best_acc[layer_index])
 
     """收敛时valid loss——按层划分"""
     p.add_figure("best_loss", xlabel="layers", ylabel="loss", title="best loss (avg {:.4f})".format(np.mean(list(layer_best_loss.values())).item()))
-    p.add_label("best_loss", "loss", dot_map=False)
+    p.add_label("best_loss", "loss", dot_graph=False)
     for layer_index in range(layer_num):
         if layer_index in layer_best_loss.keys():
             p.add_data("best_loss", "loss", layer_index, layer_best_loss[layer_index])
 
     """收敛步数——按层划分"""
     p.add_figure("best_epoch", xlabel="layers", ylabel="epoch", title="best epoch (avg {:.1f})".format(np.mean(list(layer_save_epoch.values())).item()))
-    p.add_label("best_epoch", "epoch", dot_map=False)
+    p.add_label("best_epoch", "epoch", dot_graph=False)
     for layer_index in range(layer_num):
         if layer_index in layer_save_epoch.keys():
             p.add_data("best_epoch", "epoch", layer_index, layer_save_epoch[layer_index])
@@ -101,7 +105,7 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
     """train准确率曲线——按epoch划分"""
     p.add_figure("train_acc", xlabel="epoch", ylabel="acc", title="train acc")
     for layer_index in layer_train_epochs.keys():
-        p.add_label("train_acc", "layer_{}".format(layer_index), markersize=4, dot_map=False)
+        p.add_label("train_acc", "layer_{}".format(layer_index), markersize=4, dot_graph=False)
         for epoch in range(epoch_num):
             p.add_data("train_acc", "layer_{}".format(layer_index),
                        epoch, np.mean(layer_train_accs[layer_index][epoch * train_step_per_epoch:(epoch + 1) * train_step_per_epoch]).item())
@@ -109,7 +113,7 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
     """valid准确率曲线——按epoch划分"""
     p.add_figure("valid_acc", xlabel="epoch", ylabel="acc", title="valid acc")
     for layer_index in layer_valid_epochs.keys():
-        p.add_label("valid_acc", "layer_{}".format(layer_index), markersize=4, dot_map=False)
+        p.add_label("valid_acc", "layer_{}".format(layer_index), markersize=4, dot_graph=False)
         for epoch in range(epoch_num):
             p.add_data("valid_acc", "layer_{}".format(layer_index),
                        epoch, np.mean(layer_valid_accs[layer_index][epoch * valid_step_per_epoch:(epoch + 1) * valid_step_per_epoch]).item())
@@ -117,7 +121,7 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
     """train loss曲线——按epoch划分"""
     p.add_figure("train_loss", xlabel="epoch", ylabel="loss", title="train loss")
     for layer_index in layer_train_epochs.keys():
-        p.add_label("train_loss", "layer_{}".format(layer_index), markersize=4, dot_map=False)
+        p.add_label("train_loss", "layer_{}".format(layer_index), markersize=4, dot_graph=False)
         for epoch in range(epoch_num):
             p.add_data("train_loss", "layer_{}".format(layer_index),
                        epoch, np.mean(layer_train_losses[layer_index][epoch * train_step_per_epoch:(epoch + 1) * train_step_per_epoch]).item())
@@ -125,12 +129,12 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
     """valid loss曲线——按epoch划分"""
     p.add_figure("valid_loss", xlabel="epoch", ylabel="loss", title="valid loss")
     for layer_index in layer_valid_epochs.keys():
-        p.add_label("valid_loss", "layer_{}".format(layer_index), markersize=4, dot_map=False)
+        p.add_label("valid_loss", "layer_{}".format(layer_index), markersize=4, dot_graph=False)
         for epoch in range(epoch_num):
             p.add_data("valid_loss", "layer_{}".format(layer_index),
                        epoch, np.mean(layer_valid_losses[layer_index][epoch * valid_step_per_epoch:(epoch + 1) * valid_step_per_epoch]).item())
 
-    p.save(path=save_path, close_graph=True)
+    p.save(path=save_path, close_graph=True, bbox_inches="tight")
     print(f"Results saved to \"{save_path}\"!")
     # fmt: on
 
@@ -178,7 +182,7 @@ def visualize_swiglu_output(
 
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    fig.savefig(os.path.join(save_path, fig_name + ".png"), dpi=640)
+    fig.savefig(os.path.join(save_path, fig_name + ".png"), dpi=640, bbox_inches="tight")
     plt.close(fig)
     print(f'Results saved to "{save_path}"!')
     # fmt: on

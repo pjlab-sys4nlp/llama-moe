@@ -1,35 +1,20 @@
 import argparse
 import os
 
-import tqdm
+from tqdm import tqdm
 from transformers import LlamaForCausalLM
 
 from smoe.utils.moefication.expert_split import GraphSplit
 
 if __name__ == "__main__":
+    # fmt: off
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, default="./model_path")
     parser.add_argument("--metric", type=str, default="l1_norm")
     parser.add_argument("--threshold", type=int, default=1)
-    parser.add_argument(
-        "--hidden_features_path",
-        type=str,
-        default="./hidden_features_path",
-    )
-    parser.add_argument(
-        "--save_path",
-        type=str,
-        default="./save_path",
-    )
-    parser.add_argument(
-        "--templates",
-        type=str,
-        default="layers.{}.mlp.gate_proj.weight",
-        help=(
-            "weight names of the first linear layer in each FFN (use comma to separate"
-            " multiple templates)"
-        ),
-    )
+    parser.add_argument("--hidden_features_path", type=str, default="./hidden_features_path", )
+    parser.add_argument("--save_path", type=str, default="./save_path", )
+    parser.add_argument("--templates", type=str, default="layers.{}.mlp.gate_proj.weight", help="weight names of the first linear layer in each FFN (use comma to separate multiple templates)")
     parser.add_argument("--num_experts", type=int, default=8, help="number of experts")
 
     args = parser.parse_args()
@@ -51,8 +36,9 @@ if __name__ == "__main__":
 
     templates = args.templates.split(",")
     for template in templates:
-        for i in tqdm.tqdm(range(model.config.num_hidden_layers)):
+        for i in tqdm(range(model.config.num_hidden_layers)):
             print("now is layer: ", str(i))
             split = GraphSplit(args, model, template, i)
             split.split_and_save()
     print("Done.")
+    # fmt: on
