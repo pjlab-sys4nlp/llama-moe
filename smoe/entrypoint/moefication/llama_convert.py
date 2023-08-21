@@ -38,6 +38,8 @@ if __name__ == "__main__":
         convert_llama_model_for_causal_lm(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         convert_llama_model_for_sequence_classificaiton(args.model_path, args.split_file_path, args.select_file_path, args.save_path, args.templates, args.num_experts, args.num_selects)
+    else:
+        raise ValueError
 
     # load test
     print("Loading converted LLaMA-MoE file for test...")
@@ -47,4 +49,6 @@ if __name__ == "__main__":
         model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.save_path)
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(args.save_path)
+    else:
+        raise ValueError
     print("Done.")

@@ -22,10 +22,10 @@ class plotter:
         if not figure_name in self.data:
             self.data[figure_name] = {}, xlabel, ylabel, title, legend
 
-    def add_label(self, figure_name, label, linewidth=2, linestyle="-", markersize=8, marker=".", dot_map=False, annotate=None):
+    def add_label(self, figure_name, label, linewidth=2, linestyle="-", markersize=8, marker=".", dot_graph=False, annotate=None):
         self.add_figure(figure_name)
         if not label in self.data[figure_name][0]:
-            self.data[figure_name][0][label] = [], [], linewidth, linestyle, markersize, marker, dot_map, annotate
+            self.data[figure_name][0][label] = [], [], linewidth, linestyle, markersize, marker, dot_graph, annotate
 
     def add_data(self, figure_name, label, x, y):
         self.add_label(figure_name, label)
@@ -74,22 +74,23 @@ class plotter:
 
             self.figures[figure_name] = fig
 
-    def show(self, names=None):
+    def show(self, names=None, close_graph=True):
         names = self.data.keys() if names is None else names
         for figure_name in names:
             self.draw(names=[figure_name])
             self.figures[figure_name].show()
+            if close_graph:
+                plt.close(self.figures[figure_name])
 
-    def save(self, names=None, path="", name_prefix=None, format="png", dpi=320):
+    def save(self, path="", name_format="{}.{}", format="png", dpi=320, bbox_inches='auto', names=None, close_graph=True):
         names = self.data.keys() if names is None else names
         for figure_name in names:
             self.draw(names=[figure_name])
             if not os.path.exists(path):
                 os.makedirs(path)
-            if name_prefix is None:
-                self.figures[figure_name].savefig(os.path.join(path, figure_name + "." + format), dpi=dpi)
-            else:
-                self.figures[figure_name].savefig(os.path.join(path, name_prefix + "-" + figure_name + "." + format), dpi=dpi)
+            self.figures[figure_name].savefig(os.path.join(path, name_format.format(figure_name, format)), dpi=dpi, bbox_inches=bbox_inches)
+            if close_graph:
+                plt.close(self.figures[figure_name])
 
 
 if __name__ == "__main__":
@@ -98,8 +99,8 @@ if __name__ == "__main__":
     p.add_figure("fig1", xlabel="x", ylabel="y", title="fig1", legend="best")
     p.add_figure("fig2", xlabel="x", ylabel="y", title="fig2", legend="best")
 
-    p.add_label("fig1", "test1", dot_map=True, annotate="max")
-    p.add_label("fig1", "test2", dot_map=True, annotate="max")
+    p.add_label("fig1", "test1", dot_graph=True, annotate="max")
+    p.add_label("fig1", "test2", dot_graph=True, annotate="max")
     p.add_label("fig2", "test1", marker="", annotate="min")
     p.add_label("fig2", "test2", marker="", annotate="min")
 
@@ -114,4 +115,4 @@ if __name__ == "__main__":
     print(p.data)
 
     p.show()
-    p.save(path="../")
+    p.save(path="../", name_format="{}-TESTFIG.{}", close_graph=True, bbox_inches='tight')

@@ -6,13 +6,14 @@ import time
 import numpy as np
 import pandas as pd
 import torch
-from crop import crop
 from datasets import load_dataset
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 from transformers import LlamaTokenizer
 
 from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.utils.eval.crop import crop
+from smoe.utils.eval.gather_results import gather_results
 
 choices = ["A", "B", "C", "D"]
 
@@ -108,14 +109,14 @@ def main(args):
             if "_test.csv" in f
         ]
     )
-    subjects = subjects[28:44]
+    subjects = subjects[44:48] + subjects[49:]
     try:
         if not os.path.exists(args.save_dir):
             os.makedirs(args.save_dir)
     except:
         print("args.save_dir has been made!")
-    if os.path.isfile(os.path.join(args.save_dir, "all_datasets_1.txt")):
-        os.remove(os.path.join(args.save_dir, "all_datasets_1.txt"))
+    if os.path.isfile(os.path.join(args.save_dir, "all_datasets_2.txt")):
+        os.remove(os.path.join(args.save_dir, "all_datasets_2.txt"))
 
     print(subjects, "\n")
     print(args, "\n")
@@ -141,7 +142,7 @@ def main(args):
 
         cors, acc, probs = eval(args, tokenizer, model, subject, dev_df, test_df)
 
-        with open(os.path.join(args.save_dir, "all_datasets_1.txt"), "a+") as file:
+        with open(os.path.join(args.save_dir, "all_datasets_2.txt"), "a+") as file:
             file.write("Average accuracy {:.3f} - {}\n".format(acc, subject))
 
         all_cors.append(cors)
@@ -156,6 +157,7 @@ def main(args):
 
     weighted_acc = np.mean(np.concatenate(all_cors))
     print("Average accuracy: {:.3f}".format(weighted_acc))
+    gather_results(args)
 
 
 if __name__ == "__main__":
