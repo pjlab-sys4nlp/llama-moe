@@ -237,7 +237,40 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "Final lr = learning_rate * final_lr_portion. Default is 0.0"
         },
     )
-    debug_mode: Optional[bool] = field(default=False)
+    debug_mode: Optional[bool] = field(
+        default=False,
+        metadata={"help": "If set to True, the number of data files will be cut to 2."},
+    )
+    _block_size: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "This is an automatic assigned value from DataArguments, and should not be hijacked. In most cases, you should not use this argument manually."
+        },
+    )
+    num_tokens_per_batch: Optional[int] = field(
+        default=-1,
+        metadata={
+            "help": "the number of tokens per batch, should be calculated automatically after `block_size`"
+        },
+    )
+
+    @property
+    def block_size(self):
+        return self._block_size
+
+    @block_size.setter
+    def block_size(self, value: int):
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(
+                "`block_size` should be an integer that is greater than 0!"
+            )
+        self._block_size = value
+        self.num_tokens_per_batch = (
+            self._block_size
+            * self.per_device_train_batch_size
+            * self.gradient_accumulation_steps
+            * self.world_size
+        )
 
 
 @dataclass
@@ -275,5 +308,16 @@ def parse_args(*args: Type[Arguments]) -> tuple[Arguments, ...]:
             )
     else:
         arg_tuple = parser.parse_args_into_dataclasses()
+
+    data_args = None
+    training_args = None
+    for arg in arg_tuple:
+        if isinstance(arg, DataArguments):
+            data_args = arg
+        elif isinstance(arg, TrainingArguments):
+            training_args = arg
+
+    if hasattr(data_args, "block_size"):
+        training_args.block_size = data_args.block_size
 
     return arg_tuple

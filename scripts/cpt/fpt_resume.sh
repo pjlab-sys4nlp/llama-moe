@@ -1,8 +1,10 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-64gpus-bs16_2-zero1default
-#SBATCH --output=logs/%x-%j.log
-#SBATCH --error=logs/%x-%j.log
+set -vx
+
+#SBATCH --job-name=cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316
+#SBATCH --output=logs/%x-part2-%j.log
+#SBATCH --error=logs/%x-part2-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -10,12 +12,12 @@
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116
 
-#SBATCH --nodes=8
+#SBATCH --nodes=4
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=8         # should match with --nodes
+num_nodes=4         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
@@ -38,7 +40,7 @@ export LOGLEVEL=INFO
 
     per_device_train_batch_size=16
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=2
+    gradient_accumulation_steps=4
     block_size=2048
     max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "10^11 / $block_size" | bc)
@@ -51,6 +53,7 @@ export LOGLEVEL=INFO
 
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    # output_dir=outputs/$SLURM_JOB_NAME
     echo "output_dir: $output_dir"
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
@@ -69,6 +72,8 @@ export LOGLEVEL=INFO
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
+            --ignore_data_skip \
+            --resume_from_checkpoint outputs/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \

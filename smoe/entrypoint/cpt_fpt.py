@@ -1,7 +1,6 @@
 import os
 
 import torch
-from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -15,6 +14,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
+from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
@@ -30,6 +30,7 @@ from smoe.utils.config import (
     parse_args,
 )
 from smoe.utils.logging import get_logger_from_training_args
+from smoe.utils.notification import wechat_sender
 from smoe.utils.param import get_trainable_parameters
 
 MODEL_MAP = {
@@ -45,7 +46,7 @@ CONFIG_MAPPING.update(
 )
 
 
-@record
+@wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -251,7 +252,7 @@ def main():
             else None
         ),
     )
-
+    trainer.add_callback(EnhancedTensorboardCallback)
     # Training
     if training_args.do_train:
         checkpoint = None
