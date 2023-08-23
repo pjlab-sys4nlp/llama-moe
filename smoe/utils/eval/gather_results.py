@@ -6,7 +6,7 @@ import pandas as pd
 
 def gather_results(args):
     df = pd.DataFrame(columns=["dataset", "accuracy"])
-    for (dir_path, dir_names, file_names) in os.walk(args.save_dir):
+    for dir_path, dir_names, file_names in os.walk(args.save_dir):
         print(dir_path)
         for name in sorted(file_names):
             print(name)
