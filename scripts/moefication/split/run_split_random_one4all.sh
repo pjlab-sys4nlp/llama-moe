@@ -24,4 +24,4 @@ for num_experts in 8 16; do
 done
 
 wait
-chmod -R 777 ${save_path}
+chmod -R 777 ${save_path} >/dev/null 2>&1

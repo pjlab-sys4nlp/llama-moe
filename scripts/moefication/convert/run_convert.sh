@@ -31,4 +31,4 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --convert_type ${convert_type}
 
 wait
-chmod -R 777 ${save_path}
+chmod -R 777 ${save_path} >/dev/null 2>&1

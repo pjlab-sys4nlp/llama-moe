@@ -1,93 +1,121 @@
-import argparse
-import os
-import random
+import os.path
+from typing import Optional
 
 import torch
-import torch.distributed as dist
-from torch.utils.data import ConcatDataset
-from tqdm import tqdm
-from transformers import LlamaForCausalLM
-from transformers.models.llama.tokenization_llama_fast import LlamaTokenizer
+from torch.distributed.elastic.multiprocessing.errors import record
+from transformers import (
+    LlamaConfig,
+    LlamaForCausalLM,
+    LlamaTokenizer,
+    set_seed,
+)
 
-from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-from smoe.utils.moefication.expert_split import GradientSplit
+from smoe.data.collate_fn import fault_tolerance_data_collator
+from smoe.data.single_file import load_cached_dataset
+from smoe.trainer.moefication.expert_split_gradient import ExpertSplitGradientTrainer
+from smoe.utils.config import (
+    DataArguments,
+    EnhancedTrainingArguments,
+    ModelArguments,
+    parse_args,
+)
+from smoe.utils.moefication.expert_split import GradientSplitGetGrads
+from smoe.utils.param import get_trainable_parameters
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class SplitArguments:
+    save_path: str = field(default=None)
+    expert_size: int = field(default=None)
+    template: Optional[str] = field(default='layers.{}.mlp.gate_proj.weight')
+    accumulate_level: Optional[str] = field(default="sample")  # sample total
+    kernel: Optional[str] = field(default="l1_norm")  # plain l1_norm l2_norm
+    data_use_range_begin: Optional[float] = field(default=0.0)
+    data_use_range_end: Optional[float] = field(default=1.0)
+
+
+@record
+def main():
+    model_args, data_args, training_args, split_args = parse_args(
+        ModelArguments, DataArguments, EnhancedTrainingArguments, SplitArguments
+    )
+    model_name = os.path.split(model_args.model_name_or_path)[1]
+    dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
+    split_args.save_path = os.path.join(split_args.save_path,
+                                        "Gradients",
+                                        model_name + "-Gradients-" + split_args.kernel + "-" + split_args.accumulate_level,
+                                        dataset_name)
+    print(split_args, "\n")
+
+    """Set seed before initializing model."""
+    set_seed(training_args.seed)
+
+    config = LlamaConfig.from_pretrained(model_args.model_name_or_path)
+    if training_args.gradient_checkpointing:
+        config.use_cache = False
+
+    tokenizer = LlamaTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+
+    """Preprocessing the datasets."""
+    if data_args.block_size is None:
+        block_size = tokenizer.model_max_length
+        block_size = 2048 if block_size > 2048 else block_size
+    else:
+        block_size = min(data_args.block_size, tokenizer.model_max_length)
+
+    with training_args.main_process_first(desc="dataset map tokenization and grouping"):
+        lm_datasets = load_cached_dataset(
+            data_args.dataset_dir,
+            block_size=block_size,
+        )
+
+    """Initialize model"""
+    torch_dtype = (
+        model_args.torch_dtype
+        if model_args.torch_dtype in ["auto", None]
+        else getattr(torch, model_args.torch_dtype)
+    )
+    model = LlamaForCausalLM.from_pretrained(
+        model_args.model_name_or_path,
+        from_tf=bool(".ckpt" in model_args.model_name_or_path),
+        config=config,
+        torch_dtype=torch_dtype,
+        low_cpu_mem_usage=True,
+    )
+
+    model_vocab_size = model.get_output_embeddings().weight.size(0)
+    if model_vocab_size != len(tokenizer):
+        model.resize_token_embeddings(len(tokenizer))
+        raise ValueError(
+            f"The model's vocab size ({model_vocab_size}) does not match with the"
+            f" tokenizer ({len(tokenizer)})"
+        )
+
+    get_trainable_parameters(model, verbose=True)
+
+    """Initialize our Trainer"""
+    trainer = ExpertSplitGradientTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=lm_datasets,
+        tokenizer=tokenizer,
+        data_collator=fault_tolerance_data_collator,
+    )
+
+    """Start splitting"""
+    split = GradientSplitGetGrads(
+        split_args,
+        trainer,
+        split_args.template,
+        accumulate_level=split_args.accumulate_level,
+        kernel=split_args.kernel,
+        device=f"cuda:{training_args.local_rank}"
+    )
+    split.get_grad()
+    print("Done.")
+
 
 if __name__ == "__main__":
-    # fmt: off
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default="/home/data/models/llama-transformers/7B")
-    parser.add_argument('--save_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/")
-    parser.add_argument('--templates', type=str, default='layers.{}.mlp.gate_proj.weight')
-    parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
-    parser.add_argument('--datasets', nargs='+', help='datasets for gradient split, example \"--datasets commoncrawl c4 github\"')
-    parser.add_argument('--data_use_range_begin', type=float, default=0)
-    parser.add_argument('--data_use_range_end', type=float, default=1.0)
-
-    args = parser.parse_args()
-    args.local_rank = int(os.environ["LOCAL_RANK"])
-    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Split-Gradient")
-    print(args, "\n")
-
-    print("cuda is_available: " + str(torch.cuda.is_available()))
-    dist.init_process_group(backend='nccl')
-
-    """load tokenizer"""
-    tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
-    tokenizer.pad_token = tokenizer.eos_token
-
-    """prepare datasets"""
-    # dataset_list = [
-    #     "commoncrawl",
-    #     "c4",
-    #     "github",
-    #     "wikipedia",
-    #     "books",
-    #     "arxiv",
-    #     "stackexchange"
-    # ]
-
-    all_datasets = {}
-    for key in tqdm(args.datasets):
-        for file_name in os.listdir(args.train_data_path):
-            if key in file_name and file_name.endswith(".jsonl"):
-                cached_file_path = os.path.join(args.train_data_cache_path, key + "_cached.pth")
-                if os.path.exists(cached_file_path):
-                    print("\nReading dataset \"" + key + "\" from cached file \"" + cached_file_path + "\"...")
-                    all_datasets[key] = CommonDataset(torch.load(cached_file_path))
-                else:
-                    raw_file_path = os.path.join(args.train_data_path, file_name)
-                    print("\nReading dataset \"" + key + "\" from raw file \"" + raw_file_path + "\"...")
-                    all_datasets[key] = LineByLineJsonlTextDataset(tokenizer, file_path=raw_file_path, block_size=2048)
-                    if not os.path.exists(args.train_data_cache_path):
-                        os.makedirs(args.train_data_cache_path)
-                    with open(cached_file_path, "wb") as file:
-                        torch.save(all_datasets[key].examples, os.path.join(args.train_data_cache_path, key + "_cached.pth"))
-                print("Dataset " + key + ": " + str(sum([torch.sum(all_datasets[key][i] != 2).item() for i in range(len(all_datasets[key]))])) + " total tokens.")  # 统计非padding的token数量
-
-    for key in args.datasets:  # reset the number of examples by data_use_range_begin and data_use_range_end
-        random.seed(0)
-        random.shuffle(all_datasets[key].examples)
-        example_num = len(all_datasets[key].examples)
-        all_datasets[key].examples = all_datasets[key].examples[int(example_num * args.data_use_range_begin):
-                                                                int(example_num * args.data_use_range_end)]
-
-    combined_dataset = []
-    for key in args.datasets:
-        combined_dataset.append(CommonDataset(all_datasets[key].examples))
-        print("Dataset " + key + ": " + str(sum([torch.sum(combined_dataset[-1][i] != 2).item() for i in range(len(combined_dataset[-1]))])) + " used tokens.")  # 统计非padding的token数量
-    combined_dataset = ConcatDataset(combined_dataset)
-
-    """load model"""
-    print("Loading llama model...")
-    model = LlamaForCausalLM.from_pretrained(args.model_path).model
-
-    """start splitting"""
-    templates = args.templates.split(",")
-    for template in templates:
-        for i in tqdm(range(model.config.num_hidden_layers)):
-            split = GradientSplit(args, model, template, i)
-            split.split()
-            split.cnt()
-            split.save()
-    print("Done.")
-    # fmt: off
+    main()

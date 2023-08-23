@@ -29,4 +29,4 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres
   --batch_size ${batch_size}
 
 wait
-chmod -R 777 ${save_path}/${llama_size}
+chmod -R 777 ${save_path}/${llama_size} >/dev/null 2>&1

@@ -1,4 +1,5 @@
 import os
+import pickle
 import random
 from collections import Counter
 
@@ -9,10 +10,12 @@ from k_means_constrained import KMeansConstrained
 from sklearn.preprocessing import Normalizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.datasets_moefication import ShardDataset
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
+from accelerate import Accelerator
 
 
 def load_ffn_weight(model, template, layer):
@@ -188,12 +191,134 @@ class GraphSplit(LayerSplit):
                 fout.write(" ".join(["{} {}".format(x[0], x[1]) for x in vec]) + "\n")
 
 
+class GradientSplitGetGrads:
+    # fmt: off
+    """
+    SNIP: Single-shot Network Pruning based on Connection Sensitivity (ICLR 2019)
+    """
+
+    def __init__(self, config, trainer, template, accumulate_level="total", kernel="l1_norm", device="cpu"):
+        self.config = config
+        self.trainer = trainer
+        self.template = template
+
+        self.accumulate_level = accumulate_level
+        self.kernel = kernel
+        self.device = device
+
+        self.layer_num = self.trainer.model.config.num_hidden_layers
+        self.neuron_num = self.trainer.model.config.intermediate_size
+
+        self.sample_count = 0
+        self.up_proj_grads = {}
+        self.gate_proj_grads = {}
+        for i in range(self.layer_num):
+            self.up_proj_grads[i] = torch.zeros((self.neuron_num,), device=self.device)
+            self.gate_proj_grads[i] = torch.zeros((self.neuron_num,), device=self.device)
+
+    def _backward_hook_up_proj(self, module, grad_in, grad_out):
+        if module.add_batch_size:
+            batch_size = grad_out[0].shape[0]
+            self.sample_count += batch_size
+        print("grad_out", grad_out, len(grad_out))
+        print("grad_out", grad_out[0].shape, self.sample_count)
+        print("grad_in", grad_in, len(grad_in))
+        print("grad_in", grad_in[0].shape, self.sample_count)
+        if self.accumulate_level == "sample":
+            self.up_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_out[0].detach(), criterion=self.kernel), dim=0)
+        elif self.accumulate_level == "total":
+            self.up_proj_grads[module.layer_index] += torch.sum(grad_out[0].detach(), dim=0)
+        else:
+            raise NotImplementedError
+
+    def _backward_hook_gate_proj(self, module, grad_in, grad_out):
+        if module.add_batch_size:
+            batch_size = grad_in[0].shape[0]
+            self.sample_count += batch_size
+            print(grad_in, len(grad_in))
+            print(grad_in[0].shape, self.sample_count)
+        if self.accumulate_level == "sample":
+            self.gate_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_in[0].detach(), criterion=self.kernel), dim=0)
+        elif self.accumulate_level == "total":
+            self.gate_proj_grads[module.layer_index] += torch.sum(grad_in[0].detach(), dim=0)
+        else:
+            raise NotImplementedError
+
+    def get_grad(self):
+        # initialization
+        for layer_index, layer in enumerate(self.trainer.model.model.layers):  # locate block by the name template
+            assert type(layer.mlp) == LlamaMLP
+            if layer_index == 31:
+                layer.mlp.down_proj.add_batch_size = True  # use the down_proj of layer0 to count for the batch_size
+                layer.mlp.gate_proj.add_batch_size = False
+            else:
+                layer.mlp.down_proj.add_batch_size = False
+                layer.mlp.gate_proj.add_batch_size = False
+
+            layer.mlp.down_proj.layer_index = layer_index
+            layer.mlp.down_proj.register_backward_hook(self._backward_hook_up_proj)  # "grad_out" of "down_proj" <==> grad of "up_proj * gate_proj" output
+            layer.mlp.gate_proj.layer_index = layer_index
+            layer.mlp.gate_proj.register_backward_hook(self._backward_hook_gate_proj)  # "grad_in" of "gate_proj" <==> grad of "gate_proj" output
+
+        # get grads
+        self.trainer.train()
+        self.sample_count = torch.tensor(self.sample_count)
+
+        # save grads
+        if self.device == "cuda:0":  # gather results to device 0
+            # gather results on different devices
+            gathered_sample_count = self.trainer.accelerator.gather(self.sample_count)
+            gathered_sample_count = torch.sum(gathered_sample_count)
+
+            if not os.path.exists(self.config.save_path):
+                os.makedirs(self.config.save_path)
+
+            for layer_index in range(self.layer_num):
+                # gather results on different devices
+                gathered_up_proj_grads = self.trainer.accelerator.gather(self.up_proj_grads[layer_index].reshape(1, -1))
+                gathered_up_proj_grads = torch.sum(gathered_up_proj_grads, dim=0)
+                gathered_gate_proj_grads = self.trainer.accelerator.gather(self.gate_proj_grads[layer_index].reshape(1, -1))
+                gathered_gate_proj_grads = torch.sum(gathered_gate_proj_grads, dim=0)
+
+                # accumulate if set to "total"
+                if self.accumulate_level == "total":
+                    gathered_up_proj_grads = pass_kernel_function(gathered_up_proj_grads, criterion=self.kernel)
+                    gathered_gate_proj_grads = pass_kernel_function(gathered_gate_proj_grads, criterion=self.kernel)
+
+                # get mean values
+                gathered_up_proj_grads /= gathered_sample_count
+                gathered_gate_proj_grads /= gathered_sample_count
+
+                # save
+                up_filename = os.path.join(self.config.save_path, "layers.{}.mlp.up_proj.weight.grad".format(layer_index))
+                torch.save(gathered_up_proj_grads, up_filename, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+                print(f'Accumulated gradients of neurons for layer {layer_index} saved to "{up_filename}".')
+
+                gate_filename = os.path.join(self.config.save_path, "layers.{}.mlp.gate_proj.weight.grad".format(layer_index))
+                torch.save(gathered_gate_proj_grads, gate_filename, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+                print(f'Accumulated gradients of neurons for layer {layer_index} saved to "{gate_filename}".')
+    # fmt: on
+
+
 class GradientSplit(LayerSplit):
-    def __init__(self, config, model, template, layer):
+    def __init__(self, config, model_config, template, layer):
         super().__init__(config, template, layer)
-        self.model = model
-        self.neuron_num = model.config.intermediate_size
+        self.model_config = model_config
+        self.neuron_num = model_config.intermediate_size
         self.split_size = self.neuron_num // self.config.num_experts
 
-    def split(self):
-        raise NotImplementedError
+    def split(self, expert_size, criterion="min"):
+        for layer_index in range(self.layer_num):
+            if criterion == "min":
+                _, neuron_indices = self.grads[layer_index].sort(0)
+            elif criterion == "max":
+                _, neuron_indices = self.grads[layer_index].sort(0, descending=True)
+            else:
+                raise NotImplementedError
+
+            selected_neuron_indices = neuron_indices[:expert_size]
+
+            # save
+            filename = os.path.join(self.config.save_path, self.template.format(layer_index) + "." + criterion + ".indices")
+            torch.save(selected_neuron_indices, filename, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+            print(f'Selected indices for layer {layer_index} saved to "{filename}".')

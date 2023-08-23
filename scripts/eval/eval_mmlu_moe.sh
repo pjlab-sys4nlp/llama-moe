@@ -6,9 +6,9 @@ llama_size="llama2_7B"
 
 num_experts=8             #  8  16
 num_selects=2             #  2  4
-split_type=Clustering-cos #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+split_type=Random #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
 select_type=l2_norm       #  plain  positive  l1_norm  l2_norm
-proj_type=gate_proj         #  gate_proj  up_proj
+proj_type=up_proj       #  gate_proj  up_proj
 
 set_num_selects=2 #  手动设置eval时选择的专家数量
 
