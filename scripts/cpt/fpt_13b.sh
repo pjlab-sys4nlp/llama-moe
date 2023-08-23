@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-7b-random-64gpus-bs16_2-zero1default
+#SBATCH --job-name=cpt-moe-fpt-13b-64gpus-bs4_8-zero2default
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
@@ -33,18 +33,16 @@ export LOGLEVEL=INFO
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
 
-    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    per_device_train_batch_size=16
+    per_device_train_batch_size=4
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=2
+    gradient_accumulation_steps=8
     block_size=2048
     max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "10^11 / $block_size" | bc)
@@ -58,7 +56,7 @@ export LOGLEVEL=INFO
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
+    deepspeed_config_file=conf/deepspeed/bf16_zero2_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -101,7 +99,7 @@ export LOGLEVEL=INFO
             --logging_strategy steps \
             --logging_steps 10 \
             --save_strategy steps \
-            --save_total_limit 3 \
+            --save_total_limit 2 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
