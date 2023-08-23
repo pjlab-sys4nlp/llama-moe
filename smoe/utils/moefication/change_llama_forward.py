@@ -1,16 +1,17 @@
 import os
 import pickle
-from typing import Optional, List, Union, Tuple
+from typing import List, Optional, Tuple, Union
 
 import torch
 from transformers.modeling_outputs import BaseModelOutputWithPast
-
 from transformers.utils import logging
 
 logger = logging.get_logger(__name__)
 
 
-def forward_mlp_with_feature_dumping(self, x, padding_mask):  # new forward function with hidden_states recording for mlp layer
+def forward_mlp_with_feature_dumping(
+    self, x, padding_mask
+):  # new forward function with hidden_states recording for mlp layer
     # fmt: off
     self.now_epoch += 1
 
@@ -46,14 +47,14 @@ def forward_mlp_with_feature_dumping(self, x, padding_mask):  # new forward func
 
 
 def forward_decoder_with_feature_dumping(
-        self,
-        hidden_states,
-        padding_mask,
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False
+    self,
+    hidden_states,
+    padding_mask,
+    attention_mask=None,
+    position_ids=None,
+    past_key_value=None,
+    output_attentions=False,
+    use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -72,7 +73,9 @@ def forward_decoder_with_feature_dumping(
     # Fully Connected
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
-    hidden_states = self.mlp(hidden_states, padding_mask)  # ----- add padding_mask -----
+    hidden_states = self.mlp(
+        hidden_states, padding_mask
+    )  # ----- add padding_mask -----
     hidden_states = residual + hidden_states
 
     outputs = (hidden_states,)
@@ -86,34 +89,46 @@ def forward_decoder_with_feature_dumping(
 
 
 def forward_llama_model_with_feature_dumping(
-        self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+    self,
+    input_ids: torch.LongTensor = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
-    output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+    output_attentions = (
+        output_attentions
+        if output_attentions is not None
+        else self.config.output_attentions
+    )
     output_hidden_states = (
-        output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_hidden_states
+        if output_hidden_states is not None
+        else self.config.output_hidden_states
     )
     use_cache = use_cache if use_cache is not None else self.config.use_cache
 
-    return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+    return_dict = (
+        return_dict if return_dict is not None else self.config.use_return_dict
+    )
 
     # retrieve input_ids and inputs_embeds
     if input_ids is not None and inputs_embeds is not None:
-        raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        raise ValueError(
+            "You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time"
+        )
     elif input_ids is not None:
         batch_size, seq_length = input_ids.shape
     elif inputs_embeds is not None:
         batch_size, seq_length, _ = inputs_embeds.shape
     else:
-        raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+        raise ValueError(
+            "You have to specify either decoder_input_ids or decoder_inputs_embeds"
+        )
 
     seq_length_with_past = seq_length
     past_key_values_length = 0
@@ -125,7 +140,10 @@ def forward_llama_model_with_feature_dumping(
     if position_ids is None:
         device = input_ids.device if input_ids is not None else inputs_embeds.device
         position_ids = torch.arange(
-            past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=device
+            past_key_values_length,
+            seq_length + past_key_values_length,
+            dtype=torch.long,
+            device=device,
         )
         position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
     else:
@@ -138,7 +156,9 @@ def forward_llama_model_with_feature_dumping(
     padding_mask = attention_mask.bool()  # ----- add padding_mask -----
     if attention_mask is None:
         attention_mask = torch.ones(
-            (batch_size, seq_length_with_past), dtype=torch.bool, device=inputs_embeds.device
+            (batch_size, seq_length_with_past),
+            dtype=torch.bool,
+            device=inputs_embeds.device,
         )
     attention_mask = self._prepare_decoder_attention_mask(
         attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
@@ -208,7 +228,11 @@ def forward_llama_model_with_feature_dumping(
 
     next_cache = next_decoder_cache if use_cache else None
     if not return_dict:
-        return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+        return tuple(
+            v
+            for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+            if v is not None
+        )
     return BaseModelOutputWithPast(
         last_hidden_state=hidden_states,
         past_key_values=next_cache,

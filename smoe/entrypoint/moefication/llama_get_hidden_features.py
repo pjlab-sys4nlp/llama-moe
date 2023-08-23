@@ -13,8 +13,11 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-from smoe.utils.moefication.change_llama_forward import forward_mlp_with_feature_dumping, forward_llama_model_with_feature_dumping, forward_decoder_with_feature_dumping
-
+from smoe.utils.moefication.change_llama_forward import (
+    forward_decoder_with_feature_dumping,
+    forward_llama_model_with_feature_dumping,
+    forward_mlp_with_feature_dumping,
+)
 
 # fmt: off
 

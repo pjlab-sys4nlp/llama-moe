@@ -15,11 +15,11 @@ from smoe.utils.list_operation import split_list_with_yield
 
 class LineByLineJsonlTextDataset(Dataset):
     def __init__(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            file_path: str,
-            block_size: int,
-            num_threads=1,
+        self,
+        tokenizer: PreTrainedTokenizer,
+        file_path: str,
+        block_size: int,
+        num_threads=1,
     ):
         """numthreads should be set <=1, otherwise it will slow down the reading process by ~4 times"""
         if num_threads > 1:
@@ -134,12 +134,12 @@ class CommonDataset(Dataset):
 
 class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读取
     def __init__(
-            self,
-            path,
-            parallel_mode="shards",
-            data_use_percent=1.0,
-            file_load_index_range=(0.0, 1.0),
-            shards_in_memory=8,  # 只在"shards"模式下有效
+        self,
+        path,
+        parallel_mode="shards",
+        data_use_percent=1.0,
+        file_load_index_range=(0.0, 1.0),
+        shards_in_memory=8,  # 只在"shards"模式下有效
     ):
         # fmt: off
         assert parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
@@ -208,13 +208,13 @@ class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读�
 
 class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数据集读取
     def __init__(
-            self,
-            hidden_inputs_path,
-            hidden_outputs_path,
-            parallel_mode="shards",
-            data_use_percent=1.0,
-            file_load_index_range=(0.0, 1.0),
-            shards_in_memory=8,  # 只在"shards"模式下有效
+        self,
+        hidden_inputs_path,
+        hidden_outputs_path,
+        parallel_mode="shards",
+        data_use_percent=1.0,
+        file_load_index_range=(0.0, 1.0),
+        shards_in_memory=8,  # 只在"shards"模式下有效
     ):
         # fmt: off
         hidden_inputs_filename_list = os.listdir(hidden_inputs_path)

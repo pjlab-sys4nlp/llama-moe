@@ -1,14 +1,10 @@
 import os.path
+from dataclasses import dataclass, field
 from typing import Optional
 
 import torch
 from torch.distributed.elastic.multiprocessing.errors import record
-from transformers import (
-    LlamaConfig,
-    LlamaForCausalLM,
-    LlamaTokenizer,
-    set_seed,
-)
+from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer, set_seed
 
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.single_file import load_cached_dataset
@@ -22,14 +18,12 @@ from smoe.utils.config import (
 from smoe.utils.moefication.expert_split import GradientSplitGetGrads
 from smoe.utils.param import get_trainable_parameters
 
-from dataclasses import dataclass, field
-
 
 @dataclass
 class SplitArguments:
     save_path: str = field(default=None)
     expert_size: int = field(default=None)
-    template: Optional[str] = field(default='layers.{}.mlp.gate_proj.weight')
+    template: Optional[str] = field(default="layers.{}.mlp.gate_proj.weight")
     accumulate_level: Optional[str] = field(default="sample")  # sample total
     kernel: Optional[str] = field(default="l1_norm")  # plain l1_norm l2_norm
     data_use_range_begin: Optional[float] = field(default=0.0)
@@ -43,10 +37,16 @@ def main():
     )
     model_name = os.path.split(model_args.model_name_or_path)[1]
     dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
-    split_args.save_path = os.path.join(split_args.save_path,
-                                        "Gradients",
-                                        model_name + "-Gradients-" + split_args.kernel + "-" + split_args.accumulate_level,
-                                        dataset_name)
+    split_args.save_path = os.path.join(
+        split_args.save_path,
+        "Gradients",
+        model_name
+        + "-Gradients-"
+        + split_args.kernel
+        + "-"
+        + split_args.accumulate_level,
+        dataset_name,
+    )
     print(split_args, "\n")
 
     """Set seed before initializing model."""
@@ -111,7 +111,7 @@ def main():
         split_args.template,
         accumulate_level=split_args.accumulate_level,
         kernel=split_args.kernel,
-        device=f"cuda:{training_args.local_rank}"
+        device=f"cuda:{training_args.local_rank}",
     )
     split.get_grad()
     print("Done.")

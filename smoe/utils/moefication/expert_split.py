@@ -15,7 +15,6 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 from smoe.data.datasets_moefication import ShardDataset
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
-from accelerate import Accelerator
 
 
 def load_ffn_weight(model, template, layer):
@@ -319,6 +318,13 @@ class GradientSplit(LayerSplit):
             selected_neuron_indices = neuron_indices[:expert_size]
 
             # save
-            filename = os.path.join(self.config.save_path, self.template.format(layer_index) + "." + criterion + ".indices")
-            torch.save(selected_neuron_indices, filename, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+            filename = os.path.join(
+                self.config.save_path,
+                self.template.format(layer_index) + "." + criterion + ".indices",
+            )
+            torch.save(
+                selected_neuron_indices,
+                filename,
+                pickle_protocol=pickle.HIGHEST_PROTOCOL,
+            )
             print(f'Selected indices for layer {layer_index} saved to "{filename}".')
