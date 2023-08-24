@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from smoe.utils.io import load_jsonlines
-from smoe.utils.visualization.barh import barh
+from smoe.utils.visualization.bar import barh
 
 
 def main(args):
