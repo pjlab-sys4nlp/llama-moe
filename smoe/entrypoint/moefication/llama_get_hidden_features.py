@@ -15,8 +15,8 @@ from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
 from smoe.utils.change_llama_forward import (
     forward_llama_decoder_with_padding_mask,
-    forward_llama_model_with_padding_mask,
     forward_llama_mlp_with_feature_dumping,
+    forward_llama_model_with_padding_mask,
 )
 
 # fmt: off

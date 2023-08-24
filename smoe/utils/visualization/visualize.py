@@ -1,19 +1,17 @@
 import os
-
-import numpy
-import numpy as np
-import torch
+from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy
+import numpy as np
+import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from smoe.data.datasets_moefication import ShardDataset
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.visualization.plotter import plotter
-
-from pathlib import Path
 
 
 def visualize_expert_select_mlp(result_path, save_path, proj_type):
@@ -143,14 +141,14 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
 
 def visualize_swiglu_output(
-        hidden_outputs_path,
-        save_path,
-        neuron_type,
-        layer_idx,
-        criterion="plain",
-        num_bins=1000,
-        edge=(-1.0, 1.0),
-        device="cpu",
+    hidden_outputs_path,
+    save_path,
+    neuron_type,
+    layer_idx,
+    criterion="plain",
+    num_bins=1000,
+    edge=(-1.0, 1.0),
+    device="cpu",
 ):
     # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
@@ -192,11 +190,11 @@ def visualize_swiglu_output(
 
 
 def visualize_expert_load_heatmap(
-        load_sum: np.ndarray,
-        layer_idx: int,
-        dataset_name: str,
-        shape: tuple = (4, 4),
-        save_dir: str = "results/expert_load_vis",
+    load_sum: np.ndarray,
+    layer_idx: int,
+    dataset_name: str,
+    shape: tuple = (4, 4),
+    save_dir: str = "results/expert_load_vis",
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -223,12 +221,12 @@ def visualize_expert_load_heatmap(
 
 
 def visualize_expert_load_barv(
-        load_sum: np.ndarray,
-        layer_idx: int,
-        dataset_name: str,
-        y_max: float = None,
-        x_label: str = None,
-        save_dir: str = "results/expert_load_vis",
+    load_sum: np.ndarray,
+    layer_idx: int,
+    dataset_name: str,
+    y_max: float = None,
+    x_label: str = None,
+    save_dir: str = "results/expert_load_vis",
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():

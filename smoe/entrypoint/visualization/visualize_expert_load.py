@@ -11,10 +11,16 @@ from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import LineByLineJsonlTextDataset
 from smoe.models.llama_moefication import LlamaMoEForCausalLM
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
-
-from smoe.utils.change_llama_moe_forward import forward_llama_moe_model_with_padding_mask, forward_llama_moe_decoder_with_padding_mask, forward_mlp_moe_gate_with_load_recording, forward_linear_glu_moe_layer_with_padding_mask
-
-from smoe.utils.visualization.visualize import visualize_expert_load_heatmap, visualize_expert_load_barv
+from smoe.utils.change_llama_moe_forward import (
+    forward_linear_glu_moe_layer_with_padding_mask,
+    forward_llama_moe_decoder_with_padding_mask,
+    forward_llama_moe_model_with_padding_mask,
+    forward_mlp_moe_gate_with_load_recording,
+)
+from smoe.utils.visualization.visualize import (
+    visualize_expert_load_barv,
+    visualize_expert_load_heatmap,
+)
 
 
 # fmt: off

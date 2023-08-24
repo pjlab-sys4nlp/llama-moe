@@ -1,5 +1,4 @@
 import torch
-
 from transformers.utils import logging
 
 from smoe.models.llama_moefication import BaseMoEModelOutputWithPast
@@ -7,7 +6,10 @@ from smoe.models.llama_moefication import BaseMoEModelOutputWithPast
 logger = logging.get_logger(__name__)
 
 
-def forward_mlp_moe_gate_with_load_recording(self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2):
+def forward_mlp_moe_gate_with_load_recording(
+    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
+):
+    # fmt: off
     """先计算所有专家的权重值"""
     logits_gate = self.gate_network(x)  # gate计算出的权重
     if self.training and self.add_noise:
@@ -72,9 +74,12 @@ def forward_mlp_moe_gate_with_load_recording(self, x, padding_mask, noise_epsilo
         gate_loss = None
 
     return top_k_indices, top_k_scores, gate_loss
+    # fmt: on
 
 
-def forward_linear_glu_moe_layer_with_padding_mask(self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2):
+def forward_linear_glu_moe_layer_with_padding_mask(
+    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
+):
     # fmt: off
     batch_size = x.shape[0]
     seq_len = x.shape[1]
@@ -92,14 +97,14 @@ def forward_linear_glu_moe_layer_with_padding_mask(self, x, padding_mask, noise_
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-        self,
-        hidden_states,
-        padding_mask,  # ----- add padding_mask -----
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+    self,
+    hidden_states,
+    padding_mask,  # ----- add padding_mask -----
+    attention_mask=None,
+    position_ids=None,
+    past_key_value=None,
+    output_attentions=False,
+    use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -139,16 +144,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+    self,
+    input_ids=None,
+    attention_mask=None,
+    position_ids=None,
+    past_key_values=None,
+    inputs_embeds=None,
+    use_cache=None,
+    output_attentions=None,
+    output_hidden_states=None,
+    return_dict=None,
 ):
     output_attentions = (
         output_attentions
@@ -240,9 +245,7 @@ def forward_llama_moe_model_with_padding_mask(
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
-        past_key_value = (
-            past_key_values[idx] if past_key_values is not None else None
-        )
+        past_key_value = past_key_values[idx] if past_key_values is not None else None
 
         if self.gradient_checkpointing and self.training:
 
