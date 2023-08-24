@@ -4,7 +4,7 @@ import os
 import torch.cuda
 from transformers import LlamaConfig
 
-from smoe.utils.moefication.visualize import visualize_swiglu_output
+from smoe.utils.visualization.visualize import visualize_swiglu_output
 
 # fmt: off
 if __name__ == "__main__":

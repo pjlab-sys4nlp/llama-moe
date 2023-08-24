@@ -40,11 +40,7 @@ def main():
     split_args.save_path = os.path.join(
         split_args.save_path,
         "Gradients",
-        model_name
-        + "-Gradients-"
-        + split_args.kernel
-        + "-"
-        + split_args.accumulate_level,
+        f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}",
         dataset_name,
     )
     print(split_args, "\n")

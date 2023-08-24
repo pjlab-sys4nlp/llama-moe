@@ -9,18 +9,11 @@ from transformers.utils import logging
 logger = logging.get_logger(__name__)
 
 
-def forward_mlp_with_feature_dumping(
-    self, x, padding_mask
-):  # new forward function with hidden_states recording for mlp layer
-    # fmt: off
+
+# fmt: off
+def forward_llama_mlp_with_feature_dumping(self, x, padding_mask):  # new forward function with hidden_states recording for mlp layer
     self.now_epoch += 1
-
-    # print(x, x.shape)
-    # print(padding_mask, padding_mask.shape)
-
     self.hidden_inputs.append(x.detach().half()[padding_mask])  # exclude padding features
-
-    # print(self.hidden_inputs[-1].shape)
 
     if self.now_epoch % self.save_interval == (self.save_interval - 1):
         save_path = os.path.join(self.save_path_hidden_inputs, str(self.device_id) + "_" + str(self.now_epoch // self.save_interval) + ".pth")
@@ -43,18 +36,18 @@ def forward_mlp_with_feature_dumping(
         self.hidden_outputs = []
 
     return down_proj_output
-    # fmt: on
+# fmt: on
 
 
-def forward_decoder_with_feature_dumping(
-    self,
-    hidden_states,
-    padding_mask,
-    attention_mask=None,
-    position_ids=None,
-    past_key_value=None,
-    output_attentions=False,
-    use_cache=False,
+def forward_llama_decoder_with_padding_mask(
+        self,
+        hidden_states,
+        padding_mask,# ----- add padding_mask -----
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -73,9 +66,10 @@ def forward_decoder_with_feature_dumping(
     # Fully Connected
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
-    hidden_states = self.mlp(
-        hidden_states, padding_mask
-    )  # ----- add padding_mask -----
+    ###########################################################
+    # ----- add padding_mask -----
+    hidden_states = self.mlp(hidden_states, padding_mask)
+    ###########################################################
     hidden_states = residual + hidden_states
 
     outputs = (hidden_states,)
@@ -88,17 +82,17 @@ def forward_decoder_with_feature_dumping(
     return outputs
 
 
-def forward_llama_model_with_feature_dumping(
-    self,
-    input_ids: torch.LongTensor = None,
-    attention_mask: Optional[torch.Tensor] = None,
-    position_ids: Optional[torch.LongTensor] = None,
-    past_key_values: Optional[List[torch.FloatTensor]] = None,
-    inputs_embeds: Optional[torch.FloatTensor] = None,
-    use_cache: Optional[bool] = None,
-    output_attentions: Optional[bool] = None,
-    output_hidden_states: Optional[bool] = None,
-    return_dict: Optional[bool] = None,
+def forward_llama_model_with_padding_mask(
+        self,
+        input_ids: torch.LongTensor = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        past_key_values: Optional[List[torch.FloatTensor]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        use_cache: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
     output_attentions = (
         output_attentions
@@ -153,7 +147,9 @@ def forward_llama_model_with_feature_dumping(
         inputs_embeds = self.embed_tokens(input_ids)
 
     # embed positions
+    ###########################################################
     padding_mask = attention_mask.bool()  # ----- add padding_mask -----
+    ###########################################################
     if attention_mask is None:
         attention_mask = torch.ones(
             (batch_size, seq_length_with_past),
@@ -193,6 +189,7 @@ def forward_llama_model_with_feature_dumping(
 
                 return custom_forward
 
+            ###########################################################
             layer_outputs = torch.utils.checkpoint.checkpoint(
                 create_custom_forward(decoder_layer),
                 padding_mask,  # ----- add padding_mask -----
@@ -211,6 +208,7 @@ def forward_llama_model_with_feature_dumping(
                 output_attentions=output_attentions,
                 use_cache=use_cache,
             )
+            ###########################################################
 
         hidden_states = layer_outputs[0]
 

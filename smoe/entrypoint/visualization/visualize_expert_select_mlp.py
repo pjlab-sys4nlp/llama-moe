@@ -1,6 +1,6 @@
 import argparse
 
-from smoe.utils.moefication.visualize import visualize_expert_select_mlp
+from smoe.utils.visualization.visualize import visualize_expert_select_mlp
 
 # fmt: off
 if __name__ == "__main__":

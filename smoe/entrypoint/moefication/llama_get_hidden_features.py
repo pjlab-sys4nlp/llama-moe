@@ -13,10 +13,10 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-from smoe.utils.moefication.change_llama_forward import (
-    forward_decoder_with_feature_dumping,
-    forward_llama_model_with_feature_dumping,
-    forward_mlp_with_feature_dumping,
+from smoe.utils.change_llama_forward import (
+    forward_llama_decoder_with_padding_mask,
+    forward_llama_model_with_padding_mask,
+    forward_llama_mlp_with_feature_dumping,
 )
 
 # fmt: off
@@ -51,14 +51,14 @@ def get_max_available_num(all_datasets, dataset_weight):
 
 
 def change_forward(llama_model, device_id, save_path, template, save_interval=1):
-    llama_model.forward = types.MethodType(forward_llama_model_with_feature_dumping, llama_model)  # change forward function for LlamaModel
+    llama_model.forward = types.MethodType(forward_llama_model_with_padding_mask, llama_model)  # change forward function for LlamaModel
 
     for layer_idx, layer in enumerate(llama_model.layers):  # locate block by the name template
         mlp = layer.mlp
         assert type(mlp) == LlamaMLP
 
-        layer.forward = types.MethodType(forward_decoder_with_feature_dumping, layer)  # change forward function for LlamaDecoderLayer
-        mlp.forward = types.MethodType(forward_mlp_with_feature_dumping, mlp)  # change forward function for LlamaMLP
+        layer.forward = types.MethodType(forward_llama_decoder_with_padding_mask, layer)  # change forward function for LlamaDecoderLayer
+        mlp.forward = types.MethodType(forward_llama_mlp_with_feature_dumping, mlp)  # change forward function for LlamaMLP
 
         mlp.hidden_inputs = []
         mlp.hidden_outputs = []
@@ -139,7 +139,6 @@ if __name__ == "__main__":
                     if not os.path.exists(args.train_data_cache_path):
                         os.makedirs(args.train_data_cache_path)
                     torch.save(all_datasets[key].examples, cached_file_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
-                print(all_datasets[key][0]["input_ids"], all_datasets[key][0]["input_ids"].shape)
                 print(f"Dataset {key}: {sum([torch.sum(all_datasets[key][i]['attention_mask']).item() for i in range(len(all_datasets[key]))])} total tokens.")  # 统计非special token的数量
 
     # scale datasets by weights

@@ -219,16 +219,17 @@ class GradientSplitGetGrads:
         if module.add_batch_size:
             batch_size = grad_out[0].shape[0]
             self.sample_count += batch_size
-        print("grad_out", grad_out, len(grad_out))
-        print("grad_out", grad_out[0].shape, self.sample_count)
-        print("grad_in", grad_in, len(grad_in))
-        print("grad_in", grad_in[0].shape, self.sample_count)
-        if self.accumulate_level == "sample":
-            self.up_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_out[0].detach(), criterion=self.kernel), dim=0)
-        elif self.accumulate_level == "total":
-            self.up_proj_grads[module.layer_index] += torch.sum(grad_out[0].detach(), dim=0)
-        else:
-            raise NotImplementedError
+        # if self.device == "cuda:0":
+        #     print("grad_out", grad_out, len(grad_out))
+        #     print("grad_out", grad_out[0].shape, self.sample_count)
+        #     print("grad_in", grad_in, len(grad_in))
+        #     print("grad_in", grad_in[0].shape, self.sample_count)
+        # if self.accumulate_level == "sample":
+        #     self.up_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_out[0].detach(), criterion=self.kernel), dim=0)
+        # elif self.accumulate_level == "total":
+        #     self.up_proj_grads[module.layer_index] += torch.sum(grad_out[0].detach(), dim=0)
+        # else:
+        #     raise NotImplementedError
 
     def _backward_hook_gate_proj(self, module, grad_in, grad_out):
         if module.add_batch_size:
@@ -236,12 +237,17 @@ class GradientSplitGetGrads:
             self.sample_count += batch_size
             print(grad_in, len(grad_in))
             print(grad_in[0].shape, self.sample_count)
-        if self.accumulate_level == "sample":
-            self.gate_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_in[0].detach(), criterion=self.kernel), dim=0)
-        elif self.accumulate_level == "total":
-            self.gate_proj_grads[module.layer_index] += torch.sum(grad_in[0].detach(), dim=0)
-        else:
-            raise NotImplementedError
+        if self.device == "cuda:0":
+            print("grad_out", grad_out, len(grad_out))
+            print("grad_out", grad_out[0].shape, self.sample_count)
+            print("grad_in", grad_in, len(grad_in))
+            print("grad_in", grad_in[0].shape, self.sample_count)
+        # if self.accumulate_level == "sample":
+        #     self.gate_proj_grads[module.layer_index] += torch.sum(pass_kernel_function(grad_in[0].detach(), criterion=self.kernel), dim=0)
+        # elif self.accumulate_level == "total":
+        #     self.gate_proj_grads[module.layer_index] += torch.sum(grad_in[0].detach(), dim=0)
+        # else:
+        #     raise NotImplementedError
 
     def get_grad(self):
         # initialization
