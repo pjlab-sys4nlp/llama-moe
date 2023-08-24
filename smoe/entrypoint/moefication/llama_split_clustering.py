@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument('--metric', type=str, default="l2", choices=("l2", "cos"))
 
     args = parser.parse_args()
-    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Split-Clustering", )
+    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Split-Clustering-" + args.metric)
 
     print("Loading llama model...")
     model = LlamaForCausalLM.from_pretrained(args.model_path).model

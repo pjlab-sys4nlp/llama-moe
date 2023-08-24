@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
+from smoe.utils.list_operation import split_list_with_yield
+
 """for hidden feature generation"""
 
 
@@ -49,13 +51,13 @@ class LineByLineJsonlTextDataset(Dataset):
 
                     if chunk_num == 1:  # 只有一块，则直接对原文本编码
                         content_encoding = tokenizer(content, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
-                        self.examples.append(content_encoding["input_ids"])
+                        self.examples.append(content_encoding)
                     else:  # 多于一块，对各块分别编码
                         process_bar2 = tqdm(desc="Chunking line", total=chunk_num, leave=False, position=2)
-                        for content_tokenized_block in self.split_list_by_n(content_tokenized, block_size):  # chunk content by block_size
-                            content_block = " ".join(content_tokenized_block)  # 重新组合为文本形式，以使用tokenizer的encode函数进行自动处理
+                        for content_tokenized_block in split_list_with_yield(content_tokenized, block_size):  # chunk content by block_size
+                            content_block = tokenizer.convert_tokens_to_string(content_tokenized_block)  # 重新组合为文本形式，以使用tokenizer的encode函数进行自动处理
                             content_encoding = tokenizer(content_block, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
-                            self.examples.append(content_encoding["input_ids"])
+                            self.examples.append(content_encoding)  # dict: {"input_ids":... , "attention_mask":...}
                             process_bar2.update(1)
                         process_bar2.close()
                 except Exception:
@@ -64,7 +66,7 @@ class LineByLineJsonlTextDataset(Dataset):
                 process_bar.update(1)
             process_bar.close()
 
-        else:  # don't use this, it is slower than single-processing as data reading is IO consuming instead of CPU consuming
+        else:  # don't use this, it is slower than single-processing as data reading is IO bounded instead of CPU bounded
             from pebble import ProcessExpired, ProcessPool
             with ProcessPool(max_workers=num_threads) as pool:
                 future = pool.map(self.process_line, lines, [tokenizer] * len(lines), [block_size] * len(lines))
@@ -93,13 +95,9 @@ class LineByLineJsonlTextDataset(Dataset):
     def __getitem__(self, i):
         return self.examples[i]
 
-    def split_list_by_n(self, list_collection, n):  # 将集合均分，每份n个元素
-        for i in range(0, len(list_collection), n):
-            yield list_collection[i : i + n]
-
     def process_line(self, line, tokenizer, block_size):  # 多进程分词函数
         # fmt: off
-        if (len(line) > 0 and not line.isspace()):
+        if len(line) > 0 and not line.isspace():
             # 提前分词，查看分词数量，并以最大长度将文本分块
             content = json.loads(line)["content"]
             content_tokenized = tokenizer.tokenize(content)
@@ -110,7 +108,7 @@ class LineByLineJsonlTextDataset(Dataset):
                 return [content_encoding["input_ids"]]
             else:  # 多于一块，对各块分别编码
                 content_encoding_all = []
-                for content_tokenized_block in self.split_list_by_n(content_tokenized, block_size):  # chunk content by block_size
+                for content_tokenized_block in split_list_with_yield(content_tokenized, block_size):  # chunk content by block_size
                     content_block = " ".join(content_tokenized_block)  # 重新组合为文本形式，以使用tokenizer的encode函数进行自动处理
                     content_encoding = tokenizer(content_block, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
                     content_encoding_all.append(content_encoding["input_ids"])
