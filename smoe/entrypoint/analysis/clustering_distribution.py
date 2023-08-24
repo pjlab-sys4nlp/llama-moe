@@ -1,5 +1,5 @@
 """
-python -m smoe.entrypoint.analysis.clustering_distribution -d resources/clustering_samples
+python -m smoe.entrypoint.analysis.clustering_distribution -d resources/clustering_7_samples -o results/analysis_clustering7
 """
 
 import argparse
@@ -30,7 +30,7 @@ def main(args):
         barh(
             source_to_num,
             title=f"Cluster {cluster_idx}",
-            save_filepath=f"results/analysis/cluster_{cluster_idx}.png",
+            save_filepath=f"{args.out_dir}/cluster_{cluster_idx}.png",
         )
         print(f"Done: {file}")
 
@@ -38,5 +38,6 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data_dir", required=True)
+    parser.add_argument("-o", "--out_dir", required=True)
     args = parser.parse_args()
     main(args)

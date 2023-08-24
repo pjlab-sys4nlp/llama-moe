@@ -34,6 +34,7 @@ def visualize_expert_load_heatmap(
     fig.colorbar(im)
     fig.tight_layout()
     fig.savefig(path)
+    plt.close()
 
 
 def visualize_expert_load_barv(
@@ -64,3 +65,4 @@ def visualize_expert_load_barv(
     ax.set_axisbelow(True)
     fig.tight_layout()
     fig.savefig(path)
+    plt.close()
