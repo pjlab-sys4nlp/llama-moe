@@ -16,12 +16,10 @@ def load_cached_dataset(
         "json",
         data_files=filepath,
         num_proc=num_proc,
-        streaming=True,
         split=split,
     )
     grouped_datasets = ds.map(
         grouping_func,
         batched=True,
     )
-
     return grouped_datasets
