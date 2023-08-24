@@ -165,3 +165,5 @@ resources/
 outputs/
 /backups/
 /visualization/
+results/analysis/cluster_*.png
+results/expert_load_vis
