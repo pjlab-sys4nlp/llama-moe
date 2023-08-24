@@ -19,7 +19,8 @@ class LineByLineJsonlTextDataset(Dataset):
         tokenizer: PreTrainedTokenizer,
         file_path: str,
         block_size: int,
-        num_threads=1,
+        data_index_range: tuple = None,
+        num_threads: int = 1,
     ):
         """numthreads should be set <=1, otherwise it will slow down the reading process by ~4 times"""
         if num_threads > 1:
@@ -34,7 +35,8 @@ class LineByLineJsonlTextDataset(Dataset):
         with open(file_path, encoding="utf-8") as f:
             lines = f.read().splitlines()
 
-        # lines = lines[:1000]
+        if data_index_range is not None:
+            lines = lines[data_index_range[0] : data_index_range[1]]
         self.examples = []
         process_bar = tqdm(
             desc="Reading lines", total=len(lines), leave=False, position=1

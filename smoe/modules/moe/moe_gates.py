@@ -105,7 +105,7 @@ class TopKBalancedNoisyGate(nn.Module):
             top_k_scores = top_k_logits
 
         """专家平衡选择"""
-        if self.training and self.use_balance:
+        if self.use_balance:
 
             """计算importance"""
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
@@ -113,7 +113,7 @@ class TopKBalancedNoisyGate(nn.Module):
             importance = scores_filtered.sum(0)  # shape(num_experts)
 
             """计算load"""
-            if self.add_noise:  # 计算各分数在给定随机噪声的情况下，处于topK范围内的概率
+            if self.training and self.add_noise:  # 计算各分数在给定随机噪声的情况下，处于topK范围内的概率
                 batch_size = logits_gate.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
