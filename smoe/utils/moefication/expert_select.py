@@ -68,9 +68,9 @@ class MLPGate(BaseGate):
         # fmt: off
         if isinstance(module, torch.nn.Linear):
             if module.weight.shape[-1] == self.hidden_dim:  # 第一层，用所有专家权重的中心点初始化，shape(expert_num, input_dim)
-                if self.available_mlp_init_criterion == "weight":
+                if self.mlp_init_criterion == "weight":
                     module.weight.data = torch.from_numpy(self.centers).float()  # 不理解有什么道理，这样会使gate初始偏向选择与权重方向最相似的输入，使其缺乏变换能力
-                elif self.available_mlp_init_criterion == "random":
+                elif self.mlp_init_criterion == "random":
                     module.weight.data = torch.normal(0, 1.0, module.weight.data.shape)
             else:  # 第二层，使用对角矩阵初始化，意图平衡专家间的知识
                 module.weight.data = torch.eye(module.weight.data.shape[0])
@@ -83,14 +83,12 @@ class MLPGate(BaseGate):
         with torch.no_grad():
             if self.select_criterion == "plain":
                 scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的输出总值，shape(batch_size, expert_num)
-                # scores /= torch.abs(scores).max()  # 归一化
+                scores = torch.abs(scores)
 
             elif self.select_criterion == "positive":
                 hidden_outputs_mask = (hidden_outputs < 0)  # 选出输出值小于0的神经元，标记其为死神经元
                 hidden_outputs[hidden_outputs_mask] = 0  # 死神经元的输出置零
-
                 scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
-                # scores /= scores.max()  # 归一化
 
             elif self.select_criterion == "l1_norm":
                 # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
@@ -98,9 +96,7 @@ class MLPGate(BaseGate):
                 hidden_outputs_l1 = pass_kernel_function(hidden_outputs, criterion="l1_norm")  # 输出值L1范数
                 # hidden_outputs_mask = (hidden_outputs_l1 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
                 # hidden_outputs_l1[hidden_outputs_mask] = 0  # 死神经元的输出置零
-
                 scores = torch.matmul(hidden_outputs_l1, expert_masks)  # 各个专家所对应神经元的输出值L1范数总值，shape(batch_size, expert_num)
-                # scores /= scores.max()  # 归一化
 
             elif self.select_criterion == "l2_norm":
                 # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
@@ -108,12 +104,12 @@ class MLPGate(BaseGate):
                 hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
                 # hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
                 # hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
-
                 scores = torch.matmul(hidden_outputs_l2, expert_masks)  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
-                # scores /= scores.max()  # 归一化
 
             if use_softmax:
                 scores = nn.Softmax(1)(scores)
+            else:
+                scores /= scores.max()  # 归一化
 
         return scores
         # fmt: on
@@ -162,8 +158,11 @@ class MLPGate(BaseGate):
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
         # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, train_epochs)
         lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.03, patience=5)
-        # loss_function = torch.nn.BCEWithLogitsLoss()
-        loss_function = torch.nn.KLDivLoss(reduction="batchmean")
+
+        if use_softmax:
+            loss_function = torch.nn.KLDivLoss(reduction="batchmean")
+        else:
+            loss_function = torch.nn.BCEWithLogitsLoss()
 
         """Initialize training configs"""
         self.train_loss = {
@@ -228,7 +227,10 @@ class MLPGate(BaseGate):
                     # scores_reform = torch.zeros((batch_size, self.config.num_experts), device=device)
                     # scores_reform = scores_reform.scatter(dim=1, index=scores_labels, value=1)  # shape(batch_size, expert_num)
 
-                    loss = loss_function(torch.log(pred.view(-1)), scores.view(-1))  # KL损失
+                    if use_softmax:
+                        loss = loss_function(torch.log(pred.view(-1)), scores.view(-1))  # KL损失
+                    else:
+                        loss = loss_function(pred.view(-1), scores.view(-1))  # BCE损失
                     loss += gate_loss
                     loss.backward()
 
@@ -279,7 +281,10 @@ class MLPGate(BaseGate):
                         scores = self.calculate_scores(hidden_outputs, expert_masks, use_softmax=use_softmax)  # 根据当前层激活后的输出所计算出的各个专家的分数
                         scores_topk, scores_labels = torch.topk(scores, k=int(self.config.num_selects), dim=-1)
 
-                        loss = loss_function(torch.log(pred.view(-1)), scores.view(-1))  # KL损失
+                        if use_softmax:
+                            loss = loss_function(torch.log(pred.view(-1)), scores.view(-1))  # KL损失
+                        else:
+                            loss = loss_function(pred.view(-1), scores.view(-1))  # BCE损失
 
                         correct_num = torch.sum(torch.eq(pred_labels, scores_labels)).item()
                         total_num = torch.numel(pred_labels)

@@ -21,4 +21,4 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --num_experts ${num_experts}
 
 wait
-chmod -R 777 ${save_path}
+chmod -R 777 ${save_path} >/dev/null 2>&1

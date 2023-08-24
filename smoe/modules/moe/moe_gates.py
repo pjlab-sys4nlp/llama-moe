@@ -59,8 +59,9 @@ class TopKBalancedNoisyGate(nn.Module):
             dtype=self.weight_noise.weight.data.dtype,
         )
         # print(self.weight_noise.weight.data)
-        self.mean = torch.tensor([0.0], requires_grad=False)
-        self.std = torch.tensor([1.0], requires_grad=False)
+        self.mean = torch.tensor([0.0], device=self.weight_noise.weight.data.device)
+        self.std = torch.tensor([1.0], device=self.weight_noise.weight.data.device)
+        self.normal = Normal(self.mean, self.std)
         self.softplus = nn.Softplus()
 
         # use_softmax
@@ -105,6 +106,7 @@ class TopKBalancedNoisyGate(nn.Module):
 
         """专家平衡选择"""
         if self.training and self.use_balance:
+
             """计算importance"""
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
             scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
@@ -115,20 +117,14 @@ class TopKBalancedNoisyGate(nn.Module):
                 batch_size = logits_gate.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
-
-                if self.mean.device != x.device:
-                    self.mean = self.mean.to(x.device)
-                    self.std = self.std.to(x.device)
-                normal = Normal(self.mean, self.std)
-
                 threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
                 threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
                 is_in = torch.gt(logits_noise, threshold_if_in)
                 threshold_positions_if_out = threshold_positions_if_in - 1
                 threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
                 # is each value currently in the top k.
-                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control)
-                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control)
+                prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
+                prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
                 load = prob.sum(0)
             else:
