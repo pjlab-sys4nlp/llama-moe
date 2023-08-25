@@ -2,14 +2,14 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama2_7B"
+llama_size="llama_7B"
 
-num_experts=8                    #  8  16
-num_selects=2                    #  2  4
+num_experts=16                   #  8  16
+num_selects=4                    #  2  4
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
-split_type=Random                #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+split_type=Graph-l2_norm         #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
 select_type=l2_norm              #  plain  positive  l1_norm  l2_norm
-proj_type=gate_proj              #  gate_proj  up_proj
+proj_type=up_proj                #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}

@@ -1,117 +1,53 @@
-import os.path
-from dataclasses import dataclass, field
-from typing import Optional
+import argparse
+import os
 
 import torch
-from torch.distributed.elastic.multiprocessing.errors import record
-from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer, set_seed
+from tqdm import tqdm
+from transformers import LlamaConfig
 
-from smoe.data.collate_fn import fault_tolerance_data_collator
-from smoe.data.single_file import load_cached_dataset
-from smoe.trainer.moefication.expert_split_gradient import ExpertSplitGradientTrainer
-from smoe.utils.config import (
-    DataArguments,
-    EnhancedTrainingArguments,
-    ModelArguments,
-    parse_args,
-)
-from smoe.utils.moefication.expert_split import GradientSplitGetGrads
-from smoe.utils.param import get_trainable_parameters
-
-
-@dataclass
-class SplitArguments:
-    save_path: str = field(default=None)
-    expert_size: int = field(default=None)
-    template: Optional[str] = field(default="layers.{}.mlp.gate_proj.weight")
-    accumulate_level: Optional[str] = field(default="sample")  # sample total
-    kernel: Optional[str] = field(default="l1_norm")  # plain l1_norm l2_norm
-    data_use_range_begin: Optional[float] = field(default=0.0)
-    data_use_range_end: Optional[float] = field(default=1.0)
-
-
-@record
-def main():
-    model_args, data_args, training_args, split_args = parse_args(
-        ModelArguments, DataArguments, EnhancedTrainingArguments, SplitArguments
-    )
-    model_name = os.path.split(model_args.model_name_or_path)[1]
-    dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
-    split_args.save_path = os.path.join(
-        split_args.save_path,
-        "Gradients",
-        f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}",
-        dataset_name,
-    )
-    print(split_args, "\n")
-
-    """Set seed before initializing model."""
-    set_seed(training_args.seed)
-
-    config = LlamaConfig.from_pretrained(model_args.model_name_or_path)
-    if training_args.gradient_checkpointing:
-        config.use_cache = False
-
-    tokenizer = LlamaTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-
-    """Preprocessing the datasets."""
-    if data_args.block_size is None:
-        block_size = tokenizer.model_max_length
-        block_size = 2048 if block_size > 2048 else block_size
-    else:
-        block_size = min(data_args.block_size, tokenizer.model_max_length)
-
-    with training_args.main_process_first(desc="dataset map tokenization and grouping"):
-        lm_datasets = load_cached_dataset(
-            data_args.dataset_dir,
-            block_size=block_size,
-        )
-
-    """Initialize model"""
-    torch_dtype = (
-        model_args.torch_dtype
-        if model_args.torch_dtype in ["auto", None]
-        else getattr(torch, model_args.torch_dtype)
-    )
-    model = LlamaForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
-        from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        torch_dtype=torch_dtype,
-        low_cpu_mem_usage=True,
-    )
-
-    model_vocab_size = model.get_output_embeddings().weight.size(0)
-    if model_vocab_size != len(tokenizer):
-        model.resize_token_embeddings(len(tokenizer))
-        raise ValueError(
-            f"The model's vocab size ({model_vocab_size}) does not match with the"
-            f" tokenizer ({len(tokenizer)})"
-        )
-
-    get_trainable_parameters(model, verbose=True)
-
-    """Initialize our Trainer"""
-    trainer = ExpertSplitGradientTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=lm_datasets,
-        tokenizer=tokenizer,
-        data_collator=fault_tolerance_data_collator,
-    )
-
-    """Start splitting"""
-    split = GradientSplitGetGrads(
-        split_args,
-        trainer,
-        split_args.template,
-        accumulate_level=split_args.accumulate_level,
-        kernel=split_args.kernel,
-        device=f"cuda:{training_args.local_rank}",
-    )
-    split.get_grad()
-    print("Done.")
-
+from smoe.utils.moefication.expert_split import GradientSplit
+from smoe.utils.string_operation import str2bool
 
 if __name__ == "__main__":
-    main()
+    # fmt: off
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_path', type=str)
+    parser.add_argument('--grad_file_path', type=str)
+    parser.add_argument('--save_path', type=str)
+    parser.add_argument('--expert_size', type=int)
+    parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
+
+    parser.add_argument('--kernel', type=str, default="plain", choices=("plain", "l1_norm", "l2_norm"))
+    parser.add_argument('--accumulate_level', type=str, default="sample", choices=("sample", "total"))
+    parser.add_argument('--criterion', type=str, default="min", choices=("min", "max"))
+    parser.add_argument('--share_neurons', type=str, default="False")
+
+    args = parser.parse_args()
+    args.share_neurons = str2bool(args.share_neurons)
+    print(args, "\n")
+
+    print("Loading llama config...")
+    config = LlamaConfig.from_pretrained(args.model_path)
+
+    print("Processing layers...")
+    for i in tqdm(range(config.num_hidden_layers)):
+        grad_list = []
+
+        for expert_folder_name in os.listdir(args.grad_file_path):
+            grad_file_path = os.path.join(args.grad_file_path, expert_folder_name, args.template.format(i) + ".grad")
+            grad = torch.load(grad_file_path, map_location="cpu")
+            grad_list.append(grad)
+        print(grad_list)
+
+        expert_num = len(grad_list)
+
+        save_path = os.path.join(
+            args.save_path,
+            f"{os.path.split(args.model_path)[1]}-Split-Gradient-{args.criterion}-{args.kernel}-{args.accumulate_level}",
+            f"{expert_num}Experts-{args.expert_size}Neurons-{'Share' if args.share_neurons else ''}"
+        )
+
+        split = GradientSplit(args, args.template, i, grad_list)
+        split.split(args.expert_size, criterion=args.criterion, share_neurons=args.share_neurons)
+    print("Done.")
+    # fmt: on

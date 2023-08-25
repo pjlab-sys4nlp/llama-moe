@@ -5,7 +5,7 @@
 llama_size="llama_13B"
 
 num_experts=8       #  8  16
-metric=l2          #  l2  cos
+metric=l2           #  l2  cos
 proj_type=gate_proj #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
@@ -22,5 +22,4 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --num_experts ${num_experts} \
   --metric ${metric}
 
-wait
 chmod -R 777 ${save_path} >/dev/null 2>&1
