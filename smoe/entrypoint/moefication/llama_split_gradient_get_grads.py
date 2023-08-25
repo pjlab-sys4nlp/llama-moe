@@ -82,9 +82,11 @@ def main():
         low_cpu_mem_usage=True,
     )
 
-    for layer_index, layer in enumerate(model.model.layers):  # locate block by the name template
-        layer.mlp.forward = types.MethodType(forward_llama_mlp_with_backward_hook_bug_fix, layer.mlp)  # change forward function for LlamaMLP
-        # layer.mlp.forward = forward_llama_mlp_with_backward_hook_bug_fix
+    # locate block by the name template
+    for layer_index, layer in enumerate(model.model.layers):
+        layer.mlp.forward = types.MethodType(
+            forward_llama_mlp_with_backward_hook_bug_fix, layer.mlp
+        )
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
     if model_vocab_size != len(tokenizer):
@@ -111,7 +113,7 @@ def main():
         trainer,
         accumulate_level=split_args.accumulate_level,
         kernel=split_args.kernel,
-        device=f"cuda:{training_args.local_rank}"
+        device=f"cuda:{training_args.local_rank}",
     )
     split.get_grad()
     print(f"Device {training_args.local_rank} Done.")

@@ -1,9 +1,9 @@
 import torch
 from torch import nn
-
 from transformers.models.llama.modeling_llama import LlamaMLP
 
 
+# fmt: off
 def backward_hook(module, grad_in, grad_out):
     print(module.name, "grad_in", len(grad_in), [grad_in[i].shape if grad_in[i] is not None else None for i in range(len(grad_in))], grad_in, sep='\n')
     print(module.name, "grad_out", len(grad_out), [grad_out[i].shape if grad_out[i] is not None else None for i in range(len(grad_out))], grad_out, sep='\n')

@@ -63,6 +63,7 @@ class LinearMoELayer(nn.Module):
     def reinit_gate_network(self):
         self.gate.reinit_gate_network()
 
+
 class LinearGLUMoELayer(nn.Module):
     def __init__(
         self,

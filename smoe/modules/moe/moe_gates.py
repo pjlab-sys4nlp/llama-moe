@@ -30,14 +30,14 @@ class TopKBalancedNoisyGate(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            num_selects,
-            gate_network="mlp",
-            use_balance=True,
-            add_noise=True,
-            use_softmax=True,
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_balance=True,
+        add_noise=True,
+        use_softmax=True,
     ):
         super(TopKBalancedNoisyGate, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
