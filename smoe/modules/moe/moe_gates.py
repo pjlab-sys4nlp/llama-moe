@@ -210,7 +210,7 @@ class TopKBalancedNoisyGate(nn.Module):
 
     # fmt: on
 
-    def reinit_gate_network(self):
+    def reset_gate_network(self):
         for name, param in self.gate_network.named_parameters():
             if "weight" in name:
                 torch.nn.init.kaiming_normal_(param)

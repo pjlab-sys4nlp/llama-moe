@@ -101,8 +101,8 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def set_moe_gate_use_softmax(self, use_softmax):
         self.mlp.set_gate_use_softmax(use_softmax)
 
-    def reinit_gate_network(self):
-        self.mlp.reinit_gate_network()
+    def reset_gate_network(self):
+        self.mlp.reset_gate_network()
 
 
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
@@ -299,9 +299,9 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_gate_use_softmax(use_softmax)
 
-    def reinit_gate_network(self):
+    def reset_gate_network(self):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.reinit_gate_network()
+            decoder_layer.reset_gate_network()
 
 
 class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
@@ -392,8 +392,8 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_gate_use_softmax(self, use_softmax):
         self.model.set_moe_gate_use_softmax(use_softmax)
 
-    def reinit_gate_network(self):
-        self.model.reinit_gate_network()
+    def reset_gate_network(self):
+        self.model.reset_gate_network()
 
 
 class LlamaMoEForSequenceClassification(
@@ -513,5 +513,5 @@ class LlamaMoEForSequenceClassification(
     def set_moe_gate_use_softmax(self, use_softmax):
         self.model.set_moe_gate_use_softmax(use_softmax)
 
-    def reinit_gate_network(self):
-        self.model.reinit_gate_network()
+    def reset_gate_network(self):
+        self.model.reset_gate_network()

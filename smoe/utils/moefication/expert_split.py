@@ -288,8 +288,9 @@ class GradientSplitGetGrads:
         # if self.device == "cuda:0":
         #     print(gathered_sample_count)
 
-        if not os.path.exists(self.config.save_path):
-            os.makedirs(self.config.save_path)
+        if self.device == "cuda:0":
+            if not os.path.exists(self.config.save_path):
+                os.makedirs(self.config.save_path)
 
         for layer_index in tqdm(range(self.layer_num)):
             # gather results on different devices

@@ -60,8 +60,8 @@ class LinearMoELayer(nn.Module):
     def set_gate_use_softmax(self, use_softmax):
         self.gate.use_softmax = use_softmax
 
-    def reinit_gate_network(self):
-        self.gate.reinit_gate_network()
+    def reset_gate_network(self):
+        self.gate.reset_gate_network()
 
 
 class LinearGLUMoELayer(nn.Module):
@@ -124,5 +124,5 @@ class LinearGLUMoELayer(nn.Module):
     def set_gate_use_softmax(self, use_softmax):
         self.gate.use_softmax = use_softmax
 
-    def reinit_gate_network(self):
-        self.gate.reinit_gate_network()
+    def reset_gate_network(self):
+        self.gate.reset_gate_network()
