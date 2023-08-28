@@ -9,8 +9,23 @@ from transformers.utils import logging
 logger = logging.get_logger(__name__)
 
 
-# fmt: off
-def forward_llama_mlp_with_feature_dumping(self, x, padding_mask):  # new forward function with hidden_states recording for mlp layer
+def forward_llama_mlp_with_backward_hook_bug_fix(self, x):
+    # fmt: off
+    batch_size, seq_len, hidden_size = x.shape
+    x = x.reshape(batch_size * seq_len, hidden_size)  # ---- reshape -----
+
+    gate_proj_output = self.act_fn(self.gate_proj(x))
+    up_proj_output = self.up_proj(x)
+    gate_up_mm_output = gate_proj_output * up_proj_output
+    down_proj_output = self.down_proj(gate_up_mm_output)
+
+    down_proj_output = down_proj_output.reshape(batch_size, seq_len, hidden_size)  # ---- reshape -----
+    return down_proj_output
+    # fmt: on
+
+
+def forward_llama_mlp_with_feature_dumping(self, x, padding_mask):
+    # fmt: off
     self.now_epoch += 1
     self.hidden_inputs.append(x.detach().half()[padding_mask])  # exclude padding features
 
@@ -35,7 +50,7 @@ def forward_llama_mlp_with_feature_dumping(self, x, padding_mask):  # new forwar
         self.hidden_outputs = []
 
     return down_proj_output
-# fmt: on
+    # fmt: on
 
 
 def forward_llama_decoder_with_padding_mask(

@@ -17,6 +17,8 @@ from smoe.utils.change_llama_moe_forward import (
     forward_llama_moe_model_with_padding_mask,
     forward_mlp_moe_gate_with_load_recording,
 )
+from smoe.utils.seed import set_seed
+from smoe.utils.string_operation import str2bool
 from smoe.utils.visualization.visualize import (
     visualize_expert_load_barv,
     visualize_expert_load_heatmap,
@@ -43,12 +45,17 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, default="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000/commoncrawl-part-000203-16de0c55-head1000.jsonl")
     parser.add_argument('--data_path', type=str, default="/mnt/petrelfs/share_data/quxiaoye/data/vis_data")
     parser.add_argument('--save_path', type=str, default="/mnt/petrelfs/share_data/quxiaoye/visualization")
+    parser.add_argument('--save_name_prefix', type=str, default="")
+    parser.add_argument('--reinit_gate', type=str, default="False")
+    parser.add_argument('--data_begin_index', type=int, default=0)
+    parser.add_argument('--data_end_index', type=int, default=-1)
     parser.add_argument('--batch_size', type=int, default=8)  # 单次evaluate的batch_size
 
     args = parser.parse_args()
+    args.reinit_gate = str2bool(args.reinit_gate)
     print("\n", args)
 
-    data_index_range = (0, 200) ##########################
+    data_index_range = (args.data_begin_index, args.data_end_index)
 
     print("\ncuda is_available: " + str(torch.cuda.is_available()))
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -68,6 +75,11 @@ if __name__ == "__main__":
     """load model"""
     print("Loading llama model...")
     model = LlamaMoEForCausalLM.from_pretrained(args.model_path).model
+    if args.reinit_gate:
+        set_seed(0)
+        # print(model.layers[0].mlp.gate.gate_network[0].weight)
+        model.reset_gate_network()
+        # print(model.layers[0].mlp.gate.gate_network[0].weight)
     change_forward(model)
 
     """evaluation"""
@@ -83,7 +95,7 @@ if __name__ == "__main__":
             model(**batch)
 
     """visualization"""
-    dataset_name = os.path.split(args.data_path)[1].split(".")[0]
+    dataset_name = os.path.split(args.data_path)[1].split(".")[0] + args.save_name_prefix
     for layer_idx, layer in enumerate(model.layers):
         load_sum = layer.mlp.gate.load_sum.cpu().numpy()  # shape(num_experts)
         visualize_expert_load_heatmap(

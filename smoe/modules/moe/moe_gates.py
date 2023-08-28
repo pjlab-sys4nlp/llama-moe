@@ -48,6 +48,7 @@ class TopKBalancedNoisyGate(nn.Module):
         self.add_noise = add_noise
         self.use_softmax = use_softmax
 
+        self.gate_network_type = gate_network
         self.gate_network = get_gate_network(gate_network, input_size, num_experts)
 
         # add_noise
@@ -206,4 +207,10 @@ class TopKBalancedNoisyGate(nn.Module):
             gate_loss = None
 
         return scores, gate_loss
+
     # fmt: on
+
+    def reset_gate_network(self):
+        for name, param in self.gate_network.named_parameters():
+            if "weight" in name:
+                torch.nn.init.kaiming_normal_(param)
