@@ -78,7 +78,7 @@ if __name__ == "__main__":
     if args.reinit_gate:
         set_seed(0)
         # print(model.layers[0].mlp.gate.gate_network[0].weight)
-        model.reinit_gate_network()
+        model.reset_gate_network()
         # print(model.layers[0].mlp.gate.gate_network[0].weight)
     change_forward(model)
 
