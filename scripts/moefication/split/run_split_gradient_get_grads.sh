@@ -22,9 +22,9 @@ export LOGLEVEL=INFO
 ###################################################################
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama2_7B"
 
-accumulate_level=sample #  sample  total
+accumulate_level=total #  sample  total
 kernel=l1_norm         #  plain  l1_norm  l2_norm
 
 data_use_range_begin=0.0
@@ -38,7 +38,9 @@ tokenizer_path=${data_path}/models/${llama_size}
 #dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl")
 #dataset_name=("8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
 #dataset_name=("16.jsonl" "17.jsonl" "18.jsonl" "19.jsonl" "20.jsonl" "21.jsonl" "22.jsonl" "23.jsonl")
-dataset_name=("24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
+#dataset_name=("24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
+
+dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl" "16.jsonl")
 
 dataset_dir=${data_path}/data/16clusters
 #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
@@ -58,18 +60,6 @@ head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 echo "Node: $head_node"
 echo "Node IP: $head_node_ip"
-
-#nodes=1
-#gpus=2
-#cpus=$((gpus * 16))
-#srun --job-name split-grad --partition MoE --ntasks-per-node 1 --cpus-per-task ${cpus} --nodes ${nodes} --gres gpu:${gpus} \
-#  torchrun \
-#  --nnodes ${nodes} \
-#  --nproc_per_node ${gpus} \
-#  --node_rank $SLURM_NODEID \
-#  --rdzv_id $RANDOM \
-#  --rdzv_backend c10d \
-#  --rdzv_endpoint $head_node:21212 \
 
 for name in "${dataset_name[@]}"; do
   srun torchrun \

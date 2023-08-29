@@ -6,10 +6,14 @@ from smoe.models.llama_moefication import BaseMoEModelOutputWithPast
 logger = logging.get_logger(__name__)
 
 
-def forward_mlp_moe_gate_with_load_recording(
-    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
+def forward_mlp_moe_gate_with_hidden_states_recording(
+        self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
 ):
     # fmt: off
+    #########################################################
+    self.samples_cnt += torch.sum(padding_mask).item()
+    #########################################################
+
     """先计算所有专家的权重值"""
     logits_gate = self.gate_network(x)  # gate计算出的权重
     if self.training and self.add_noise:
@@ -36,7 +40,12 @@ def forward_mlp_moe_gate_with_load_recording(
         """计算importance"""
         zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
         scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+        scores_filtered = scores_filtered[padding_mask]  ###############################################
         importance = scores_filtered.sum(0)  # shape(num_experts)
+
+        #########################################################
+        self.importance_sum += scores_filtered.detach().sum(0)
+        #########################################################
 
         """计算load"""
         if self.training and self.add_noise:  # 计算各分数在给定随机噪声的情况下，处于topK范围内的概率
@@ -55,20 +64,24 @@ def forward_mlp_moe_gate_with_load_recording(
             load = prob.sum(0)
 
             #########################################################
-            self.load_sum = self.load_sum.to(x.device)
-            self.load_sum += prob[padding_mask].detach().sum(0)
+            self.load_sum += prob.detach().sum(0)
             #########################################################
         else:
             load = (scores_filtered > 0).sum(0)  # shape(num_experts)
 
             #########################################################
-            self.load_sum = self.load_sum.to(x.device)
-            self.load_sum += (scores_filtered[padding_mask].detach() > 0).sum(0)
+            self.load_sum += (scores_filtered.detach() > 0).sum(0)
             #########################################################
 
         """计算balance loss"""
-        gate_loss = self.cv_squared(importance) + self.cv_squared(load)
-        gate_loss *= gate_loss_lambda
+        #########################################################
+        importance_loss = self.cv_squared(importance) * gate_loss_lambda
+        load_loss = self.cv_squared(load) * gate_loss_lambda
+        gate_loss = importance_loss + load_loss
+
+        self.importance_loss_sum += importance_loss.detach()
+        self.load_loss_sum += load_loss.detach()
+        #########################################################
 
     else:
         gate_loss = None
@@ -78,7 +91,7 @@ def forward_mlp_moe_gate_with_load_recording(
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
+        self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
 ):
     # fmt: off
     batch_size = x.shape[0]
@@ -97,14 +110,14 @@ def forward_linear_glu_moe_layer_with_padding_mask(
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-    self,
-    hidden_states,
-    padding_mask,  # ----- add padding_mask -----
-    attention_mask=None,
-    position_ids=None,
-    past_key_value=None,
-    output_attentions=False,
-    use_cache=False,
+        self,
+        hidden_states,
+        padding_mask,  # ----- add padding_mask -----
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -144,16 +157,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-    self,
-    input_ids=None,
-    attention_mask=None,
-    position_ids=None,
-    past_key_values=None,
-    inputs_embeds=None,
-    use_cache=None,
-    output_attentions=None,
-    output_hidden_states=None,
-    return_dict=None,
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
 ):
     output_attentions = (
         output_attentions

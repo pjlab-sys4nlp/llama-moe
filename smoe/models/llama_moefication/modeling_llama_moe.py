@@ -28,6 +28,27 @@ _CONFIG_FOR_DOC = "LlamaMoEConfig"
 class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def __init__(self, config: LlamaMoEConfig, layer_index):
         super().__init__(config)
+
+        gating_config = {
+            # all gates
+            "gate_type": config.gate_type,
+            "gate_network": config.gate_network,
+            "gate_use_softmax": config.gate_use_softmax,
+            "gate_use_balance": config.gate_use_balance,
+            "gate_balance_loss_weight": config.gate_balance_loss_weight,
+            # TopKBalancedNoisyGate
+            "gate_add_noise": config.gate_add_noise,
+            "gate_noise_epsilon": config.gate_noise_epsilon,
+        }
+        calculator_config = {
+            # all calculators
+            "calculator_type": config.calculator_type,
+            "multiply_gate_scores": config.multiply_gate_scores,
+            # SwitchDropTokenCalculator
+            "drop_tokens": config.drop_tokens,
+            "capacity_factor": config.capacity_factor,
+        }
+
         self.mlp = LinearGLUMoELayer(
             input_size=self.hidden_size,
             hidden_size=config.intermediate_size,
@@ -41,20 +62,18 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
                 else None
             ),
             bias=False,
-            gate_network=config.gates,
-            gate_use_balance=True,
-            gate_add_noise=True,
-            gate_use_softmax=True,
+            **gating_config,
+            **calculator_config,
         )
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+            self,
+            hidden_states,
+            attention_mask=None,
+            position_ids=None,
+            past_key_value=None,
+            output_attentions=False,
+            use_cache=False,
     ):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -92,14 +111,20 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def set_moe_num_selects(self, num_selects):
         self.mlp.set_num_selects(num_selects)
 
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.mlp.set_gate_use_softmax(use_softmax)
+
     def set_moe_gate_use_balance(self, use_balance):
         self.mlp.set_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        self.mlp.set_gate_balance_loss_weight(balance_loss_weight)
 
     def set_moe_gate_add_noise(self, add_noise):
         self.mlp.set_gate_add_noise(add_noise)
 
-    def set_moe_gate_use_softmax(self, use_softmax):
-        self.mlp.set_gate_use_softmax(use_softmax)
+    def set_moe_calculator_drop_tokens(self, drop_tokens):
+        self.mlp.set_calculator_drop_tokens(drop_tokens)
 
     def reset_gate_network(self):
         self.mlp.reset_gate_network()
@@ -125,16 +150,16 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         )
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         output_attentions = (
             output_attentions
@@ -287,17 +312,25 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_num_selects(num_selects)
 
+    def set_moe_gate_use_softmax(self, use_softmax):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_use_softmax(use_softmax)
+
     def set_moe_gate_use_balance(self, use_balance):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_balance_loss_weight(balance_loss_weight)
 
     def set_moe_gate_add_noise(self, add_noise):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_gate_add_noise(add_noise)
 
-    def set_moe_gate_use_softmax(self, use_softmax):
+    def set_moe_calculator_drop_tokens(self, drop_tokens):
         for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.set_moe_gate_use_softmax(use_softmax)
+            decoder_layer.set_moe_calculator_drop_tokens(drop_tokens)
 
     def reset_gate_network(self):
         for idx, decoder_layer in enumerate(self.layers):
@@ -310,18 +343,18 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        **kwargs
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            **kwargs
     ):
         output_attentions = (
             output_attentions
@@ -383,14 +416,20 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)
 
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.model.set_moe_gate_use_softmax(use_softmax)
+
     def set_moe_gate_use_balance(self, use_balance):
         self.model.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        self.model.set_moe_gate_balance_loss_weight(balance_loss_weight)
 
     def set_moe_gate_add_noise(self, add_noise):
         self.model.set_moe_gate_add_noise(add_noise)
 
-    def set_moe_gate_use_softmax(self, use_softmax):
-        self.model.set_moe_gate_use_softmax(use_softmax)
+    def set_moe_calculator_drop_tokens(self, drop_tokens):
+        self.model.set_moe_calculator_drop_tokens(drop_tokens)
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
@@ -406,17 +445,17 @@ class LlamaMoEForSequenceClassification(
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
@@ -451,7 +490,7 @@ class LlamaMoEForSequenceClassification(
         else:
             if input_ids is not None:
                 sequence_lengths = (
-                    torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
+                        torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
                 ).to(logits.device)
             else:
                 sequence_lengths = -1
@@ -467,7 +506,7 @@ class LlamaMoEForSequenceClassification(
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
                 elif self.num_labels > 1 and (
-                    labels.dtype == torch.long or labels.dtype == torch.int
+                        labels.dtype == torch.long or labels.dtype == torch.int
                 ):
                     self.config.problem_type = "single_label_classification"
                 else:
@@ -504,14 +543,20 @@ class LlamaMoEForSequenceClassification(
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)
 
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.model.set_moe_gate_use_softmax(use_softmax)
+
     def set_moe_gate_use_balance(self, use_balance):
         self.model.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        self.model.set_moe_gate_balance_loss_weight(balance_loss_weight)
 
     def set_moe_gate_add_noise(self, add_noise):
         self.model.set_moe_gate_add_noise(add_noise)
 
-    def set_moe_gate_use_softmax(self, use_softmax):
-        self.model.set_moe_gate_use_softmax(use_softmax)
+    def set_moe_calculator_drop_tokens(self, drop_tokens):
+        self.model.set_moe_calculator_drop_tokens(drop_tokens)
 
     def reset_gate_network(self):
         self.model.reset_gate_network()

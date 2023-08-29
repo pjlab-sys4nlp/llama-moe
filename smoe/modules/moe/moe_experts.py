@@ -14,7 +14,13 @@ class LinearExperts(nn.Module):
     __constants__ = ["bias", "in_features", "out_features", "num_experts"]
 
     def __init__(
-        self, in_features, out_features, num_experts, bias=True, device=None, dtype=None
+            self,
+            in_features,
+            out_features,
+            num_experts,
+            bias=True,
+            device=None,
+            dtype=None
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super(LinearExperts, self).__init__()
@@ -65,16 +71,16 @@ class LinearGLUExperts(nn.Module):
     ]
 
     def __init__(
-        self,
-        in_features,
-        hidden_features,
-        out_features,
-        hidden_act,
-        num_experts,
-        size_experts=None,
-        bias=True,
-        device=None,
-        dtype=None,
+            self,
+            in_features,
+            hidden_features,
+            out_features,
+            hidden_act,
+            num_experts,
+            size_experts=None,
+            bias=True,
+            device=None,
+            dtype=None,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super(LinearGLUExperts, self).__init__()
@@ -91,8 +97,8 @@ class LinearGLUExperts(nn.Module):
             size_experts = [size_per_expert for _ in range(num_experts)]
         else:  # use specified expert sizes
             assert (
-                len(size_experts) == num_experts
-                and sum(size_experts) == hidden_features
+                    len(size_experts) == num_experts
+                    and sum(size_experts) == hidden_features
             )
 
         self.act_fn = ACT2FN[hidden_act]

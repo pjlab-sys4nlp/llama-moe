@@ -1,22 +1,19 @@
 from torch import nn
 
-from .moe_calculators import UniversalCalculator
+from .moe_calculators import UniversalCalculator, SwitchDropTokenCalculator
 from .moe_experts import LinearExperts, LinearGLUExperts
-from .moe_gates import TopKBalancedNoisyGate
+from .moe_gates import TopKBalancedNoisyGate, SwitchBalancedGate
 
 
 class LinearMoELayer(nn.Module):
     def __init__(
-        self,
-        input_size,
-        output_size,
-        num_experts,
-        num_selects,
-        bias=True,
-        gate_network="mlp",
-        gate_use_balance=True,
-        gate_add_noise=True,
-        gate_use_softmax=True,
+            self,
+            input_size,
+            output_size,
+            num_experts,
+            num_selects,
+            bias=True,
+            **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -26,39 +23,99 @@ class LinearMoELayer(nn.Module):
         self.num_experts = num_experts
         self.num_selects = num_selects
 
-        experts = LinearExperts(input_size, output_size, num_experts, bias=bias)
-        self.gate = TopKBalancedNoisyGate(input_size, num_experts, num_selects, gate_network=gate_network,
-                                          use_balance=gate_use_balance, add_noise=gate_add_noise, use_softmax=gate_use_softmax)  # noisy gate
-        self.calculator = UniversalCalculator(experts, multiply_gate_scores=gate_use_softmax)  # forward calculator for experts
+        self.gate_type = kwargs["gate_type"]
+        self.calculator_type = kwargs["calculator_type"]
+
+        experts = LinearExperts(
+            input_size,
+            output_size,
+            num_experts,
+            bias=bias
+        )
+
+        if kwargs["gate_type"] == "TopKBalancedNoisyGate":  # noisy gate
+            self.gate = TopKBalancedNoisyGate(
+                input_size,
+                num_experts,
+                num_selects,
+                gate_network=kwargs["gate_network"],
+                use_softmax=kwargs["gate_use_softmax"],
+                use_balance=kwargs["gate_use_balance"],
+                balance_loss_weight=kwargs["gate_balance_loss_weight"],
+                add_noise=kwargs["gate_add_noise"],
+                noise_epsilon=kwargs["gate_noise_epsilon"],
+            )
+        elif kwargs["gate_type"] == "SwitchBalancedGate":  # switch gate
+            self.gate = SwitchBalancedGate(
+                input_size,
+                num_experts,
+                num_selects,
+                gate_network=kwargs["gate_network"],
+                use_softmax=kwargs["gate_use_softmax"],
+                use_balance=kwargs["gate_use_balance"],
+                balance_loss_weight=kwargs["gate_balance_loss_weight"],
+            )
+        else:
+            raise NotImplementedError
+
+        if kwargs["calculator_type"] == "UniversalCalculator":  # top K calculator
+            self.calculator = UniversalCalculator(
+                experts,
+                multiply_gate_scores=kwargs["multiply_gate_scores"]
+            )
+        elif kwargs["calculator_type"] == "SwitchDropTokenCalculator":  # switch calculator
+            self.calculator = SwitchDropTokenCalculator(
+                experts,
+                multiply_gate_scores=kwargs["multiply_gate_scores"],
+                drop_tokens=kwargs["drop_tokens"],
+                capacity_factor=kwargs["capacity_factor"],
+            )
+        else:
+            raise NotImplementedError
         # fmt: on
 
-    def forward(self, x, noise_epsilon=1e-2, gate_loss_lambda=1e-2):
+    def forward(self, x):
         # fmt: off
-        batch_size = x.shape[0]
-        seq_len = x.shape[1]
+        original_shape = x.shape[:2]
         x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
 
-        indices, scores, gate_loss = self.gate(x, noise_epsilon=noise_epsilon, gate_loss_lambda=gate_loss_lambda)  # 计算被选出的专家及其分数，以及gate的loss
-        y = self.calculator(x, indices, scores)  # 合并各专家的计算结果
+        gate_outputs = self.gate(x)  # 计算被选出的专家及其分数，以及gate的loss
+        y = self.calculator(x, **gate_outputs)  # 合并各专家的计算结果
 
-        y = y.reshape(batch_size, seq_len, self.output_size)  # shape(batch_size, seq_len, output_size)
-        return y, gate_loss
+        y = y.reshape(original_shape + (self.output_size,))  # shape(batch_size, seq_len, output_size)
+        return y, gate_outputs["balance_loss"]
         # fmt: on
 
     def set_num_selects(self, num_selects):
         if num_selects > self.gate.num_experts:
             raise ValueError(num_selects)
+        elif self.gate_type == "SwitchBalancedGate":
+            raise ValueError("SwitchBalancedGate doesn't support manually setting num_selects.")
         else:
             self.gate.num_selects = num_selects
+
+    def set_gate_use_softmax(self, use_softmax):
+        self.gate.use_softmax = use_softmax
 
     def set_gate_use_balance(self, use_balance):
         self.gate.use_balance = use_balance
 
-    def set_gate_add_noise(self, add_noise):
-        self.gate.add_noise = add_noise
+    def set_gate_balance_loss_weight(self, balance_loss_weight):
+        self.gate.balance_loss_weight = balance_loss_weight
 
-    def set_gate_use_softmax(self, use_softmax):
-        self.gate.use_softmax = use_softmax
+    def set_gate_add_noise(self, add_noise):
+        if self.gate_type != "TopKBalancedNoisyGate":
+            raise ValueError(self.gate_type)
+        else:
+            self.gate.add_noise = add_noise
+
+    def set_calculator_drop_tokens(self, drop_tokens):
+        if self.calculator_type != "SwitchDropTokenCalculator":
+            raise ValueError(self.calculator_type)
+        elif self.calculator.experts.in_features != self.calculator.experts.out_features:
+            raise ValueError("You cannot set \"drop_tokens=True\" when \"in_features != out_features\"!")
+        else:
+            self.calculator.drop_tokens = drop_tokens
 
     def reset_gate_network(self):
         self.gate.reset_gate_network()
@@ -66,19 +123,16 @@ class LinearMoELayer(nn.Module):
 
 class LinearGLUMoELayer(nn.Module):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        gate_network="mlp",
-        gate_use_balance=True,
-        gate_add_noise=True,
-        gate_use_softmax=True,
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            **kwargs
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()
@@ -90,39 +144,99 @@ class LinearGLUMoELayer(nn.Module):
         self.num_experts = num_experts
         self.num_selects = num_selects
 
-        experts = LinearGLUExperts(input_size, hidden_size, output_size, hidden_act, num_experts, size_experts=size_experts, bias=bias)
-        self.gate = TopKBalancedNoisyGate(input_size, num_experts, num_selects, gate_network=gate_network,
-                                          use_balance=gate_use_balance, add_noise=gate_add_noise, use_softmax=gate_use_softmax)  # noisy gate
-        self.calculator = UniversalCalculator(experts, multiply_gate_scores=gate_use_softmax)  # forward calculator for experts
+        experts = LinearGLUExperts(
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            size_experts=size_experts,
+            bias=bias
+        )
+
+        if kwargs["gate_type"] == "TopKBalancedNoisyGate":  # noisy gate
+            self.gate = TopKBalancedNoisyGate(
+                input_size,
+                num_experts,
+                num_selects,
+                gate_network=kwargs["gate_network"],
+                use_softmax=kwargs["gate_use_softmax"],
+                use_balance=kwargs["gate_use_balance"],
+                balance_loss_weight=kwargs["gate_balance_loss_weight"],
+                add_noise=kwargs["gate_add_noise"],
+                noise_epsilon=kwargs["gate_noise_epsilon"],
+            )
+        elif kwargs["gate_type"] == "SwitchBalancedGate":  # switch gate
+            self.gate = SwitchBalancedGate(
+                input_size,
+                num_experts,
+                num_selects,
+                gate_network=kwargs["gate_network"],
+                use_softmax=kwargs["gate_use_softmax"],
+                use_balance=kwargs["gate_use_balance"],
+                balance_loss_weight=kwargs["gate_balance_loss_weight"],
+            )
+        else:
+            raise NotImplementedError
+
+        if kwargs["calculator_type"] == "UniversalCalculator":  # top K calculator
+            self.calculator = UniversalCalculator(
+                experts,
+                multiply_gate_scores=kwargs["multiply_gate_scores"]
+            )
+        elif kwargs["calculator_type"] == "SwitchDropTokenCalculator":  # switch calculator
+            self.calculator = SwitchDropTokenCalculator(
+                experts,
+                multiply_gate_scores=kwargs["multiply_gate_scores"],
+                drop_tokens=kwargs["drop_tokens"],
+                capacity_factor=kwargs["capacity_factor"],
+            )
+        else:
+            raise NotImplementedError
         # fmt: on
 
-    def forward(self, x, noise_epsilon=1e-2, gate_loss_lambda=1e-2):
+    def forward(self, x):
         # fmt: off
-        batch_size = x.shape[0]
-        seq_len = x.shape[1]
+        original_shape = x.shape[:-1]
         x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
 
-        indices, scores, gate_loss = self.gate(x, noise_epsilon=noise_epsilon, gate_loss_lambda=gate_loss_lambda)  # 计算被选出的专家及其分数，以及gate的loss
-        y = self.calculator(x, indices, scores)  # 合并各专家的计算结果
+        gate_outputs = self.gate(x)  # 计算被选出的专家及其分数，以及gate的loss
+        y = self.calculator(x, **gate_outputs)  # 合并各专家的计算结果
 
-        y = y.reshape(batch_size, seq_len, self.output_size)  # shape(batch_size, seq_len, output_size)
-        return y, gate_loss
+        y = y.reshape(original_shape + (self.output_size,))  # shape(batch_size, seq_len, output_size)
+        return y, gate_outputs["balance_loss"]
         # fmt: on
 
     def set_num_selects(self, num_selects):
         if num_selects > self.gate.num_experts:
             raise ValueError(num_selects)
+        elif self.gate_type == "SwitchBalancedGate":
+            raise ValueError("SwitchBalancedGate doesn't support manually setting num_selects.")
         else:
             self.gate.num_selects = num_selects
+
+    def set_gate_use_softmax(self, use_softmax):
+        self.gate.use_softmax = use_softmax
 
     def set_gate_use_balance(self, use_balance):
         self.gate.use_balance = use_balance
 
-    def set_gate_add_noise(self, add_noise):
-        self.gate.add_noise = add_noise
+    def set_gate_balance_loss_weight(self, balance_loss_weight):
+        self.gate.balance_loss_weight = balance_loss_weight
 
-    def set_gate_use_softmax(self, use_softmax):
-        self.gate.use_softmax = use_softmax
+    def set_gate_add_noise(self, add_noise):
+        if self.gate_type != "TopKBalancedNoisyGate":
+            raise ValueError(self.gate_type)
+        else:
+            self.gate.add_noise = add_noise
+
+    def set_calculator_drop_tokens(self, drop_tokens):
+        if self.calculator_type != "SwitchDropTokenCalculator":
+            raise ValueError(self.calculator_type)
+        elif self.calculator.experts.in_features != self.calculator.experts.out_features:
+            raise ValueError("You cannot set \"drop_tokens=True\" when \"in_features != out_features\"!")
+        else:
+            self.calculator.drop_tokens = drop_tokens
 
     def reset_gate_network(self):
         self.gate.reset_gate_network()

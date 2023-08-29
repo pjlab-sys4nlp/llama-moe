@@ -49,5 +49,7 @@ if __name__ == "__main__":
 
         split = GradientSplit(args, args.template, i, grad_list)
         split.split(args.expert_size, criterion=args.criterion, share_neurons=args.share_neurons)
+        split.cnt()
+        split.save()
     print("Done.")
     # fmt: on
