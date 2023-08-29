@@ -30,16 +30,16 @@ class TopKBalancedNoisyGate(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            num_selects,
-            gate_network="mlp",
-            use_softmax=True,
-            use_balance=True,
-            balance_loss_weight=1e-2,
-            add_noise=True,
-            noise_epsilon=1e-2,
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_softmax=True,
+        use_balance=True,
+        balance_loss_weight=1e-2,
+        add_noise=True,
+        noise_epsilon=1e-2,
     ):
         super(TopKBalancedNoisyGate, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
@@ -213,14 +213,14 @@ class SwitchBalancedGate(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            num_selects,
-            gate_network="mlp",
-            use_softmax=True,
-            use_balance=True,
-            balance_loss_weight=1e-2,
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_softmax=True,
+        use_balance=True,
+        balance_loss_weight=1e-2,
     ):
         super(SwitchBalancedGate, self).__init__()
         assert num_selects == 1

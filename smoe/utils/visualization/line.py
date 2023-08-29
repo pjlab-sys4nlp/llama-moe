@@ -1,7 +1,14 @@
 import matplotlib.pyplot as plt
 
 
-def line_plot(xs, label_to_nums, title: str = None, xlabel: str = None, ylabel: str = None, save_path: str = None):
+def line_plot(
+    xs,
+    label_to_nums,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    save_path: str = None,
+):
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111)
     for label, nums in label_to_nums.items():

@@ -13,48 +13,44 @@ class LlamaMoEConfig(PretrainedConfig):
     keys_to_ignore_at_inference = ["past_key_values"]
 
     def __init__(
-            self,
-            vocab_size=32000,
-            hidden_size=4096,
-            intermediate_size=11008,
-            num_hidden_layers=32,
-            num_attention_heads=32,
-            num_key_value_heads=None,
-            hidden_act="silu",
-            max_position_embeddings=2048,
-            initializer_range=0.02,
-            rms_norm_eps=1e-6,
-            use_cache=True,
-            pad_token_id=0,
-            bos_token_id=1,
-            eos_token_id=2,
-            pretraining_tp=1,
-            tie_word_embeddings=False,
-            rope_scaling=None,
-
-            #### -------- moe expert configs -------- ####
-            num_experts=16,
-            num_selects=4,
-            size_experts=None,
-
-            #### -------- moe gate configs -------- ####
-            gate_type="TopKBalancedNoisyGate",
-            gate_network="mlp",
-            gate_use_softmax=True,
-            gate_use_balance=True,
-            gate_balance_loss_weight=1e-2,
-            # TopKBalancedNoisyGate
-            gate_add_noise=True,
-            gate_noise_epsilon=1e-2,
-
-            #### -------- moe calculator configs -------- ####
-            calculator_type="UniversalCalculator",
-            multiply_gate_scores=True,
-            # SwitchDropTokenCalculator
-            drop_tokens=True,
-            capacity_factor=1.25,
-
-            **kwargs,
+        self,
+        vocab_size=32000,
+        hidden_size=4096,
+        intermediate_size=11008,
+        num_hidden_layers=32,
+        num_attention_heads=32,
+        num_key_value_heads=None,
+        hidden_act="silu",
+        max_position_embeddings=2048,
+        initializer_range=0.02,
+        rms_norm_eps=1e-6,
+        use_cache=True,
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=2,
+        pretraining_tp=1,
+        tie_word_embeddings=False,
+        rope_scaling=None,
+        #### -------- moe expert configs -------- ####
+        num_experts=16,
+        num_selects=4,
+        size_experts=None,
+        #### -------- moe gate configs -------- ####
+        gate_type="TopKBalancedNoisyGate",
+        gate_network="mlp",
+        gate_use_softmax=True,
+        gate_use_balance=True,
+        gate_balance_loss_weight=1e-2,
+        # TopKBalancedNoisyGate
+        gate_add_noise=True,
+        gate_noise_epsilon=1e-2,
+        #### -------- moe calculator configs -------- ####
+        calculator_type="UniversalCalculator",
+        multiply_gate_scores=True,
+        # SwitchDropTokenCalculator
+        drop_tokens=True,
+        capacity_factor=1.25,
+        **kwargs,
     ):
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
@@ -120,9 +116,9 @@ class LlamaMoEConfig(PretrainedConfig):
                 f"`rope_scaling`'s name field must be one of ['linear', 'dynamic'], got {rope_scaling_type}"
             )
         if (
-                rope_scaling_factor is None
-                or not isinstance(rope_scaling_factor, float)
-                or rope_scaling_factor <= 1.0
+            rope_scaling_factor is None
+            or not isinstance(rope_scaling_factor, float)
+            or rope_scaling_factor <= 1.0
         ):
             raise ValueError(
                 f"`rope_scaling`'s factor field must be an float > 1, got {rope_scaling_factor}"

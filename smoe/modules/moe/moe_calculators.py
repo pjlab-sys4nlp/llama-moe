@@ -66,11 +66,11 @@ class SwitchDropTokenCalculator(nn.Module):
     """
 
     def __init__(
-            self,
-            experts,
-            multiply_gate_scores=True,
-            drop_tokens=True,
-            capacity_factor=1.25,
+        self,
+        experts,
+        multiply_gate_scores=True,
+        drop_tokens=True,
+        capacity_factor=1.25,
     ):
         super(SwitchDropTokenCalculator, self).__init__()
         if drop_tokens:  # 如果丢弃token，则必须保证输入输出维度相同

@@ -1,19 +1,13 @@
 from torch import nn
 
-from .moe_calculators import UniversalCalculator, SwitchDropTokenCalculator
+from .moe_calculators import SwitchDropTokenCalculator, UniversalCalculator
 from .moe_experts import LinearExperts, LinearGLUExperts
-from .moe_gates import TopKBalancedNoisyGate, SwitchBalancedGate
+from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate
 
 
 class LinearMoELayer(nn.Module):
     def __init__(
-            self,
-            input_size,
-            output_size,
-            num_experts,
-            num_selects,
-            bias=True,
-            **kwargs
+        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -90,7 +84,9 @@ class LinearMoELayer(nn.Module):
         if num_selects > self.gate.num_experts:
             raise ValueError(num_selects)
         elif self.gate_type == "SwitchBalancedGate":
-            raise ValueError("SwitchBalancedGate doesn't support manually setting num_selects.")
+            raise ValueError(
+                "SwitchBalancedGate doesn't support manually setting num_selects."
+            )
         else:
             self.gate.num_selects = num_selects
 
@@ -112,8 +108,12 @@ class LinearMoELayer(nn.Module):
     def set_calculator_drop_tokens(self, drop_tokens):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
-        elif self.calculator.experts.in_features != self.calculator.experts.out_features:
-            raise ValueError("You cannot set \"drop_tokens=True\" when \"in_features != out_features\"!")
+        elif (
+            self.calculator.experts.in_features != self.calculator.experts.out_features
+        ):
+            raise ValueError(
+                'You cannot set "drop_tokens=True" when "in_features != out_features"!'
+            )
         else:
             self.calculator.drop_tokens = drop_tokens
 
@@ -123,16 +123,16 @@ class LinearMoELayer(nn.Module):
 
 class LinearGLUMoELayer(nn.Module):
     def __init__(
-            self,
-            input_size,
-            hidden_size,
-            output_size,
-            hidden_act,
-            num_experts,
-            num_selects,
-            size_experts=None,
-            bias=True,
-            **kwargs
+        self,
+        input_size,
+        hidden_size,
+        output_size,
+        hidden_act,
+        num_experts,
+        num_selects,
+        size_experts=None,
+        bias=True,
+        **kwargs
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()
@@ -211,7 +211,9 @@ class LinearGLUMoELayer(nn.Module):
         if num_selects > self.gate.num_experts:
             raise ValueError(num_selects)
         elif self.gate_type == "SwitchBalancedGate":
-            raise ValueError("SwitchBalancedGate doesn't support manually setting num_selects.")
+            raise ValueError(
+                "SwitchBalancedGate doesn't support manually setting num_selects."
+            )
         else:
             self.gate.num_selects = num_selects
 
@@ -233,8 +235,12 @@ class LinearGLUMoELayer(nn.Module):
     def set_calculator_drop_tokens(self, drop_tokens):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
-        elif self.calculator.experts.in_features != self.calculator.experts.out_features:
-            raise ValueError("You cannot set \"drop_tokens=True\" when \"in_features != out_features\"!")
+        elif (
+            self.calculator.experts.in_features != self.calculator.experts.out_features
+        ):
+            raise ValueError(
+                'You cannot set "drop_tokens=True" when "in_features != out_features"!'
+            )
         else:
             self.calculator.drop_tokens = drop_tokens
 

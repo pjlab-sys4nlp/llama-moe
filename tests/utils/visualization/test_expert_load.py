@@ -3,7 +3,10 @@ import tempfile
 import numpy as np
 import pytest
 
-from smoe.utils.visualization.visualize import visualize_expert_load_heatmap, visualize_expert_load_barv
+from smoe.utils.visualization.visualize import (
+    visualize_expert_load_barv,
+    visualize_expert_load_heatmap,
+)
 
 
 def test_visualization_expert_load_heatmap():
