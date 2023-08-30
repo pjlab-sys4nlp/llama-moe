@@ -17,14 +17,14 @@ from smoe.utils.io import torch_load_template_file
 
 
 def convert_llama_model_neuron_index(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEModel
@@ -47,9 +47,16 @@ def convert_llama_model_neuron_index(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:
@@ -110,14 +117,14 @@ def convert_llama_model_neuron_index(
 
 
 def convert_llama_model_for_causal_lm_neuron_index(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEForCausalLM
@@ -140,9 +147,16 @@ def convert_llama_model_for_causal_lm_neuron_index(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:
@@ -204,14 +218,14 @@ def convert_llama_model_for_causal_lm_neuron_index(
 
 
 def convert_llama_model_for_sequence_classification_neuron_index(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEForSequenceClassification
@@ -234,9 +248,16 @@ def convert_llama_model_for_sequence_classification_neuron_index(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:

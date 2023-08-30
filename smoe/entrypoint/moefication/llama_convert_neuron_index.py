@@ -6,7 +6,11 @@ from smoe.models.llama_moefication.modeling_llama_moe import (
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,
 )
-from smoe.utils.moefication.convert_llama_moe_neuron_index import convert_llama_model_neuron_index, convert_llama_model_for_causal_lm_neuron_index, convert_llama_model_for_sequence_classification_neuron_index
+from smoe.utils.moefication.convert_llama_moe_neuron_index import (
+    convert_llama_model_for_causal_lm_neuron_index,
+    convert_llama_model_for_sequence_classification_neuron_index,
+    convert_llama_model_neuron_index,
+)
 from smoe.utils.string_operation import str2bool
 
 # fmt: off

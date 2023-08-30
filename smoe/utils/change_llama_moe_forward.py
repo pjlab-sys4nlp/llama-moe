@@ -48,7 +48,9 @@ def forward_mlp_moe_gate_with_hidden_states_recording(self, x, padding_mask, **k
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-        self, x, padding_mask,
+    self,
+    x,
+    padding_mask,
 ):
     # fmt: off
     original_shape = x.shape[:-1]
@@ -64,14 +66,14 @@ def forward_linear_glu_moe_layer_with_padding_mask(
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-        self,
-        hidden_states,
-        padding_mask,  # ----- add padding_mask -----
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+    self,
+    hidden_states,
+    padding_mask,  # ----- add padding_mask -----
+    attention_mask=None,
+    position_ids=None,
+    past_key_value=None,
+    output_attentions=False,
+    use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -111,16 +113,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+    self,
+    input_ids=None,
+    attention_mask=None,
+    position_ids=None,
+    past_key_values=None,
+    inputs_embeds=None,
+    use_cache=None,
+    output_attentions=None,
+    output_hidden_states=None,
+    return_dict=None,
 ):
     output_attentions = (
         output_attentions

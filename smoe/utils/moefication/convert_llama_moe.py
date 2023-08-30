@@ -17,14 +17,14 @@ from smoe.utils.io import torch_load_template_file
 
 
 def convert_llama_model(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEModel
@@ -110,14 +110,14 @@ def convert_llama_model(
 
 
 def convert_llama_model_for_causal_lm(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEForCausalLM
@@ -204,14 +204,14 @@ def convert_llama_model_for_causal_lm(
 
 
 def convert_llama_model_for_sequence_classification(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_selects,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_selects,
+    use_default_gate=False,
 ):
     """
     LlamaMoEForSequenceClassification

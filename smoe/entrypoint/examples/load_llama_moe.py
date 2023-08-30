@@ -33,7 +33,9 @@ def main(args):
     model_llama_moe.set_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
     model_llama_moe.set_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
     model_llama_moe.set_moe_gate_balance_loss_weight(0.02)  # 修改平衡loss的权重
-    model_llama_moe.set_moe_calculator_multiply_gate_scores(True)  # 修改是否对专家输出乘以gate所得的分数
+    model_llama_moe.set_moe_calculator_multiply_gate_scores(
+        True
+    )  # 修改是否对专家输出乘以gate所得的分数
     model_llama_moe.reset_gate_network()  # 重新初始化门控网络
 
     if model_llama_moe.config.gate_type == "TopKBalancedNoisyGate":
