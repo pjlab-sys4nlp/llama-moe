@@ -7,7 +7,7 @@ from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate
 
 class LinearMoELayer(nn.Module):
     def __init__(
-        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
+            self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -70,7 +70,7 @@ class LinearMoELayer(nn.Module):
 
     def forward(self, x):
         # fmt: off
-        original_shape = x.shape[:2]
+        original_shape = x.shape[:-1]
         x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
 
         gate_outputs = self.gate(x)  # 计算被选出的专家及其分数，以及gate的loss
@@ -82,7 +82,9 @@ class LinearMoELayer(nn.Module):
 
     def set_num_selects(self, num_selects):
         if num_selects > self.gate.num_experts:
-            raise ValueError(num_selects)
+            raise ValueError(
+                'The value of "num_selects" must satisfy "num_selects <= num_experts"!'
+            )
         elif self.gate_type == "SwitchBalancedGate":
             raise ValueError(
                 "SwitchBalancedGate doesn't support manually setting num_selects."
@@ -105,17 +107,30 @@ class LinearMoELayer(nn.Module):
         else:
             self.gate.add_noise = add_noise
 
+    def set_gate_noise_epsilon(self, noise_epsilon):
+        if self.gate_type != "TopKBalancedNoisyGate":
+            raise ValueError(self.gate_type)
+        else:
+            self.gate.noise_epsilon = noise_epsilon
+
+    def set_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.calculator.multiply_gate_scores = multiply_gate_scores
+
     def set_calculator_drop_tokens(self, drop_tokens):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
-        elif (
-            self.calculator.experts.in_features != self.calculator.experts.out_features
-        ):
+        elif self.input_size != self.output_size:
             raise ValueError(
-                'You cannot set "drop_tokens=True" when "in_features != out_features"!'
+                'You cannot set "drop_tokens=True" when "input_size != output_size"!'
             )
         else:
             self.calculator.drop_tokens = drop_tokens
+
+    def set_calculator_capacity_factor(self, capacity_factor):
+        if self.calculator_type != "SwitchDropTokenCalculator":
+            raise ValueError(self.calculator_type)
+        else:
+            self.calculator.capacity_factor = capacity_factor
 
     def reset_gate_network(self):
         self.gate.reset_gate_network()
@@ -123,16 +138,16 @@ class LinearMoELayer(nn.Module):
 
 class LinearGLUMoELayer(nn.Module):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        **kwargs
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            **kwargs
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()
@@ -209,7 +224,9 @@ class LinearGLUMoELayer(nn.Module):
 
     def set_num_selects(self, num_selects):
         if num_selects > self.gate.num_experts:
-            raise ValueError(num_selects)
+            raise ValueError(
+                'The value of "num_selects" must satisfy "num_selects <= num_experts"!'
+            )
         elif self.gate_type == "SwitchBalancedGate":
             raise ValueError(
                 "SwitchBalancedGate doesn't support manually setting num_selects."
@@ -232,17 +249,30 @@ class LinearGLUMoELayer(nn.Module):
         else:
             self.gate.add_noise = add_noise
 
+    def set_gate_noise_epsilon(self, noise_epsilon):
+        if self.gate_type != "TopKBalancedNoisyGate":
+            raise ValueError(self.gate_type)
+        else:
+            self.gate.noise_epsilon = noise_epsilon
+
+    def set_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.calculator.multiply_gate_scores = multiply_gate_scores
+
     def set_calculator_drop_tokens(self, drop_tokens):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
-        elif (
-            self.calculator.experts.in_features != self.calculator.experts.out_features
-        ):
+        elif self.input_size != self.output_size:
             raise ValueError(
-                'You cannot set "drop_tokens=True" when "in_features != out_features"!'
+                'You cannot set "drop_tokens=True" when "input_size != output_size"!'
             )
         else:
             self.calculator.drop_tokens = drop_tokens
+
+    def set_calculator_capacity_factor(self, capacity_factor):
+        if self.calculator_type != "SwitchDropTokenCalculator":
+            raise ValueError(self.calculator_type)
+        else:
+            self.calculator.capacity_factor = capacity_factor
 
     def reset_gate_network(self):
         self.gate.reset_gate_network()

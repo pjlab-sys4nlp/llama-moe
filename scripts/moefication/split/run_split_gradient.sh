@@ -2,17 +2,17 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama2_7B"
 intermediate_size=11008
-expert_num=8
-expert_size=$(${intermediate_size}/${expert_num})
+expert_num=16
+expert_size=`expr 1 \* ${intermediate_size} / ${expert_num}`
 echo ${expert_size}
 
 kernel=l1_norm         #  plain  l1_norm  l2_norm
 accumulate_level=total #  sample  total
-criterion=min          #  min  max
+criterion=max          #  min  max
 share_neurons=False    #  True  False
-proj_type=up_proj    #  gate_proj  up_proj
+proj_type=up_proj      #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}

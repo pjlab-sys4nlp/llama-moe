@@ -16,7 +16,7 @@ from smoe.models.llama_moefication import (
 from smoe.utils.io import torch_load_template_file
 
 
-def convert_llama_model(
+def convert_llama_model_neuron_index(
         llama_model_path,
         split_index_path,
         select_gate_path,
@@ -30,7 +30,7 @@ def convert_llama_model(
     LlamaMoEModel
     """
 
-    moe_indices = []
+    moe_neuron_indices = []
     moe_gates = []
     size_experts = []
 
@@ -46,10 +46,10 @@ def convert_llama_model(
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
-        moe_indices.append(torch.tensor(this_layer_index, dtype=torch.int))
+        assert num_experts == len(this_layer_index)
+        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
 
-        this_layer_size_expert = Counter(this_layer_index)
-        this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
+        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:
@@ -80,11 +80,11 @@ def convert_llama_model(
             layer_index = int(key.split(".")[1])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
+                    model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
         if not use_default_gate:
@@ -109,7 +109,7 @@ def convert_llama_model(
     print(f'Converted LlamaMoEModel saved to "{save_path}".')
 
 
-def convert_llama_model_for_causal_lm(
+def convert_llama_model_for_causal_lm_neuron_index(
         llama_model_path,
         split_index_path,
         select_gate_path,
@@ -123,7 +123,7 @@ def convert_llama_model_for_causal_lm(
     LlamaMoEForCausalLM
     """
 
-    moe_indices = []
+    moe_neuron_indices = []
     moe_gates = []
     size_experts = []
 
@@ -139,10 +139,10 @@ def convert_llama_model_for_causal_lm(
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
-        moe_indices.append(torch.tensor(this_layer_index, dtype=torch.int))
+        assert num_experts == len(this_layer_index)
+        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
 
-        this_layer_size_expert = Counter(this_layer_index)
-        this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
+        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:
@@ -173,11 +173,11 @@ def convert_llama_model_for_causal_lm(
             layer_index = int(key.split(".")[2])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
         if not use_default_gate:
@@ -203,7 +203,7 @@ def convert_llama_model_for_causal_lm(
     print(f'Converted LlamaMoEForCausalLM saved to "{save_path}".')
 
 
-def convert_llama_model_for_sequence_classification(
+def convert_llama_model_for_sequence_classification_neuron_index(
         llama_model_path,
         split_index_path,
         select_gate_path,
@@ -217,7 +217,7 @@ def convert_llama_model_for_sequence_classification(
     LlamaMoEForSequenceClassification
     """
 
-    moe_indices = []
+    moe_neuron_indices = []
     moe_gates = []
     size_experts = []
 
@@ -233,10 +233,10 @@ def convert_llama_model_for_sequence_classification(
 
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
-        moe_indices.append(torch.tensor(this_layer_index, dtype=torch.int))
+        assert num_experts == len(this_layer_index)
+        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts)])
 
-        this_layer_size_expert = Counter(this_layer_index)
-        this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
+        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
         if not use_default_gate:
@@ -267,11 +267,11 @@ def convert_llama_model_for_sequence_classification(
             layer_index = int(key.split(".")[2])
             for expert_index in range(num_experts):
                 if "gate" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_gate.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "up" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_indices[layer_index] == expert_index].cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_up.{}".format(layer_index, expert_index)] = model_llama_state_dict[key][moe_neuron_indices[layer_index][expert_index]].cpu().half()
                 elif "down" in key:
-                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
+                    model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
         if not use_default_gate:
@@ -299,14 +299,14 @@ def convert_llama_model_for_sequence_classification(
 if __name__ == "__main__":
     llama_model_path = "/home/data/models/llama-transformers/7B/"
     split_index_path = "/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering/"  # split
-    select_gate_path = "/home/dongdz/workspace/moefication/llama_moe_temp_files/7B-8Expert-Select-MLP/"  # select
+    select_gate_path = ""  # select
     save_path = "/home/data/models/llama-moe-transformers/7B/"
     template = "layers.{}.mlp.gate_proj.weight"
     num_experts = 8
     num_selects = 2
-    use_default_gate = False
+    use_default_gate = True
 
-    convert_llama_model(
+    convert_llama_model_neuron_index(
         llama_model_path,
         split_index_path,
         select_gate_path,

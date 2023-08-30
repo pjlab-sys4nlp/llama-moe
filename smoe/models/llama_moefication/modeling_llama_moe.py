@@ -67,13 +67,13 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         )
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+            self,
+            hidden_states,
+            attention_mask=None,
+            position_ids=None,
+            past_key_value=None,
+            output_attentions=False,
+            use_cache=False,
     ):
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -92,12 +92,12 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states, gate_loss = self.mlp(hidden_states)
+        hidden_states, balance_loss = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
         outputs = (
             hidden_states,
-            gate_loss,
+            balance_loss,
         )
 
         if output_attentions:
@@ -123,8 +123,17 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def set_moe_gate_add_noise(self, add_noise):
         self.mlp.set_gate_add_noise(add_noise)
 
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        self.mlp.set_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.mlp.set_calculator_multiply_gate_scores(multiply_gate_scores)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.mlp.set_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_capacity_factor(self, capacity_factor):
+        self.mlp.set_calculator_capacity_factor(capacity_factor)
 
     def reset_gate_network(self):
         self.mlp.reset_gate_network()
@@ -133,7 +142,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
     config_class = LlamaMoEConfig
     base_model_prefix = "model"
-    supports_gradient_checkpointing = True  # tianjia
+    supports_gradient_checkpointing = True  # added
     _no_split_modules = ["LlamaMoEDecoderLayer"]
     _skip_keys_device_placement = "past_key_values"
 
@@ -150,16 +159,16 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         )
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         output_attentions = (
             output_attentions
@@ -228,7 +237,7 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         )
 
         hidden_states = inputs_embeds
-        gate_loss = 0.0
+        balance_loss = 0.0
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -279,7 +288,7 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
 
             hidden_states = layer_outputs[0]
             if layer_outputs[1] is not None:
-                gate_loss += layer_outputs[1]
+                balance_loss += layer_outputs[1]
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[3 if output_attentions else 2],)
@@ -302,7 +311,7 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
             )
         return BaseMoEModelOutputWithPast(
             last_hidden_state=hidden_states,
-            gate_loss=gate_loss,
+            balance_loss=balance_loss,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
@@ -328,9 +337,21 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_gate_add_noise(add_noise)
 
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_capacity_factor(self, capacity_factor):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_calculator_capacity_factor(capacity_factor)
 
     def reset_gate_network(self):
         for idx, decoder_layer in enumerate(self.layers):
@@ -343,18 +364,18 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        **kwargs
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            **kwargs
     ):
         output_attentions = (
             output_attentions
@@ -398,8 +419,8 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
-            if outputs.gate_loss is not None:
-                loss += outputs.gate_loss
+            if outputs.balance_loss is not None:
+                loss += outputs.balance_loss
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -428,8 +449,17 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_gate_add_noise(self, add_noise):
         self.model.set_moe_gate_add_noise(add_noise)
 
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        self.model.set_moe_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_capacity_factor(self, capacity_factor):
+        self.model.set_moe_calculator_capacity_factor(capacity_factor)
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
@@ -445,17 +475,17 @@ class LlamaMoEForSequenceClassification(
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
@@ -473,7 +503,7 @@ class LlamaMoEForSequenceClassification(
             return_dict=return_dict,
         )
         hidden_states = transformer_outputs[0]
-        gate_loss = transformer_outputs[1]
+        balance_loss = transformer_outputs[1]
         logits = self.score(hidden_states)
 
         if input_ids is not None:
@@ -490,7 +520,7 @@ class LlamaMoEForSequenceClassification(
         else:
             if input_ids is not None:
                 sequence_lengths = (
-                    torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
+                        torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
                 ).to(logits.device)
             else:
                 sequence_lengths = -1
@@ -506,7 +536,7 @@ class LlamaMoEForSequenceClassification(
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
                 elif self.num_labels > 1 and (
-                    labels.dtype == torch.long or labels.dtype == torch.int
+                        labels.dtype == torch.long or labels.dtype == torch.int
                 ):
                     self.config.problem_type = "single_label_classification"
                 else:
@@ -526,8 +556,8 @@ class LlamaMoEForSequenceClassification(
             elif self.config.problem_type == "multi_label_classification":
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)
-        if loss is not None and gate_loss is not None:
-            loss += gate_loss
+        if loss is not None and balance_loss is not None:
+            loss += balance_loss
         if not return_dict:
             output = (pooled_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
@@ -555,8 +585,17 @@ class LlamaMoEForSequenceClassification(
     def set_moe_gate_add_noise(self, add_noise):
         self.model.set_moe_gate_add_noise(add_noise)
 
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        self.model.set_moe_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_capacity_factor(self, capacity_factor):
+        self.model.set_moe_calculator_capacity_factor(capacity_factor)
 
     def reset_gate_network(self):
         self.model.reset_gate_network()

@@ -11,6 +11,10 @@ batch_size=8
 share_path=/mnt/petrelfs/share_data/quxiaoye
 tokenizer_path=${share_path}/models/${llama_size}
 
+use_cpu=True ############ 修改修改修改修改 ############
+gpus=0
+cpus=16
+
 ##### Clustering-l2-16 #####
 #save_folder_postfix=Clustering-l2-16
 #model_path=${share_path}/models/llama_7B_MoE_16Select4-l2_norm
@@ -39,9 +43,6 @@ if [ ${reinit_gate} = "True" ]; then
 fi
 save_path=${save_path}/${llama_size}-${save_folder_postfix}
 
-gpus=1
-cpus=16
-
 for data_path in \
   ${share_path}/data/vis_data/wikipedia-part-003428-16de0c55-head1000.jsonl \
   ${share_path}/data/vis_data/github-part-003227-16de0c55-head1000.jsonl \
@@ -57,7 +58,8 @@ for data_path in \
     --reinit_gate ${reinit_gate} \
     --data_begin_index 0 \
     --data_end_index 200 \
-    --batch_size ${batch_size} &
+    --batch_size ${batch_size} \
+    --use_cpu ${use_cpu} &
   sleep 0.7
 done
 
@@ -75,6 +77,7 @@ for data_path in \
     --reinit_gate ${reinit_gate} \
     --data_begin_index 200 \
     --data_end_index 400 \
-    --batch_size ${batch_size} &
+    --batch_size ${batch_size} \
+    --use_cpu ${use_cpu} &
   sleep 0.7
 done

@@ -15,7 +15,7 @@ data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_experts}Expert-Split-${split_type}
 select_file_path=${data_path}/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
-save_path=${data_path}/models/${convert_type}/${split_type}-${select_type}
+save_path=${data_path}/models/${convert_type}/${split_type}-${select_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}
 
 gpus=0
 cpus=16

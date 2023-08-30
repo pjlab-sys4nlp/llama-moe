@@ -6,11 +6,7 @@ from smoe.models.llama_moefication.modeling_llama_moe import (
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,
 )
-from smoe.utils.moefication.convert_llama_moe import (
-    convert_llama_model,
-    convert_llama_model_for_causal_lm,
-    convert_llama_model_for_sequence_classification,
-)
+from smoe.utils.moefication.convert_llama_moe_neuron_index import convert_llama_model_neuron_index, convert_llama_model_for_causal_lm_neuron_index, convert_llama_model_for_sequence_classification_neuron_index
 from smoe.utils.string_operation import str2bool
 
 # fmt: off
@@ -31,7 +27,7 @@ if __name__ == "__main__":
     print(args, "\n")
 
     if args.convert_type == "LlamaMoEModel":
-        convert_llama_model(
+        convert_llama_model_neuron_index(
             args.model_path,
             args.split_file_path,
             args.select_file_path,
@@ -42,7 +38,7 @@ if __name__ == "__main__":
             use_default_gate=args.use_default_gate
         )
     elif args.convert_type == "LlamaMoEForCausalLM":
-        convert_llama_model_for_causal_lm(
+        convert_llama_model_for_causal_lm_neuron_index(
             args.model_path,
             args.split_file_path,
             args.select_file_path,
@@ -53,7 +49,7 @@ if __name__ == "__main__":
             use_default_gate=args.use_default_gate
         )
     elif args.convert_type == "LlamaMoEForSequenceClassification":
-        convert_llama_model_for_sequence_classification(
+        convert_llama_model_for_sequence_classification_neuron_index(
             args.model_path,
             args.split_file_path,
             args.select_file_path,

@@ -329,7 +329,7 @@ class GradientSplit(LayerSplit):
         super().__init__(config, template, layer)
         self.grad_list = grad_list
         self.num_experts = len(grad_list)
-        self.neuron_num = grad_list[0].size()
+        self.neuron_num = grad_list[0].size(0)
         self.labels = np.zeros((self.neuron_num,))
 
     def sort_by_criterion(self, criterion):
@@ -368,62 +368,64 @@ class GradientSplit(LayerSplit):
                     if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
                         continue
 
-                    while expert_start_index[expert_id] <= self.neuron_num:
-                        if neuron_used_mark[expert_start_index[expert_id]]:
+                    while expert_start_index[expert_id] < self.neuron_num:
+                        if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
                             expert_start_index[expert_id] += 1
                         else:
                             break
 
-                    if sorted_grad_list[expert_id][expert_start_index] <= now_selected_grad:  # ----- different here -----
-                        now_selected_grad = sorted_grad_list[expert_id][expert_start_index]
-                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index]
+                    if sorted_grad_list[expert_id][expert_start_index[expert_id]] <= now_selected_grad:  # ----- different here -----
+                        now_selected_grad = sorted_grad_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
                         now_selected_expert = expert_id
 
                 self.labels[now_selected_neuron] = now_selected_expert
+                assert (not neuron_used_mark[now_selected_neuron])
                 neuron_used_mark[now_selected_neuron] = True
                 expert_neuron_count[now_selected_expert] += 1
                 expert_start_index[now_selected_expert] += 1
 
-                print(now_selected_neuron, now_selected_expert)
+                # print(now_selected_neuron, now_selected_expert)
 
         elif criterion == "max":
             while sum(expert_neuron_count) < self.neuron_num:
-                now_selected_grad = float('inf')
+                now_selected_grad = float('-inf')
                 now_selected_neuron = -1
                 now_selected_expert = -1
 
                 for expert_id in range(self.num_experts):
-                    if expert_neuron_count[expert_id] >= self.neuron_num or expert_start_index[expert_id] >= self.neuron_num:
+                    if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
                         continue
 
-                    while expert_start_index[expert_id] <= self.neuron_num:
-                        if neuron_used_mark[expert_start_index[expert_id]]:
+                    while expert_start_index[expert_id] < self.neuron_num:
+                        if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
                             expert_start_index[expert_id] += 1
                         else:
                             break
 
-                    if sorted_grad_list[expert_id][expert_start_index] >= now_selected_grad:  # ----- different here -----
-                        now_selected_grad = sorted_grad_list[expert_id][expert_start_index]
-                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index]
+                    if sorted_grad_list[expert_id][expert_start_index[expert_id]] >= now_selected_grad:  # ----- different here -----
+                        now_selected_grad = sorted_grad_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
                         now_selected_expert = expert_id
 
                 self.labels[now_selected_neuron] = now_selected_expert
+                assert (not neuron_used_mark[now_selected_neuron])
                 neuron_used_mark[now_selected_neuron] = True
                 expert_neuron_count[now_selected_expert] += 1
                 expert_start_index[now_selected_expert] += 1
 
-                print(now_selected_neuron, now_selected_expert)
+                # print(now_selected_neuron, now_selected_expert)
 
         else:
             raise NotImplementedError
 
-        print(neuron_used_mark)
-        print(expert_neuron_count)
-        print(expert_start_index)
+        # print(neuron_used_mark)
+        # print(expert_neuron_count)
+        # print(expert_start_index)
 
     def split_with_neuron_sharing(self, expert_size, criterion):
         sorted_grad_list, sorted_index_list = self.sort_by_criterion(criterion)
-        self.labels = [sorted_index_list[i][:expert_size] for i in range(len(sorted_index_list))]
+        self.labels = [sorted_index_list[i][:expert_size] for i in range(len(sorted_index_list))]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
 
     def split(self, expert_size, criterion="min", share_neurons=False):
         if not share_neurons:

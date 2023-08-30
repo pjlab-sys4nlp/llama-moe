@@ -6,118 +6,72 @@ from smoe.models.llama_moefication import BaseMoEModelOutputWithPast
 logger = logging.get_logger(__name__)
 
 
-def forward_mlp_moe_gate_with_hidden_states_recording(
-    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
-):
+def forward_mlp_moe_gate_with_hidden_states_recording(self, x, padding_mask, **kwargs):
     # fmt: off
-    #########################################################
-    self.samples_cnt += torch.sum(padding_mask).item()
-    #########################################################
+    self.samples_cnt += torch.sum(padding_mask).item()  ####################################
 
     """先计算所有专家的权重值"""
-    logits_gate = self.gate_network(x)  # gate计算出的权重
-    if self.training and self.add_noise:
-        noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
-        noise_control = self.softplus(noise_mm) + noise_epsilon  # 控制器得到的噪声增加量
-        logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
-        logits = logits_gate + logits_noise  # 最终权重
-    else:
-        logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
+    logits = self.gate_network(x)  # gate计算出的权重
 
     """选出前k个权重，并计算各个专家的分数scores"""
     top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # 选择并排序前k+1个权重
     top_k_logits = top_logits[:, :self.num_selects]
     top_k_indices = top_indices[:, :self.num_selects]
+    top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits  # 对前k个计算softmax，得到对应的分数
 
-    if self.use_softmax:
-        top_k_scores = self.softmax(top_k_logits)  # 对前k个计算softmax，得到对应的分数
-    else:
-        top_k_scores = top_k_logits
+    zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+    scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+    scores_filtered = scores_filtered[padding_mask]  ###############################################
 
-    """专家平衡选择"""
-    if self.use_balance:
+    """计算importance"""
+    importance = scores_filtered.sum(0)  # shape(num_experts)
+    self.importance_sum += scores_filtered.detach().sum(0)
 
-        """计算importance"""
-        zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
-        scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
-        scores_filtered = scores_filtered[padding_mask]  ###############################################
-        importance = scores_filtered.sum(0)  # shape(num_experts)
+    """计算load"""
+    load = (scores_filtered > 0).sum(0)  # shape(num_experts)
+    self.load_sum += (scores_filtered.detach() > 0).sum(0)
 
-        #########################################################
-        self.importance_sum += scores_filtered.detach().sum(0)
-        #########################################################
+    """计算balance loss"""
+    importance_loss = self.cv_squared(importance) * self.balance_loss_weight
+    load_loss = self.cv_squared(load) * self.balance_loss_weight
+    balance_loss = importance_loss + load_loss
 
-        """计算load"""
-        if self.training and self.add_noise:  # 计算各分数在给定随机噪声的情况下，处于topK范围内的概率
-            batch_size = logits_gate.size(0)
-            m = top_logits.size(1)
-            top_values_flat = top_logits.flatten()
-            threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
-            threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
-            is_in = torch.gt(logits_noise, threshold_if_in)
-            threshold_positions_if_out = threshold_positions_if_in - 1
-            threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-            # is each value currently in the top k.
-            prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
-            prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
-            prob = torch.where(is_in, prob_if_in, prob_if_out)
-            load = prob.sum(0)
+    self.importance_loss_sum += importance_loss.detach()
+    self.load_loss_sum += load_loss.detach()
 
-            #########################################################
-            self.load_sum += prob.detach().sum(0)
-            #########################################################
-        else:
-            load = (scores_filtered > 0).sum(0)  # shape(num_experts)
-
-            #########################################################
-            self.load_sum += (scores_filtered.detach() > 0).sum(0)
-            #########################################################
-
-        """计算balance loss"""
-        #########################################################
-        importance_loss = self.cv_squared(importance) * gate_loss_lambda
-        load_loss = self.cv_squared(load) * gate_loss_lambda
-        gate_loss = importance_loss + load_loss
-
-        self.importance_loss_sum += importance_loss.detach()
-        self.load_loss_sum += load_loss.detach()
-        #########################################################
-
-    else:
-        gate_loss = None
-
-    return top_k_indices, top_k_scores, gate_loss
+    return {
+        "topK_indices": top_k_indices,
+        "topK_scores": top_k_scores,
+        "balance_loss": balance_loss,
+    }
     # fmt: on
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-    self, x, padding_mask, noise_epsilon=1e-2, gate_loss_lambda=1e-2
+        self, x, padding_mask,
 ):
     # fmt: off
-    batch_size = x.shape[0]
-    seq_len = x.shape[1]
+    original_shape = x.shape[:-1]
     x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
-    ###########################################################
     padding_mask = padding_mask.reshape(-1)  # shape(batch_size*seq_len)
 
-    indices, scores, gate_loss = self.gate(x, padding_mask, noise_epsilon=noise_epsilon, gate_loss_lambda=gate_loss_lambda)  # 计算被选出的专家及其分数，以及gate的loss
-    ###########################################################
-    y = self.calculator(x, indices, scores)  # 合并各专家的计算结果
+    gate_outputs = self.gate(x, padding_mask)  # 计算被选出的专家及其分数，以及gate的loss
+    y = self.calculator(x, **gate_outputs)  # 合并各专家的计算结果
 
-    y = y.reshape(batch_size, seq_len, self.output_size)  # shape(batch_size, seq_len, output_size)
-    return y, gate_loss
+    y = y.reshape(original_shape + (self.output_size,))  # shape(batch_size, seq_len, output_size)
+    return y, gate_outputs["balance_loss"]
     # fmt: on
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-    self,
-    hidden_states,
-    padding_mask,  # ----- add padding_mask -----
-    attention_mask=None,
-    position_ids=None,
-    past_key_value=None,
-    output_attentions=False,
-    use_cache=False,
+        self,
+        hidden_states,
+        padding_mask,  # ----- add padding_mask -----
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -157,16 +111,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-    self,
-    input_ids=None,
-    attention_mask=None,
-    position_ids=None,
-    past_key_values=None,
-    inputs_embeds=None,
-    use_cache=None,
-    output_attentions=None,
-    output_hidden_states=None,
-    return_dict=None,
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
 ):
     output_attentions = (
         output_attentions

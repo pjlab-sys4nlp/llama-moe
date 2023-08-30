@@ -30,6 +30,7 @@ if __name__ == "__main__":
     config = LlamaConfig.from_pretrained(args.model_path)
 
     print("Processing layers...")
+    save_root_path = args.save_path
     for i in tqdm(range(config.num_hidden_layers)):
         grad_list = []
 
@@ -37,19 +38,20 @@ if __name__ == "__main__":
             grad_file_path = os.path.join(args.grad_file_path, expert_folder_name, args.template.format(i) + ".grad")
             grad = torch.load(grad_file_path, map_location="cpu")
             grad_list.append(grad)
-        print(grad_list)
+        # print(grad_list)
 
         expert_num = len(grad_list)
 
-        save_path = os.path.join(
-            args.save_path,
+        args.save_path = os.path.join(
+            save_root_path,
             f"{os.path.split(args.model_path)[1]}-Split-Gradient-{args.criterion}-{args.kernel}-{args.accumulate_level}",
-            f"{expert_num}Experts-{args.expert_size}Neurons-{'Share' if args.share_neurons else ''}"
+            f"{expert_num}Experts-{args.expert_size}Neurons{'-Share' if args.share_neurons else ''}"
         )
 
         split = GradientSplit(args, args.template, i, grad_list)
         split.split(args.expert_size, criterion=args.criterion, share_neurons=args.share_neurons)
-        split.cnt()
+        if not args.share_neurons:
+            split.cnt()
         split.save()
     print("Done.")
     # fmt: on
