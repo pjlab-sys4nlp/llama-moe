@@ -1,7 +1,6 @@
 """Convert a vanilla llama to llama-moe"""
 import os
 import shutil
-from collections import Counter
 
 import torch
 from tqdm import tqdm
@@ -69,6 +68,7 @@ def convert_llama_model_neuron_index(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
+    config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
 
     """initialize moe model"""
@@ -169,6 +169,7 @@ def convert_llama_model_for_causal_lm_neuron_index(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
+    config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
 
     """initialize moe model"""
@@ -270,6 +271,7 @@ def convert_llama_model_for_sequence_classification_neuron_index(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
+    config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
 
     """initialize moe model"""

@@ -29,7 +29,7 @@ def main(args):
     else:
         raise ValueError
 
-    model_llama_moe.set_moe_num_selects(4)  # 修改专家的选择数量
+    model_llama_moe.set_moe_num_selects(1)  # 修改专家的选择数量
     model_llama_moe.set_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
     model_llama_moe.set_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
     model_llama_moe.set_moe_gate_balance_loss_weight(0.02)  # 修改平衡loss的权重

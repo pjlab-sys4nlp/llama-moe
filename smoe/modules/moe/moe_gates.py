@@ -208,7 +208,7 @@ class TopKBalancedNoisyGate(nn.Module):
 class SwitchBalancedGate(nn.Module):
     """
     https://arxiv.org/pdf/2101.03961.pdf
-    https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/feed_forward.py
+    https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/switch/__init__.py
     https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/moe.py
     """
 

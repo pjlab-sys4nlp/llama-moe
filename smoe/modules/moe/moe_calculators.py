@@ -60,7 +60,7 @@ class UniversalCalculator(nn.Module):
 class SwitchDropTokenCalculator(nn.Module):
     """
     https://arxiv.org/pdf/2101.03961.pdf
-    https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/feed_forward.py
+    https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/switch/__init__.py
     https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/moe.py
     带有capacity_factor的计算器，自动丢弃超出容量的token
     """
@@ -109,14 +109,14 @@ class SwitchDropTokenCalculator(nn.Module):
 
             if expert_batch_size[i] > 0:
                 expert_output = self.experts(x[batch_indices, :], i)
-                if self.multiply_gate_scores:
-                    batch_scores = topK_scores[batch_indices]
-                    expert_output = torch.mul(expert_output, batch_scores.reshape(-1, 1))  # 乘权重
                 y[batch_indices, :] = expert_output
 
         if len(dropped_indices) > 0:
             dropped_indices = torch.cat(dropped_indices, dim=0)
             y[dropped_indices, :] = x[dropped_indices, :]
+
+        if self.multiply_gate_scores:
+            y = torch.mul(y, topK_scores.reshape(-1, 1))  # 乘权重
 
         return y
         # fmt: on

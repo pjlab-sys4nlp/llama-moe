@@ -100,20 +100,20 @@ if __name__ == "__main__":
 
     """visualization"""
     dataset_name = os.path.split(args.data_path)[1].split(".")[0] + args.save_name_prefix
-    # for layer_idx, layer in enumerate(model.layers):
-    #     load_sum = layer.mlp.gate.load_sum.cpu().numpy()  # shape(num_experts)
-    #     visualize_expert_load_heatmap(
-    #         load_sum,
-    #         layer_idx,
-    #         dataset_name,
-    #         save_dir=args.save_path + "-heat"
-    #     )
-    #     visualize_expert_load_barv(
-    #         load_sum,
-    #         layer_idx,
-    #         dataset_name,
-    #         save_dir=args.save_path + "-bar"
-    #     )
+    for layer_idx, layer in enumerate(model.layers):
+        load_sum = layer.mlp.gate.load_sum.cpu().numpy()  # shape(num_experts)
+        visualize_expert_load_heatmap(
+            load_sum,
+            layer_idx,
+            dataset_name,
+            save_dir=args.save_path + "-heat"
+        )
+        # visualize_expert_load_barv(
+        #     load_sum,
+        #     layer_idx,
+        #     dataset_name,
+        #     save_dir=args.save_path + "-bar"
+        # )
 
     """save evaluation results as cache"""
     saved_dict = {

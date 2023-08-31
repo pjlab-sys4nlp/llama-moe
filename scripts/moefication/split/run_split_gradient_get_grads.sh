@@ -8,8 +8,6 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
-#SBATCH --mem=0
-#SBATCH --exclusive
 
 num_nodes=1        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
@@ -24,8 +22,9 @@ export LOGLEVEL=INFO
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama_7B"
 
-accumulate_level=sample #  sample  total
-kernel=l1_norm         #  plain  l1_norm  l2_norm
+accumulate_level=sample       #  sample  total
+kernel=l1_norm               #  plain  l1_norm  l2_norm
+importance_type=feature_grad #  feature_grad  feature_change
 
 data_use_range_begin=0.0
 data_use_range_end=1.0
@@ -105,6 +104,7 @@ for name in "${dataset_name[@]}"; do
     --save_path ${save_path} \
     --accumulate_level ${accumulate_level} \
     --kernel ${kernel} \
+    --importance_type ${importance_type} \
     --data_use_range_begin ${data_use_range_begin} \
     --data_use_range_end ${data_use_range_end}
 done

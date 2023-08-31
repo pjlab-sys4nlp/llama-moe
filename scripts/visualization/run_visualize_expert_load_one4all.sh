@@ -2,10 +2,10 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B" ################ 修改修改修改修改 ################
+llama_size="llama2_7B" ################ 修改修改修改修改 ################
 
-reinit_gate=False ############## 修改修改修改修改 ##############
-cpt_tokens=25B    ############ 修改修改修改修改 ############
+reinit_gate=True ############## 修改修改修改修改 ##############
+cpt_tokens=0B    ############ 修改修改修改修改 ############
 batch_size=8
 
 share_path=/mnt/petrelfs/share_data/quxiaoye
@@ -17,12 +17,13 @@ cpus=16
 
 ##### Clustering-l2-16 #####
 #save_folder_postfix=Clustering-l2-16
-#model_path=${share_path}/models/llama_7B_MoE_16Select4-l2_norm
+#model_path=${share_path}/models/llama_7B_MoE_16Select4-l2_norm_back
 #model_path=${share_path}/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 # 100B
 
 ##### Clustering-l2-16-gate0.1 #####
-save_folder_postfix=Clustering-l2-16-gate0.1
-model_path=${share_path}/model_back/cpt-moe-fpt-56gpus-bs16_2-zero1default-gateloss0.1-1719794/checkpoint-7000 # 25B
+#save_folder_postfix=Clustering-l2-16-gate0.1
+#model_path=${share_path}/model_back/cpt-moe-fpt-56gpus-bs16_2-zero1default-gateloss0.1-1719794/checkpoint-7000 # 25B
+#model_path=/mnt/petrelfs/share_data/zhutong/models/cpt-moe-fpt-56gpus-bs16_2-zero1default-gateloss0.1-1719794/checkpoint-13000 # 47B
 
 ##### Graph-l2-16 #####
 #save_folder_postfix=Graph-l2-16
@@ -31,6 +32,30 @@ model_path=${share_path}/model_back/cpt-moe-fpt-56gpus-bs16_2-zero1default-gatel
 ##### Random-16 #####
 #save_folder_postfix=Random-16
 #model_path=${share_path}/models/LlamaMoEForCausalLM/Random-l2_norm/llama_7B-16Select4-up_proj
+
+##### Gradient-max-l1_norm-total-16-688 #####
+#save_folder_postfix=Gradient-max-l1_norm-total-16-688 # llama2_7B
+#model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-total/llama2_7B-16Select4-688Neurons
+
+##### Gradient-max-l1_norm-total-16-688-Share #####
+#save_folder_postfix=Gradient-max-l1_norm-total-16-688-Share # llama2_7B
+#model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-total/llama2_7B-16Select4-688Neurons-Share
+
+##### Gradient-max-l1_norm-total-16-1376-Share #####
+#save_folder_postfix=Gradient-max-l1_norm-total-16-1376-Share # llama2_7B
+#model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-total/llama2_7B-16Select4-1376Neurons-Share
+
+##### Gradient-min-l1_norm-total-16-688 #####
+#save_folder_postfix=Gradient-min-l1_norm-total-16-688 # llama2_7B
+#model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-min-l1_norm-total/llama2_7B-16Select4-688Neurons
+
+##### Gradient-min-l1_norm-total-16-688-Share #####
+#save_folder_postfix=Gradient-min-l1_norm-total-16-688-Share # llama2_7B
+#model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-min-l1_norm-total/llama2_7B-16Select4-688Neurons-Share
+
+##### Gradient-min-l1_norm-total-16-1376-Share #####
+save_folder_postfix=Gradient-min-l1_norm-total-16-1376-Share # llama2_7B
+model_path=${share_path}/models/LlamaMoEForCausalLM/Gradient-min-l1_norm-total/llama2_7B-16Select4-1376Neurons-Share
 
 ##### Initialize-16 #####
 #save_folder_postfix=Initialize-16

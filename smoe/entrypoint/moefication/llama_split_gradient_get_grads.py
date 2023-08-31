@@ -29,6 +29,9 @@ class SplitArguments:
     accumulate_level: Optional[str] = field(default="sample")  # sample total
     data_use_range_begin: Optional[float] = field(default=0.0)
     data_use_range_end: Optional[float] = field(default=1.0)
+    importance_type: Optional[str] = field(
+        default="feature_grad"
+    )  # feature_grad feature_change
 
 
 @record
@@ -41,7 +44,7 @@ def main():
     split_args.save_path = os.path.join(
         split_args.save_path,
         "Gradients",
-        f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}",
+        f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}-{split_args.importance_type}",
         dataset_name,
     )
     print(split_args, "\n")
@@ -113,9 +116,10 @@ def main():
         trainer,
         accumulate_level=split_args.accumulate_level,
         kernel=split_args.kernel,
+        importance_type=split_args.importance_type,
         device=f"cuda:{training_args.local_rank}",
     )
-    split.get_grad()
+    split.get_score()
     print(f"Device {training_args.local_rank} Done.")
 
 

@@ -67,13 +67,13 @@ if __name__ == "__main__":
         raise ValueError
 
     # load test
-    print("Loading converted LLaMA-MoE file for test...")
-    if args.convert_type == "LlamaMoEModel":
-        model_llama_moe = LlamaMoEModel.from_pretrained(args.save_path)
-    elif args.convert_type == "LlamaMoEForCausalLM":
-        model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.save_path)
-    elif args.convert_type == "LlamaMoEForSequenceClassification":
-        model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(args.save_path)
-    else:
-        raise ValueError
+    # print("Loading converted LLaMA-MoE file for test...")
+    # if args.convert_type == "LlamaMoEModel":
+    #     model_llama_moe = LlamaMoEModel.from_pretrained(args.save_path)
+    # elif args.convert_type == "LlamaMoEForCausalLM":
+    #     model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.save_path)
+    # elif args.convert_type == "LlamaMoEForSequenceClassification":
+    #     model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(args.save_path)
+    # else:
+    #     raise ValueError
     print("Done.")
