@@ -49,6 +49,7 @@ class LlamaMoEConfig(PretrainedConfig):
         multiply_gate_scores=True,
         # SwitchDropTokenCalculator
         drop_tokens=True,
+        dropped_padding="zero",
         capacity_factor=1.25,
         **kwargs,
     ):
@@ -81,6 +82,7 @@ class LlamaMoEConfig(PretrainedConfig):
         self.calculator_type = calculator_type
         self.multiply_gate_scores = multiply_gate_scores
         self.drop_tokens = drop_tokens
+        self.dropped_padding = dropped_padding
         self.capacity_factor = capacity_factor
 
         # for backward compatibility

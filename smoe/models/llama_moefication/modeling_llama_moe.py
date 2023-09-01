@@ -46,6 +46,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             "multiply_gate_scores": config.multiply_gate_scores,
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
+            "dropped_padding": config.dropped_padding,
             "capacity_factor": config.capacity_factor,
         }
 
@@ -131,6 +132,9 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.mlp.set_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_dropped_padding(self, dropped_padding):
+        self.mlp.set_calculator_dropped_padding(dropped_padding)
 
     def set_moe_calculator_capacity_factor(self, capacity_factor):
         self.mlp.set_calculator_capacity_factor(capacity_factor)
@@ -349,6 +353,10 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_drop_tokens(drop_tokens)
 
+    def set_moe_calculator_dropped_padding(self, dropped_padding):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_calculator_dropped_padding(dropped_padding)
+
     def set_moe_calculator_capacity_factor(self, capacity_factor):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_capacity_factor(capacity_factor)
@@ -457,6 +465,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_dropped_padding(self, dropped_padding):
+        self.model.set_moe_calculator_dropped_padding(dropped_padding)
 
     def set_moe_calculator_capacity_factor(self, capacity_factor):
         self.model.set_moe_calculator_capacity_factor(capacity_factor)
@@ -593,6 +604,9 @@ class LlamaMoEForSequenceClassification(
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
+
+    def set_moe_calculator_dropped_padding(self, dropped_padding):
+        self.model.set_moe_calculator_dropped_padding(dropped_padding)
 
     def set_moe_calculator_capacity_factor(self, capacity_factor):
         self.model.set_moe_calculator_capacity_factor(capacity_factor)

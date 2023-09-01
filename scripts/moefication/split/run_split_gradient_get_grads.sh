@@ -22,9 +22,9 @@ export LOGLEVEL=INFO
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama_7B"
 
-accumulate_level=sample       #  sample  total
-kernel=l1_norm               #  plain  l1_norm  l2_norm
-importance_type=feature_grad #  feature_grad  feature_change
+accumulate_level=total         #  sample  total
+kernel=l1_norm                 #  plain  l1_norm  l2_norm
+importance_type=feature_change #  feature_grad  feature_change
 
 data_use_range_begin=0.0
 data_use_range_end=1.0

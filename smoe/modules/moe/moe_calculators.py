@@ -70,11 +70,15 @@ class SwitchDropTokenCalculator(nn.Module):
         experts,
         multiply_gate_scores=True,
         drop_tokens=True,
+        dropped_padding="zero",  # zero input
         capacity_factor=1.25,
     ):
         super(SwitchDropTokenCalculator, self).__init__()
-        if drop_tokens:  # 如果丢弃token，则必须保证输入输出维度相同
+        self.available_dropped_padding_choices = ("zero", "input")
+        assert dropped_padding in self.available_dropped_padding_choices
+        if drop_tokens and dropped_padding != "zero":  # 如果丢弃token，则必须保证输入输出维度相同
             assert experts.in_features == experts.out_features
+
         self.experts = experts
         self.multiply_gate_scores = multiply_gate_scores
         self.num_experts = experts.num_experts
@@ -82,6 +86,7 @@ class SwitchDropTokenCalculator(nn.Module):
 
         # capacity
         self.drop_tokens = drop_tokens
+        self.dropped_padding = dropped_padding
         self.capacity_factor = capacity_factor
 
     def forward(self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs):
@@ -111,7 +116,7 @@ class SwitchDropTokenCalculator(nn.Module):
                 expert_output = self.experts(x[batch_indices, :], i)
                 y[batch_indices, :] = expert_output
 
-        if len(dropped_indices) > 0:
+        if self.dropped_padding == "input" and len(dropped_indices) > 0:
             dropped_indices = torch.cat(dropped_indices, dim=0)
             y[dropped_indices, :] = x[dropped_indices, :]
 
