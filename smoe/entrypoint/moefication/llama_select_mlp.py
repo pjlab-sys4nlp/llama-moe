@@ -9,7 +9,7 @@ from smoe.data.collate_fn import tensor_list_cat_collator
 from smoe.data.datasets_moefication import ShardDatasetForMoEGate
 from smoe.utils.io import torch_load_template_file
 from smoe.utils.moefication.expert_select import MLPGate
-from smoe.utils.moefication.visualize import visualize_expert_select_mlp
+from smoe.utils.visualization.visualize import visualize_expert_select_mlp
 
 # fmt: off
 if __name__ == "__main__":

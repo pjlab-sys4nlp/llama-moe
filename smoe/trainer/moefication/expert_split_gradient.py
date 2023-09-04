@@ -477,8 +477,10 @@ class ExpertSplitGradientTrainer(Trainer):
                     #     # Delay optimizer scheduling until metrics are generated
                     #     if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     #         self.lr_scheduler.step()
-                    # model.zero_grad()
                     ############################################################################
+
+                    # model.zero_grad()
+                    # torch.cuda.empty_cache()
 
                     self.state.global_step += 1
                     self.state.epoch = (
