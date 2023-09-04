@@ -46,7 +46,7 @@ CONFIG_MAPPING.update(
 )
 
 
-@wechat_sender()
+# @wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -114,6 +114,10 @@ def main():
 
     if training_args.gradient_checkpointing:
         config.use_cache = False
+
+    config.gate_type = model_args.gate_type
+    config.calculator_type = model_args.calculator_type
+    config.num_selects = model_args.num_selects
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
