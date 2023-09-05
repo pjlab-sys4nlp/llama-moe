@@ -6,20 +6,20 @@
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=64
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116
 
-#SBATCH --nodes=8
+#SBATCH --nodes=7
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=8         # should match with --nodes
+num_nodes=7         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=4
+export OMP_NUM_THREADS=8
 export NCCL_DEBUG=INFO
 export LOGLEVEL=INFO
 # export TORCH_DISTRIBUTED_DEBUG=DETAIL
@@ -33,10 +33,11 @@ export LOGLEVEL=INFO
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed_v2
 
-    lr=1e-4
-    final_lr_portion=0.1
+    lr=2e-5
+    final_lr_portion=0.5
     per_device_train_batch_size=16
     per_device_eval_batch_size=1
     gradient_accumulation_steps=2
@@ -65,6 +66,7 @@ export LOGLEVEL=INFO
     echo "Node: $head_node"
     echo "Node IP: $head_node_ip"
 
+            # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
     srun torchrun \
         --nnodes ${num_nodes} \
         --nproc_per_node ${num_gpu_per_node} \
@@ -73,7 +75,6 @@ export LOGLEVEL=INFO
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
-            --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
             --ignore_data_skip \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \

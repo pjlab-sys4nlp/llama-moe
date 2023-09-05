@@ -100,15 +100,16 @@ class SwitchDropTokenCalculator(nn.Module):
 
         """计算专家的batch_size"""
         if expert_batch_size is None:
-            expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
-            if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
-                expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
+            expert_batch_size = topK_indices.bincount(minlength=self.num_experts)
+            # expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
+            # if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
+            #     expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
 
         """各专家分别正向传播"""  # 此处应该有并行优化的空间 (如果单次forward不足以占满显卡利用率)
         for i in range(self.num_experts):
             batch_indices = (topK_indices == i).nonzero(as_tuple=True)[0]
             if self.drop_tokens and expert_batch_size[i] > capacity:  # Ignore if the expert is not over capacity
-                batch_indices = batch_indices[torch.randperm(expert_batch_size[i], device=x.device)]  # Shuffle indexes before dropping
+                # batch_indices = batch_indices[torch.randperm(expert_batch_size[i], device=x.device)]  # Shuffle indexes before dropping
                 dropped_indices.append(batch_indices[capacity:])  # Collect the tokens over capacity as dropped tokens
                 batch_indices = batch_indices[:capacity]  # Keep only the tokens upto the capacity of the expert
 

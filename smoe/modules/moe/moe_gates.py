@@ -1,4 +1,7 @@
+import os
+
 import torch
+from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
 from torch.distributions.normal import Normal
 
@@ -222,6 +225,7 @@ class SwitchBalancedGate(nn.Module):
         use_softmax=True,
         use_balance=True,
         balance_loss_weight=1e-2,
+        add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
         assert num_selects == 1
@@ -237,21 +241,29 @@ class SwitchBalancedGate(nn.Module):
 
         self.use_balance = use_balance
         self.balance_loss_weight = balance_loss_weight
+        self.add_noise = add_noise
 
     # fmt: off
     def forward(self, x):
         batch_size = x.shape[0]
         logits = self.gate_network(x)  # shape(batch_size, num_experts)
         scores = self.softmax(logits) if self.use_softmax else logits
-        top1_scores, top1_indices = torch.max(scores, dim=1)
+        if self.add_noise:
+            logits_w_noise = logits + gumbel_rsample(logits.shape, device=logits.device)
+        else:
+            logits_w_noise = logits
+        top1_scores, top1_indices = torch.max(logits_w_noise, dim=1)
 
         """balance loss"""
         importance_mean = scores.mean(0)  # shape(num_experts)
 
-        load = top1_indices.bincount()  # 不传递梯度，与原论文保持一致
-        if load.shape[0] < self.num_experts:  # 如果长度不足，则使用0补齐load矩阵
-            pad_tensor = torch.zeros((self.num_experts - load.shape[0],), device=load.device, dtype=torch.int).flatten()
-            load = torch.cat((load, pad_tensor), dim=0)
+        load = top1_indices.bincount(minlength=self.num_experts)
+        assert load.shape[0] == self.num_experts
+        # load = top1_indices.bincount()  # 不传递梯度，与原论文保持一致
+        # if load.shape[0] < self.num_experts:  # 如果长度不足，则使用0补齐load矩阵
+        #     pad_tensor = torch.zeros((self.num_experts - load.shape[0],), device=load.device, dtype=torch.int).flatten()
+        #     load = torch.cat((load, pad_tensor), dim=0)
+        # print(f"ZHUTONG (RANK: {os.environ['RANK']}): GATE FORWARD LOAD: {load=}")
         load_mean = load / batch_size  # shape(num_experts)
 
         balance_loss = self.num_experts * torch.sum(importance_mean * load_mean)

@@ -170,6 +170,15 @@ def main():
             "en_arxiv": 0.025,
             "en_stack": 0.02,
         }
+        # data_args.prob_map = {
+        #     "en_cc_v2": 0.67,
+        #     "en_c4_v2": 0.15,
+        #     "github_v2": 0.045,
+        #     "en_wikipedia": 0.045,
+        #     "en_book": 0.045,
+        #     "en_arxiv": 0.025,
+        #     "en_stack": 0.02,
+        # }
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
         lm_datasets = load_streaming_datasets(
@@ -219,6 +228,7 @@ def main():
         #             nn.init.zeros_(param)
         #     model.change_moe_gate_add_noise(True)
         #     model.change_moe_gate_use_balance(True)
+        # model.reset_gate_network()
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)

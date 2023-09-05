@@ -21,21 +21,21 @@ num_gpu_per_node=4  # should match with --gres
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=4
 export NCCL_DEBUG=INFO
+export NCCL_DEBUG_SUBSYS=COLL
 export LOGLEVEL=INFO
-export NCCL_P2P_DISABLE=1
-# export TORCH_DISTRIBUTED_DEBUG=DETAIL
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
 # export TORCH_SHOW_CPP_STACKTRACES=1
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    model_type="llama_moe"
-    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
+    # model_type="llama_moe"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    # model_type="llama_moe"
-    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
+    model_type="llama_moe"
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
 
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
@@ -122,3 +122,6 @@ export NCCL_P2P_DISABLE=1
             --report_to none \
             --log_level info
 }
+
+# srun -p MoE -n1 -N1 -w SH-IDCA1404-10-140-54-43 scontrol listpids
+# srun -p MoE -n1 -N1 -w SH-IDCA1404-10-140-54-43 py-spy dump --pid 118340
