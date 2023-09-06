@@ -3,6 +3,8 @@
 #SBATCH --job-name=cpt-switch
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
+##SBATCH --output=logs/%x.log
+##SBATCH --error=logs/%x.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -10,32 +12,33 @@
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-15
 
-#SBATCH --nodes=1
-#SBATCH --gres=gpu:4
+#SBATCH --nodes=7
+#SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=1         # should match with --nodes
-num_gpu_per_node=4  # should match with --gres
+num_nodes=7         # should match with --nodes
+num_gpu_per_node=8  # should match with --gres
 
-# #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=4
-export NCCL_DEBUG=INFO
-export NCCL_DEBUG_SUBSYS=COLL
+export OMP_NUM_THREADS=8  #cpu/#num_gpu_per_node
 export LOGLEVEL=INFO
-export TORCH_DISTRIBUTED_DEBUG=DETAIL
+
+# for debug usage
+# export NCCL_DEBUG=INFO
+# export NCCL_DEBUG_SUBSYS=COLL
+# export TORCH_DISTRIBUTED_DEBUG=DETAIL
 # export TORCH_SHOW_CPP_STACKTRACES=1
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
+    model_type="llama_moe"
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
+    # model_type="llama_moe"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
 
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
@@ -78,6 +81,7 @@ export TORCH_DISTRIBUTED_DEBUG=DETAIL
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
+            --no_debug_mode \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \

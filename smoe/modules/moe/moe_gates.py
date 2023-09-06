@@ -1,5 +1,3 @@
-import os
-
 import torch
 from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
@@ -224,7 +222,7 @@ class SwitchBalancedGate(nn.Module):
         gate_network="mlp",
         use_softmax=True,
         use_balance=True,
-        balance_loss_weight=1e-2,
+        balance_loss_weight=1e-1,
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
@@ -249,7 +247,9 @@ class SwitchBalancedGate(nn.Module):
         logits = self.gate_network(x)  # shape(batch_size, num_experts)
         scores = self.softmax(logits) if self.use_softmax else logits
         if self.add_noise:
-            logits_w_noise = logits + gumbel_rsample(logits.shape, device=logits.device)
+            # .to(logits) to make sure the noise is in the same dtype as logits
+            #   (e.g. bfloat16) while the default type is float32
+            logits_w_noise = logits + gumbel_rsample(logits.shape, device=logits.device).to(logits)
         else:
             logits_w_noise = logits
         top1_scores, top1_indices = torch.max(logits_w_noise, dim=1)
@@ -274,6 +274,8 @@ class SwitchBalancedGate(nn.Module):
             "topK_scores": top1_scores,
             "expert_batch_size": load.tolist(),
             "balance_loss": balance_loss,
+            "load": load_mean,
+            "importance": importance_mean,
         }
 
     def reset_gate_network(self):

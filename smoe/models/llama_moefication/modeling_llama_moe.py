@@ -1,4 +1,7 @@
 """ PyTorch LLaMA-MoE model."""
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
 import torch
 import torch.utils.checkpoint
 from torch import nn
@@ -14,15 +17,50 @@ from transformers.models.llama.modeling_llama import (
     LlamaModel,
     LlamaPreTrainedModel,
 )
-from transformers.utils import logging
+from transformers.utils import ModelOutput, logging
 
 from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.outputs_llama_moe import BaseMoEModelOutputWithPast
-from smoe.modules.moe.moe_layers import LinearGLUMoELayer
+from smoe.modules.moe.moe_layers import LinearGLUMoELayer, MoEMlpOutput
 
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "LlamaMoEConfig"
+
+
+@dataclass
+class MoEDecoderLayerOutput(ModelOutput):
+    hidden_states: Optional[torch.FloatTensor] = None
+    balance_loss: Optional[torch.FloatTensor] = None
+    self_attn_weights: Optional[torch.FloatTensor] = None
+    present_key_value: Optional[torch.FloatTensor] = None
+    num_dropped_tokens: Optional[int] = None
+    gate_load: Optional[torch.FloatTensor] = None
+    gate_importance: Optional[torch.FloatTensor] = None
+
+
+@dataclass
+class BaseMoEModelOutputWithPast(ModelOutput):
+    """
+    Args:
+        num_dropped_tokens: layer idx to the number of dropped tokens
+    """
+
+    last_hidden_state: torch.FloatTensor = None
+    balance_loss: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    num_dropped_tokens: Optional[Tuple[int]] = None
+    gate_load: Optional[Tuple[torch.FloatTensor]] = None
+    gate_importance: Optional[Tuple[torch.FloatTensor]] = None
+
+
+@dataclass
+class MoECausalLMOutputWithPast(CausalLMOutputWithPast):
+    balance_loss: Optional[torch.FloatTensor] = None
+    num_dropped_tokens: Optional[Tuple[int]] = None
+    gate_load: Optional[Tuple[torch.FloatTensor]] = None
+    gate_importance: Optional[Tuple[torch.FloatTensor]] = None
 
 
 class LlamaMoEDecoderLayer(LlamaDecoderLayer):
@@ -75,7 +113,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         past_key_value=None,
         output_attentions=False,
         use_cache=False,
-    ):
+    ) -> MoEDecoderLayerOutput:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -93,19 +131,18 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states, balance_loss = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        mlp_outs: MoEMlpOutput = self.mlp(hidden_states)
+        hidden_states = residual + mlp_outs.hidden_states
 
-        outputs = (
-            hidden_states,
-            balance_loss,
+        outputs = MoEDecoderLayerOutput(
+            hidden_states=hidden_states,
+            balance_loss=mlp_outs.balance_loss,
+            self_attn_weights=self_attn_weights if output_attentions else None,
+            present_key_value=present_key_value if use_cache else None,
+            num_dropped_tokens=mlp_outs.num_dropped_tokens,
+            gate_load=mlp_outs.gate_load,
+            gate_importance=mlp_outs.gate_importance,
         )
-
-        if output_attentions:
-            outputs += (self_attn_weights,)
-
-        if use_cache:
-            outputs += (present_key_value,)
 
         return outputs
 
@@ -256,6 +293,9 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
+        num_dropped_tokens = ()
+        gate_load = ()
+        gate_importance = ()
         for idx, decoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -273,15 +313,17 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
 
                     return custom_forward
 
-                layer_outputs = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(decoder_layer),
-                    hidden_states,
-                    attention_mask,
-                    position_ids,
-                    None,
+                layer_outputs: MoEDecoderLayerOutput = (
+                    torch.utils.checkpoint.checkpoint(
+                        create_custom_forward(decoder_layer),
+                        hidden_states,
+                        attention_mask,
+                        position_ids,
+                        None,
+                    )
                 )
             else:
-                layer_outputs = decoder_layer(
+                layer_outputs: MoEDecoderLayerOutput = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
@@ -290,15 +332,19 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
                     use_cache=use_cache,
                 )
 
-            hidden_states = layer_outputs[0]
-            if layer_outputs[1] is not None:
-                balance_loss += layer_outputs[1]
+            hidden_states = layer_outputs.hidden_states
+            if layer_outputs.balance_loss is not None:
+                balance_loss += layer_outputs.balance_loss
 
             if use_cache:
-                next_decoder_cache += (layer_outputs[3 if output_attentions else 2],)
+                next_decoder_cache += (layer_outputs.present_key_value,)
 
             if output_attentions:
-                all_self_attns += (layer_outputs[2],)
+                all_self_attns += (layer_outputs.self_attn_weights,)
+
+            num_dropped_tokens += (layer_outputs.num_dropped_tokens,)
+            gate_load += (layer_outputs.gate_load,)
+            gate_importance += (layer_outputs.gate_importance,)
 
         hidden_states = self.norm(hidden_states)
 
@@ -319,6 +365,9 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
+            num_dropped_tokens=num_dropped_tokens,
+            gate_load=gate_load,
+            gate_importance=gate_importance,
         )
 
     def set_moe_num_selects(self, num_selects):
@@ -400,7 +449,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
         )
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
+        outputs: BaseMoEModelOutputWithPast = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -412,7 +461,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             return_dict=return_dict,
         )
 
-        hidden_states = outputs[0]
+        hidden_states = outputs.last_hidden_state
         logits = self.lm_head(hidden_states)
 
         loss = None
@@ -434,12 +483,16 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
-        return CausalLMOutputWithPast(
+        return MoECausalLMOutputWithPast(
             loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
+            num_dropped_tokens=outputs.num_dropped_tokens,
+            balance_loss=outputs.balance_loss,
+            gate_load=outputs.gate_load,
+            gate_importance=outputs.gate_importance,
         )
 
     def set_moe_num_selects(self, num_selects):

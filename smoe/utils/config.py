@@ -256,7 +256,9 @@ class EnhancedTrainingArguments(TrainingArguments):
     )
     debug_mode: Optional[bool] = field(
         default=False,
-        metadata={"help": "If set to True, the number of data files will be cut to 2."},
+        metadata={
+            "help": "If set to True, the number of data files will be cut to 1 and `num_hidden_layers` will be set to 1."
+        },
     )
     _block_size: Optional[int] = field(
         default=None,

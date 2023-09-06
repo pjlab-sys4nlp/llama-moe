@@ -1,5 +1,8 @@
+import torch
 from transformers import TrainerControl, TrainerState, TrainingArguments
 from transformers.integrations import TensorBoardCallback, logger, rewrite_logs
+
+from smoe.utils.visualization.visualize import get_heatmap_img_grid_for_tb
 
 
 class EnhancedTensorboardCallback(TensorBoardCallback):
@@ -27,6 +30,28 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                         tokens = state.global_step * args.num_tokens_per_batch
                         token_loss_key = "train/loss_on_tokens"
                         self.tb_writer.add_scalar(token_loss_key, v, tokens)
+                elif (
+                    k == "train/num_dropped_tokens"
+                    and isinstance(v, tuple)
+                    and all(isinstance(n, (int, float)) for n in v)
+                ):
+                    self.tb_writer.add_scalars(
+                        "train/num_dropped_tokens/layer",
+                        {str(i): n for i, n in enumerate(v)},
+                        state.global_step,
+                    )
+                    self.tb_writer.add_scalar(
+                        "train/num_dropped_tokens/total", sum(v), state.global_step
+                    )
+                elif (
+                    k == "train/gate_load"
+                    or k == "train/gate_importance"
+                    and isinstance(v, tuple)
+                    and all(isinstance(n, torch.Tensor) for n in v)
+                ):
+                    self.tb_writer.add_image(
+                        k, get_heatmap_img_grid_for_tb(v), state.global_step
+                    )
                 else:
                     logger.warning(
                         "Trainer is attempting to log a value of "

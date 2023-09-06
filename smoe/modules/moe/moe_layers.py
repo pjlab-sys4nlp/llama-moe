@@ -1,26 +1,55 @@
-from torch import nn
+from dataclasses import dataclass
+from typing import Optional, Union
 
-from .moe_calculators import SwitchDropTokenCalculator, UniversalCalculator
+import torch
+from torch import nn
+from transformers.utils import ModelOutput
+
+from .moe_calculators import (
+    CalculatorOutput,
+    SwitchDropTokenCalculator,
+    UniversalCalculator,
+)
 from .moe_experts import LinearExperts, LinearGLUExperts
 from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate
+
+
+@dataclass
+class MoEMlpOutput(ModelOutput):
+    hidden_states: Optional[torch.FloatTensor] = None
+    balance_loss: Optional[torch.FloatTensor] = None
+    num_dropped_tokens: Optional[int] = None
+    gate_load: Optional[torch.FloatTensor] = None
+    gate_importance: Optional[torch.FloatTensor] = None
 
 
 class BaseMoELayer(nn.Module):
     def __init__(self):
         super(BaseMoELayer, self).__init__()
-        pass
 
-    def forward(self, x):
-        # fmt: off
+        self.gate: Union[SwitchBalancedGate, TopKBalancedNoisyGate]
+        self.calculator: Union[SwitchDropTokenCalculator, UniversalCalculator]
+
+    def forward(self, x) -> MoEMlpOutput:
         original_shape = x.shape[:-1]
-        x = x.reshape(-1, self.input_size)  # shape(batch_size*seq_len, input_size)
+        # shape(batch_size*seq_len, input_size)
+        x = x.reshape(-1, self.input_size)
 
-        gate_outputs = self.gate(x)  # 计算被选出的专家及其分数，以及gate的loss
-        y = self.calculator(x, **gate_outputs)  # 合并各专家的计算结果
+        # 计算被选出的专家及其分数，以及gate的loss
+        gate_outputs: dict = self.gate(x)
+        # 合并各专家的计算结果
+        calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
+        y = calc_outs.hidden_states
+        # shape(batch_size, seq_len, output_size)
+        y = y.reshape(original_shape + (self.output_size,))
 
-        y = y.reshape(original_shape + (self.output_size,))  # shape(batch_size, seq_len, output_size)
-        return y, gate_outputs["balance_loss"]
-        # fmt: on
+        return MoEMlpOutput(
+            hidden_states=y,
+            balance_loss=gate_outputs["balance_loss"],
+            num_dropped_tokens=calc_outs.num_dropped_tokens,
+            gate_load=gate_outputs["load"],
+            gate_importance=gate_outputs["importance"],
+        )
 
     def set_num_selects(self, num_selects):
         if num_selects > self.gate.num_experts:
