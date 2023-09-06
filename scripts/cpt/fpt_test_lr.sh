@@ -50,8 +50,8 @@ export LOGLEVEL=INFO
     echo "#tokens/batch: $tokens_per_batch"
 
     data_cache=resources/cache
-    output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
-    #output_dir=outputs/cpt-moe-fpt-test_lr_change-1709003
+    #output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    output_dir=outputs/cpt-moe-fpt-test_lr_change-1872010
     echo "output_dir: $output_dir"
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
@@ -111,9 +111,9 @@ export LOGLEVEL=INFO
             --report_to none \
             --log_level info\
             --max_tokens ${max_tokens}\
+            --torch_compile True \
             --debug_mode \
-            --torch_compile True
-            #--resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1709003/checkpoint-10
+            --resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1872010/checkpoint-10
 }
 #SBATCH --job-name=cpt-moe-fpt-test_lr_change
 #改动前：--logging_steps 10 \

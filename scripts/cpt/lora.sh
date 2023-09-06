@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-llama-moe-lora-bs16
+#SBATCH --job-name=cpt-llama-moe-lora-bs16-dropout=0.1
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -11,7 +11,7 @@
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 
-source ~/anaconda3/bin/activate smoe
+source ~/anaconda3/bin/activate moeenv
 
 num_nodes=2         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
