@@ -1,5 +1,6 @@
 import argparse
 import os
+import pickle
 import random
 import types
 
@@ -10,47 +11,60 @@ from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from transformers.models.llama.modeling_llama import LlamaMLP
 
+from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-
+from smoe.utils.change_llama_forward import (
+    forward_llama_decoder_with_padding_mask,
+    forward_llama_mlp_with_feature_dumping,
+    forward_llama_model_with_padding_mask,
+)
 
 # fmt: off
+
+def get_max_available_num(all_datasets, dataset_weight):
+    """
+    Get the maximum number of samples for each dataset.
+    """
+    max_available_num = {}  # the maximum number of samples each dataset can provide
+
+    for key in dataset_weight.keys():  # assume this key is 100% used, O(n^2) time complexity
+        this_available_num = {key: len(all_datasets[key])}
+
+        for check_key in dataset_weight.keys():  # check if other key can provide enough number of batches
+            if key == check_key:
+                continue
+            if int(len(all_datasets[key]) * (dataset_weight[check_key] / dataset_weight[key])) > len(all_datasets[check_key]):  # the check_key cannot provide enough data
+                this_available_num = None  # not satisfied
+                break
+            else:  # this check_key is satisfied
+                this_available_num[check_key] = int(len(all_datasets[key]) * (dataset_weight[check_key] / dataset_weight[key]))
+
+        if this_available_num is not None:
+            if len(max_available_num) == 0:
+                max_available_num = this_available_num
+            else:
+                for key2 in dataset_weight.keys():  # update for all keys
+                    if this_available_num[key2] > max_available_num[key2]:
+                        max_available_num[key2] = this_available_num[key2]
+
+    return max_available_num
+
+
 def change_forward(llama_model, device_id, save_path, template, save_interval=1):
-    def _forward(self, x):  # new forward function with hidden_states recording
-        self.now_epoch += 1
-
-        self.hidden_inputs.append(x.detach().half())
-
-        if self.now_epoch % self.save_interval == (self.save_interval - 1):
-            save_path = os.path.join(self.save_path_hidden_inputs, str(self.device_id) + "_" + str(self.now_epoch // self.save_interval) + ".pth")
-            torch.save(torch.cat(self.hidden_inputs, dim=0).reshape(-1, self.hidden_dim).half().cpu(), save_path, pickle_protocol=4)
-            self.hidden_inputs = []
-
-        gate_proj_output = self.act_fn(self.gate_proj(x))
-        up_proj_output = self.up_proj(x)
-        gate_up_mm_output = gate_proj_output * up_proj_output
-        down_proj_output = self.down_proj(gate_up_mm_output)
-
-        if "gate_proj" in template:
-            self.hidden_outputs.append(gate_proj_output.detach().half())
-        elif "up_proj" in template:
-            self.hidden_outputs.append(gate_up_mm_output.detach().half())
-
-        if self.now_epoch % self.save_interval == (self.save_interval - 1):
-            save_path = os.path.join(self.save_path_hidden_outputs, str(self.device_id) + "_" + str(self.now_epoch // self.save_interval) + ".pth")
-            torch.save(torch.cat(self.hidden_outputs, dim=0).reshape(-1, self.hidden_neurons).half().cpu(), save_path, pickle_protocol=4)
-            self.hidden_outputs = []
-
-        return down_proj_output
+    llama_model.forward = types.MethodType(forward_llama_model_with_padding_mask, llama_model)  # change forward function for LlamaModel
 
     for layer_idx, layer in enumerate(llama_model.layers):  # locate block by the name template
         mlp = layer.mlp
         assert type(mlp) == LlamaMLP
 
-        mlp.forward = types.MethodType(_forward, mlp)  # change forward function for LlamaMLP
+        layer.forward = types.MethodType(forward_llama_decoder_with_padding_mask, layer)  # change forward function for LlamaDecoderLayer
+        mlp.forward = types.MethodType(forward_llama_mlp_with_feature_dumping, mlp)  # change forward function for LlamaMLP
+
         mlp.hidden_inputs = []
         mlp.hidden_outputs = []
 
         mlp.device_id = device_id
+        mlp.template = template
         mlp.layer_idx = layer_idx
         mlp.now_epoch = -1
         mlp.hidden_dim = llama_model.config.hidden_size
@@ -79,11 +93,10 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=4)  # 单次evaluate的batch_size
     parser.add_argument('--save_interval', type=int, default=1)  # 保存参数的batch间隔，调大会影响显存占用，但可以减少保存的文件个数
 
-    parser.add_argument('--local_rank', default=-1, type=int, help='node rank for distributed training')
-    parser.add_argument('--local-rank', default=-1, type=int, help='node rank for distributed training')
-
     args = parser.parse_args()
+    args.local_rank = int(os.environ["LOCAL_RANK"])
     args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-Hidden-Features")
+    print(args, "\n")
 
     print("cuda is_available: " + str(torch.cuda.is_available()))
     dist.init_process_group(backend='nccl')
@@ -125,48 +138,28 @@ if __name__ == "__main__":
                     all_datasets[key] = LineByLineJsonlTextDataset(tokenizer, file_path=raw_file_path, block_size=2048)
                     if not os.path.exists(args.train_data_cache_path):
                         os.makedirs(args.train_data_cache_path)
-                    with open(cached_file_path, "wb") as file:
-                        torch.save(all_datasets[key].examples, os.path.join(args.train_data_cache_path, key + "_cached.pth"))
-                print("Dataset " + key + ": " + str(sum([torch.sum(all_datasets[key][i] != 2).item() for i in range(len(all_datasets[key]))])) + " total tokens.")  # 统计非padding的token数量
+                    torch.save(all_datasets[key].examples, cached_file_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+                print(f"Dataset {key}: {sum([torch.sum(all_datasets[key][i]['attention_mask']).item() for i in range(len(all_datasets[key]))])} total tokens.")  # 统计非special token的数量
 
     # scale datasets by weights
-    max_available_num = {}  # the maximum number of batches each dataset can provide
+    max_available_num = get_max_available_num(all_datasets, dataset_weight)
 
-    for key in dataset_weight.keys():  # assume this key is 100% used, O(n^2) time complexity
-        this_available_num = {key: len(all_datasets[key])}
-
-        for check_key in dataset_weight.keys():  # check if other key can provide enough number of batches
-            if key == check_key:
-                continue
-            if int(len(all_datasets[key]) * (dataset_weight[check_key] / dataset_weight[key])) > len(all_datasets[check_key]):  # the check_key cannot provide enough data
-                this_available_num = None  # not satisfied
-                break
-            else:  # this check_key is satisfied
-                this_available_num[check_key] = int(len(all_datasets[key]) * (dataset_weight[check_key] / dataset_weight[key]))
-
-        if this_available_num is not None:
-            if len(max_available_num) == 0:
-                max_available_num = this_available_num
-            else:
-                for key2 in dataset_weight.keys():  # update for all keys
-                    if this_available_num[key2] > max_available_num[key2]:
-                        max_available_num[key2] = this_available_num[key2]
-
+    # randomly sample with fixed seed
     random.seed(0)
     for key in dataset_weight.keys():  # reset the number of examples by max_available_num and data_use_percent
         all_datasets[key].examples = random.sample(all_datasets[key].examples, int(max_available_num[key] * args.data_use_percent))  # 按照batch分配，由于padding的存在，token的比例会有误差
 
-    # split training set and validation set
-    training_dataset = []
+    # aggregate datasets
+    aggregated_dataset = []
     for key in dataset_weight.keys():
-        training_dataset.append(CommonDataset(all_datasets[key].examples))
-        print("Dataset " + key + ": " + str(sum([torch.sum(training_dataset[-1][i] != 2).item() for i in range(len(training_dataset[-1]))])) + " training tokens.")  # 统计非padding的token数量
-    training_dataset = ConcatDataset(training_dataset)
+        aggregated_dataset.append(CommonDataset(all_datasets[key].examples))
+        print("Dataset " + key + ": " + str(sum([torch.sum(aggregated_dataset[-1][i]['attention_mask']).item() for i in range(len(aggregated_dataset[-1]))])) + " tokens.")  # 统计非padding的token数量(padding id = 2)
+    aggregated_dataset = ConcatDataset(aggregated_dataset)
 
     """prepare dataloader"""
-    train_sampler = torch.utils.data.distributed.DistributedSampler(training_dataset, rank=args.local_rank, shuffle=True, drop_last=True)
-    train_loader = DataLoader(training_dataset, batch_size=args.batch_size, sampler=train_sampler, num_workers=4, pin_memory=True, persistent_workers=True)
-    print("All Datasets: " + str(sum([torch.sum(training_dataset[i] != 2).item() for i in range(len(training_dataset))])) + " training tokens.")
+    train_sampler = torch.utils.data.distributed.DistributedSampler(aggregated_dataset, rank=args.local_rank, shuffle=True, drop_last=True)
+    train_loader = DataLoader(aggregated_dataset, batch_size=args.batch_size, sampler=train_sampler, collate_fn=tensor_dict_cat_collator, num_workers=4, pin_memory=True, persistent_workers=True)
+    print("All Datasets: " + str(sum([torch.sum(aggregated_dataset[i]['attention_mask']).item() for i in range(len(aggregated_dataset))])) + " tokens.")
     iter_train = iter(train_loader)
 
     """load model"""
@@ -196,10 +189,11 @@ if __name__ == "__main__":
     for train_step in process_bar2:
         train_sampler.set_epoch(train_step)
         train_batch = next(iter_train)
-        train_batch = train_batch.cuda(args.local_rank, non_blocking=True)
+        for key in train_batch.keys():
+            train_batch[key] = train_batch[key].cuda(args.local_rank, non_blocking=True)
 
         with torch.no_grad():
-            model(train_batch)
+            model(**train_batch)
 
         process_bar2.update(1)
     process_bar2.close()

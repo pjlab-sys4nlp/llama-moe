@@ -1,10 +1,8 @@
 #!/usr/bin/bash
 
-set -vx
-
-#SBATCH --job-name=cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316
-#SBATCH --output=logs/%x-part2-%j.log
-#SBATCH --error=logs/%x-part2-%j.log
+#SBATCH --job-name=cpt-fpt-resume-200b
+#SBATCH --output=logs/%x-resume-%j.log
+#SBATCH --error=logs/%x-resume-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -29,21 +27,24 @@ export LOGLEVEL=INFO
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
-    lr=1e-4
-
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     model_type="llama_moe"
-    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
+    lr=1e-4
+    final_lr_portion=0.1
     per_device_train_batch_size=16
     per_device_eval_batch_size=1
     gradient_accumulation_steps=2
     block_size=2048
-    max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "10^11 / $block_size" | bc)
+    num_tokens="2*10^11"
+
+    max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
@@ -52,8 +53,8 @@ export LOGLEVEL=INFO
     echo "#tokens/batch: $tokens_per_batch"
 
     data_cache=resources/cache
-    # output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
-    output_dir=outputs/$SLURM_JOB_NAME
+    output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    # output_dir=outputs/$SLURM_JOB_NAME
     echo "output_dir: $output_dir"
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
@@ -72,7 +73,8 @@ export LOGLEVEL=INFO
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
-            --resume_from_checkpoint outputs/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-6000 \
+            --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
+            --ignore_data_skip \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
@@ -86,7 +88,7 @@ export LOGLEVEL=INFO
             --seed $RANDOM \
             --bf16 \
             --num_train_epochs 1 \
-            --final_lr_portion 0.1 \
+            --final_lr_portion ${final_lr_portion} \
             --optim adamw_torch \
             --adam_beta1 0.9 \
             --adam_beta2 0.95 \
@@ -95,9 +97,9 @@ export LOGLEVEL=INFO
             --max_grad_norm 1.0 \
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
-            --max_train_samples 48828125 \
+            --max_train_samples ${max_train_samples} \
             --logging_strategy steps \
-            --logging_steps 10 \
+            --logging_steps 1 \
             --save_strategy steps \
             --save_total_limit 2 \
             --save_steps 1000 \

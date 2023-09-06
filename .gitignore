@@ -164,5 +164,13 @@ debug.txt
 resources/
 outputs/
 /backups/
-/visualization-up-direct/
 /visualization/
+results/analysis/cluster_*.png
+results/expert_load_vis
+results/analysis_clustering7
+results/gate_loss_100b
+results/RandomSplit-l2_norm-llama_7B-16Select4-up_proj
+results/gate_loss_original_clustering_model
+results/llama_7B_MoE_16Select4-l2_norm
+results/random_16select4_moe
+results/gate_loss.png

@@ -1,5 +1,6 @@
 #!/usr/bin/bash
-#SBATCH --job-name=cpt-moe-fpt-test_lr_change
+
+#SBATCH --job-name=cpt-moe-fpt-7b-random-64gpus-bs16_2-zero1default
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
@@ -27,9 +28,14 @@ export LOGLEVEL=INFO
     lr=1e-4
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+    # model_type="llama_moe"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    # model_type="llama_moe"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     model_type="llama_moe"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
     per_device_train_batch_size=16
@@ -96,8 +102,8 @@ export LOGLEVEL=INFO
             --logging_strategy steps \
             --logging_steps 1 \
             --save_strategy steps \
-            --save_total_limit 2 \
-            --save_steps 10 \
+            --save_total_limit 3 \
+            --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --block_size ${block_size} \

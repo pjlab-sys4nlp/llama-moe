@@ -1,8 +1,16 @@
+from transformers import TrainerControl, TrainerState, TrainingArguments
 from transformers.integrations import TensorBoardCallback, logger, rewrite_logs
 
 
 class EnhancedTensorboardCallback(TensorBoardCallback):
-    def on_log(self, args, state, control, logs=None, **kwargs):
+    def on_log(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        logs: dict = None,
+        **kwargs,
+    ):
         if not state.is_world_process_zero:
             return
 
@@ -10,6 +18,7 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
             self._init_summary_writer(args)
 
         if self.tb_writer is not None:
+            logs.update({"Total_FLOPs": state.total_flos})
             logs = rewrite_logs(logs)
             for k, v in logs.items():
                 if isinstance(v, (int, float)):

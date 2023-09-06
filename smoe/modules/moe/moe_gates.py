@@ -48,6 +48,7 @@ class TopKBalancedNoisyGate(nn.Module):
         self.add_noise = add_noise
         self.use_softmax = use_softmax
 
+        self.gate_network_type = gate_network
         self.gate_network = get_gate_network(gate_network, input_size, num_experts)
 
         # add_noise
@@ -59,8 +60,11 @@ class TopKBalancedNoisyGate(nn.Module):
             dtype=self.weight_noise.weight.data.dtype,
         )
         # print(self.weight_noise.weight.data)
-        self.mean = torch.tensor([0.0], requires_grad=False)
-        self.std = torch.tensor([1.0], requires_grad=False)
+        # self.mean = torch.tensor([0.0], requires_grad=False)
+        # self.std = torch.tensor([1.0], requires_grad=False)
+        self.mean = 0.0
+        self.std = 1.0
+        self.normal = Normal(self.mean, self.std)
         self.softplus = nn.Softplus()
 
         # use_softmax
@@ -104,6 +108,7 @@ class TopKBalancedNoisyGate(nn.Module):
             top_k_scores = top_k_logits
 
         """专家平衡选择"""
+        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下gate loss输出值设备不匹配的错误
         if self.training and self.use_balance:
             """计算importance"""
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
@@ -111,28 +116,19 @@ class TopKBalancedNoisyGate(nn.Module):
             importance = scores_filtered.sum(0)  # shape(num_experts)
 
             """计算load"""
-            if self.add_noise:  # 计算各分数在给定随机噪声的情况下，处于topK范围内的概率
-                batch_size = logits_gate.size(0)
-                m = top_logits.size(1)
-                top_values_flat = top_logits.flatten()
-
-                if self.mean.device != x.device:
-                    self.mean = self.mean.to(x.device)
-                    self.std = self.std.to(x.device)
-                normal = Normal(self.mean, self.std)
-
-                threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
-                threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
-                is_in = torch.gt(logits_noise, threshold_if_in)
-                threshold_positions_if_out = threshold_positions_if_in - 1
-                threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-                # is each value currently in the top k.
-                prob_if_in = normal.cdf((logits_gate - threshold_if_in) / noise_control)
-                prob_if_out = normal.cdf((logits_gate - threshold_if_out) / noise_control)
-                prob = torch.where(is_in, prob_if_in, prob_if_out)
-                load = prob.sum(0)
-            else:
-                load = (scores_filtered > 0).sum(0)  # shape(num_experts)
+            batch_size = logits_gate.size(0)
+            m = top_logits.size(1)
+            top_values_flat = top_logits.flatten()
+            threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
+            threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
+            is_in = torch.gt(logits_noise, threshold_if_in)
+            threshold_positions_if_out = threshold_positions_if_in - 1
+            threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
+            # is each value currently in the top k.
+            prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
+            prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
+            prob = torch.where(is_in, prob_if_in, prob_if_out)
+            load = prob.sum(0)
 
             """计算balance loss"""
             gate_loss = self.cv_squared(importance) + self.cv_squared(load)
@@ -210,4 +206,10 @@ class TopKBalancedNoisyGate(nn.Module):
             gate_loss = None
 
         return scores, gate_loss
+
     # fmt: on
+
+    def reset_gate_network(self):
+        for name, param in self.gate_network.named_parameters():
+            if "weight" in name:
+                torch.nn.init.kaiming_normal_(param)

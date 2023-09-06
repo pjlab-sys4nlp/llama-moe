@@ -1,22 +1,33 @@
+import argparse
+
 import numpy as np
+import torch.cuda
 from transformers import LlamaTokenizer
 
 from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.models.llama_moefication.modeling_llama_moe import (
+    LlamaMoEForCausalLM,
+    LlamaMoEForSequenceClassification,
+    LlamaMoEModel,
+)
 
 
-def main():
-    device = "cuda:0"
-    tokenizer_path = "/mnt/petrelfs/share_data/quxiaoye/models/llama_7B"
-
-    load_from_file = False
-    model_path = "/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/llama_7B_8Select2-l2_norm"
+def main(args, load_from_file=True):
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     if load_from_file:  # 从文件读取现有模型
         print("Loading model...")
-        # model_llama_moe = LlamaMoEModel.from_pretrained(model_path)
-        model_llama_moe = LlamaMoEForCausalLM.from_pretrained(model_path)
-        # model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(model_path)
+
+        if args.model_type == "LlamaMoEModel":
+            model_llama_moe = LlamaMoEModel.from_pretrained(args.model_path)
+        elif args.model_type == "LlamaMoEForCausalLM":
+            model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.model_path)
+        elif args.model_type == "LlamaMoEForSequenceClassification":
+            model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(
+                args.model_path
+            )
+        else:
+            raise ValueError
 
         model_llama_moe.set_moe_num_selects(4)  # 修改专家的选择数量
         model_llama_moe.set_moe_gate_add_noise(True)  # 修改是否在训练时添加随机噪声到门控输出
@@ -49,9 +60,15 @@ def main():
             num_selects=num_selects,
             size_experts=size_experts,
         )
-        # model_llama_moe = LlamaMoEModel(config_llama_moe)
-        model_llama_moe = LlamaMoEForCausalLM(config_llama_moe)
-        # model_llama_moe = LlamaMoEForSequenceClassification(config_llama_moe)
+
+        if args.model_type == "LlamaMoEModel":
+            model_llama_moe = LlamaMoEModel(config_llama_moe)
+        elif args.model_type == "LlamaMoEForCausalLM":
+            model_llama_moe = LlamaMoEForCausalLM(config_llama_moe)
+        elif args.model_type == "LlamaMoEForSequenceClassification":
+            model_llama_moe = LlamaMoEForSequenceClassification(config_llama_moe)
+        else:
+            raise ValueError
 
     """prepare data"""
     sentence_list = [
@@ -62,7 +79,7 @@ def main():
         "The past is never dead. It is not even past.",
     ]
 
-    tokenizer = LlamaTokenizer.from_pretrained(tokenizer_path)
+    tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_path)
     tokenizer.pad_token = tokenizer.eos_token
     tokens = tokenizer(sentence_list, padding=True, return_tensors="pt")
     print(tokens)
@@ -75,4 +92,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tokenizer_path", type=str)
+    parser.add_argument("--model_path", type=str)
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        choices=(
+            "LlamaMoEModel",
+            "LlamaMoEForCausalLM",
+            "LlamaMoEForSequenceClassification",
+        ),
+    )
+    args = parser.parse_args()
+    main(args)

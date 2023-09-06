@@ -1,4 +1,5 @@
 import gzip
+import json
 import lzma
 import os
 import pickle
@@ -31,3 +32,23 @@ def load_compressed_file_gz(path):  # gz
     with gzip.open(path, "rb") as file:
         data = pickle.load(file)
     return data
+
+
+def load_jsonlines_iter(filepath):
+    with open(filepath, "rt", encoding="utf8") as fin:
+        for line in fin:
+            yield json.loads(line)
+
+
+def load_jsonlines(filepath):
+    data = []
+    with open(filepath, "rt", encoding="utf8") as fin:
+        for line in fin:
+            data.append(json.loads(line))
+    return data
+
+
+def dump_jsonlines(obj, filepath, **kwargs):
+    with open(filepath, "wt", encoding="utf8") as fout:
+        for ins in obj:
+            fout.write(f"{json.dumps(ins, ensure_ascii=False, **kwargs)}\n")
