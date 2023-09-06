@@ -11,7 +11,7 @@
 #SBATCH --mem=0
 #SBATCH --time=6:00:00
 
-source ~/anaconda3/bin/activate moeenv
+source ~/anaconda3/bin/activate smoe
 num_nodes=2         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
