@@ -14,6 +14,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
+from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
@@ -253,6 +254,7 @@ def main():
         ),
     )
     trainer.add_callback(EnhancedTensorboardCallback)
+    trainer.add_callback(SchedulerStateCallback)
     # Training
     if training_args.do_train:
         checkpoint = None
