@@ -202,6 +202,7 @@ class LlamaLrSchedulingTrainer(Trainer):
         trial,
         epoch,
         ignore_keys_for_eval,
+        balance_loss: torch.FloatTensor = None,
         num_dropped_tokens: tuple[int] = None,
         gate_load: tuple[torch.FloatTensor] = None,
         gate_importance: tuple[torch.FloatTensor] = None,
@@ -227,6 +228,7 @@ class LlamaLrSchedulingTrainer(Trainer):
             logs["num_dropped_tokens"] = num_dropped_tokens
             logs["gate_load"] = gate_load
             logs["gate_importance"] = gate_importance
+            logs["balance_loss"] = balance_loss
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -697,9 +699,14 @@ class LlamaLrSchedulingTrainer(Trainer):
                         trial,
                         epoch,
                         ignore_keys_for_eval,
-                        model_training_outputs.num_dropped_tokens,
-                        model_training_outputs.gate_load,
-                        model_training_outputs.gate_importance,
+                        balance_loss=getattr(model_training_outputs, "balance_loss"),
+                        num_dropped_tokens=getattr(
+                            model_training_outputs, "num_dropped_tokens"
+                        ),
+                        gate_load=getattr(model_training_outputs, "gate_load"),
+                        gate_importance=getattr(
+                            model_training_outputs, "gate_importance"
+                        ),
                     )
                 else:
                     self.control = self.callback_handler.on_substep_end(
@@ -725,6 +732,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 trial,
                 epoch,
                 ignore_keys_for_eval,
+                balance_loss=None,
                 num_dropped_tokens=None,
                 gate_load=None,
                 gate_importance=None,

@@ -282,28 +282,29 @@ def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
     img_grid = find_factors_with_minimal_sum(data.shape[0])
 
     cmap = mpl.colormaps["OrRd"]
-    fig = plt.figure(figsize=[el * 20 for el in img_grid])
+    fig, axes = plt.subplots(*img_grid, figsize=[el * 5 for el in img_grid[::-1]])
+    axes = axes.reshape(*img_grid)
     for i in range(data.shape[0]):
-        ax = fig.add_subplot(*img_grid, i + 1)
+        ax = axes[i // img_grid[1], i % img_grid[1]]
         im = ax.imshow(
             data[i].cpu().reshape(*shape).float().numpy(),
             cmap=cmap,
             interpolation="nearest",
+            # vmin=0.0,
+            # vmax=1.0,
         )
         for row in range(shape[0]):
             for col in range(shape[1]):
                 ax.text(
                     col,
                     row,
-                    f"{data[i, row, col]:.0f}",
+                    f"{data[i, row, col]:.5f}",
                     ha="center",
                     va="center",
                     color="black",
                 )
-        fig.colorbar(im)
         ax.set_title(f"Layer {i}")
         ax.set_axis_off()
-
     fig.tight_layout()
     return fig
 

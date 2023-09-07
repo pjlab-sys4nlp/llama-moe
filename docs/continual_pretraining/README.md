@@ -32,6 +32,16 @@ model_type="llama_moe"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
 ```
 
+llama1-7b 16 select 4: 3.49b params
+
+llama1-13b total params: 13,015,864,320 - total mlp params:  8,493,465,600
+
+| total experts | selected | dropped params | added gate params |  total params |
+| ------------: | -------: | -------------: | ----------------: | ------------: |
+|            16 |        8 |  4,246,732,800 |         3,287,040 | 8,772,418,560 |
+|            16 |        4 |  6,370,099,200 |         3,287,040 | 6,649,052,160 |
+|            16 |        2 |  7,431,782,400 |         3,287,040 | 5,587,368,960 |
+
 ## 🧮 Estimation of Training Speed and Tokens
 
 For convenient estimation of the model training speed, we provide some useful information at the very beginning of log files:

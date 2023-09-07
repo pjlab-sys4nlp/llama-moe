@@ -19,8 +19,8 @@ class MoEMlpOutput(ModelOutput):
     hidden_states: Optional[torch.FloatTensor] = None
     balance_loss: Optional[torch.FloatTensor] = None
     num_dropped_tokens: Optional[int] = None
-    gate_load: Optional[torch.FloatTensor] = None
-    gate_importance: Optional[torch.FloatTensor] = None
+    gate_load: Optional[list] = None
+    gate_importance: Optional[list] = None
 
 
 class BaseMoELayer(nn.Module):
@@ -45,10 +45,10 @@ class BaseMoELayer(nn.Module):
 
         return MoEMlpOutput(
             hidden_states=y,
-            balance_loss=gate_outputs["balance_loss"],
+            balance_loss=gate_outputs.get("balance_loss"),
             num_dropped_tokens=calc_outs.num_dropped_tokens,
-            gate_load=gate_outputs["load"],
-            gate_importance=gate_outputs["importance"],
+            gate_load=gate_outputs.get("load"),
+            gate_importance=gate_outputs.get("importance"),
         )
 
     def set_num_selects(self, num_selects):

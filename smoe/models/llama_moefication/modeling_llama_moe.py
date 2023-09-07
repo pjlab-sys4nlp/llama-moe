@@ -30,12 +30,12 @@ _CONFIG_FOR_DOC = "LlamaMoEConfig"
 @dataclass
 class MoEDecoderLayerOutput(ModelOutput):
     hidden_states: Optional[torch.FloatTensor] = None
-    balance_loss: Optional[torch.FloatTensor] = None
     self_attn_weights: Optional[torch.FloatTensor] = None
     present_key_value: Optional[torch.FloatTensor] = None
+    balance_loss: Optional[float] = None
     num_dropped_tokens: Optional[int] = None
-    gate_load: Optional[torch.FloatTensor] = None
-    gate_importance: Optional[torch.FloatTensor] = None
+    gate_load: Optional[list] = None
+    gate_importance: Optional[list] = None
 
 
 @dataclass
@@ -46,21 +46,21 @@ class BaseMoEModelOutputWithPast(ModelOutput):
     """
 
     last_hidden_state: torch.FloatTensor = None
-    balance_loss: torch.FloatTensor = None
     past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
+    balance_loss: Optional[float] = None
     num_dropped_tokens: Optional[Tuple[int]] = None
-    gate_load: Optional[Tuple[torch.FloatTensor]] = None
-    gate_importance: Optional[Tuple[torch.FloatTensor]] = None
+    gate_load: Optional[Tuple[list]] = None
+    gate_importance: Optional[Tuple[list]] = None
 
 
 @dataclass
 class MoECausalLMOutputWithPast(CausalLMOutputWithPast):
-    balance_loss: Optional[torch.FloatTensor] = None
+    balance_loss: Optional[float] = None
     num_dropped_tokens: Optional[Tuple[int]] = None
-    gate_load: Optional[Tuple[torch.FloatTensor]] = None
-    gate_importance: Optional[Tuple[torch.FloatTensor]] = None
+    gate_load: Optional[Tuple[list]] = None
+    gate_importance: Optional[Tuple[list]] = None
 
 
 class LlamaMoEDecoderLayer(LlamaDecoderLayer):
@@ -490,7 +490,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             num_dropped_tokens=outputs.num_dropped_tokens,
-            balance_loss=outputs.balance_loss,
+            balance_loss=outputs.balance_loss.item(),
             gate_load=outputs.gate_load,
             gate_importance=outputs.gate_importance,
         )

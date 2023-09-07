@@ -51,6 +51,7 @@ export LOGLEVEL=INFO
     gradient_accumulation_steps=2
     block_size=2048
     num_tokens="1*10^11"
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
@@ -63,8 +64,9 @@ export LOGLEVEL=INFO
 
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    mkdir -p $output_dir
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -81,7 +83,6 @@ export LOGLEVEL=INFO
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
         smoe/entrypoint/cpt_fpt.py \
-            --no_debug_mode \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
@@ -109,9 +110,9 @@ export LOGLEVEL=INFO
             --max_steps ${max_steps} \
             --max_train_samples ${max_train_samples} \
             --logging_strategy steps \
-            --logging_steps 1 \
+            --logging_steps 10 \
             --save_strategy steps \
-            --save_total_limit 3 \
+            --save_total_limit 2 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \

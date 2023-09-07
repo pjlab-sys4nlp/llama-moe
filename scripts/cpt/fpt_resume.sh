@@ -43,6 +43,7 @@ export LOGLEVEL=INFO
     gradient_accumulation_steps=2
     block_size=2048
     num_tokens="2*10^11"
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
@@ -56,8 +57,9 @@ export LOGLEVEL=INFO
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     # output_dir=outputs/$SLURM_JOB_NAME
+    mkdir -p $output_dir
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)

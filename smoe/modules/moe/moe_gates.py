@@ -142,6 +142,8 @@ class TopKBalancedNoisyGate(nn.Module):
             "topK_indices": top_k_indices,
             "topK_scores": top_k_scores,
             "balance_loss": balance_loss,
+            "load": load.tolist(),
+            "importance": importance.tolist(),
         }
 
     def forward_return_scores(self, x):
@@ -274,8 +276,8 @@ class SwitchBalancedGate(nn.Module):
             "topK_scores": top1_scores,
             "expert_batch_size": load.tolist(),
             "balance_loss": balance_loss,
-            "load": load_mean,
-            "importance": importance_mean,
+            "load": load_mean.tolist(),
+            "importance": importance_mean.tolist(),
         }
 
     def reset_gate_network(self):

@@ -36,21 +36,25 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                     and all(isinstance(n, (int, float)) for n in v)
                 ):
                     self.tb_writer.add_scalars(
-                        "train/num_dropped_tokens/layer",
+                        f"{k}/layer",
                         {str(i): n for i, n in enumerate(v)},
                         state.global_step,
                     )
-                    self.tb_writer.add_scalar(
-                        "train/num_dropped_tokens/total", sum(v), state.global_step
-                    )
+                    self.tb_writer.add_scalar(f"{k}/total", sum(v), state.global_step)
                 elif (
                     k == "train/gate_load"
                     or k == "train/gate_importance"
                     and isinstance(v, tuple)
-                    and all(isinstance(n, torch.Tensor) for n in v)
+                    and all(isinstance(n, list) for n in v)
                 ):
+                    _v = [torch.tensor(n) for n in v]
+                    self.tb_writer.add_scalars(
+                        f"{k}/std/layer",
+                        {str(i): n.std().item() for i, n in enumerate(_v)},
+                        state.global_step,
+                    )
                     self.tb_writer.add_image(
-                        k, get_heatmap_img_grid_for_tb(v), state.global_step
+                        k, get_heatmap_img_grid_for_tb(_v), state.global_step
                     )
                 else:
                     logger.warning(
