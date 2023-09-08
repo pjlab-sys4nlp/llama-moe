@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-7b-random-64gpus-bs16_2-zero1default
+#SBATCH --job-name=cpt-16select1-56gpus
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
@@ -10,44 +10,47 @@
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116
 
-#SBATCH --nodes=8
+#SBATCH --nodes=7
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=8         # should match with --nodes
+num_nodes=7         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=4
-export NCCL_DEBUG=INFO
 export LOGLEVEL=INFO
+# export NCCL_DEBUG=INFO
 # export TORCH_DISTRIBUTED_DEBUG=DETAIL
 # export TORCH_SHOW_CPP_STACKTRACES=1
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
-    lr=1e-4
-
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    model_type="llama_moe"
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
+    # model_type="llama_moe"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
 
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
+    lr=1e-4
+    final_lr_portion=0.1
     per_device_train_batch_size=16
     per_device_eval_batch_size=1
     gradient_accumulation_steps=2
     block_size=2048
-    max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "10^11 / $block_size" | bc)
+    num_tokens="1*10^11"
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
+
+    max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
@@ -57,8 +60,9 @@ export LOGLEVEL=INFO
 
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    mkdir -p $output_dir
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -79,6 +83,7 @@ export LOGLEVEL=INFO
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
             --tokenizer_name_or_path ${tokenizer_path} \
+            --num_selects 1 \
             --dataset_dir ${dataset_dir} \
             --data_cache_dir ${data_cache} \
             --validation_split_percentage 0.001 \
@@ -88,7 +93,7 @@ export LOGLEVEL=INFO
             --seed $RANDOM \
             --bf16 \
             --num_train_epochs 1 \
-            --final_lr_portion 0.1 \
+            --final_lr_portion ${final_lr_portion} \
             --optim adamw_torch \
             --adam_beta1 0.9 \
             --adam_beta2 0.95 \
@@ -97,11 +102,11 @@ export LOGLEVEL=INFO
             --max_grad_norm 1.0 \
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
-            --max_train_samples 48828125 \
+            --max_train_samples ${max_train_samples} \
             --logging_strategy steps \
             --logging_steps 10 \
             --save_strategy steps \
-            --save_total_limit 3 \
+            --save_total_limit 2 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \

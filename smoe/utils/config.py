@@ -1,7 +1,7 @@
 import os
 import sys
 from dataclasses import dataclass, field
-from typing import Optional, Type, TypeVar
+from typing import Literal, Optional, Type, TypeVar
 
 from transformers import (
     MODEL_FOR_CAUSAL_LM_MAPPING,
@@ -115,6 +115,23 @@ class ModelArguments:
             ),
             "choices": ["auto", "bfloat16", "float16", "float32"],
         },
+    )
+    gate_type: Literal["TopKBalancedNoisyGate", "SwitchBalancedGate"] = field(
+        default="TopKBalancedNoisyGate",
+        metadata={
+            "help": "The type of gate, should be one of `TopKBalancedNoisyGate` and `SwitchBalancedGate`"
+        },
+    )
+    calculator_type: Literal[
+        "UniversalCalculator", "SwitchDropTokenCalculator"
+    ] = field(
+        default="UniversalCalculator",
+        metadata={
+            "help": "The type of gate calculator, should be one of `UniversalCalculator` and `SwitchDropTokenCalculator`"
+        },
+    )
+    num_selects: int = field(
+        default=4, metadata={"help": "The number of experts to be selected"}
     )
 
     def __post_init__(self):
@@ -239,7 +256,9 @@ class EnhancedTrainingArguments(TrainingArguments):
     )
     debug_mode: Optional[bool] = field(
         default=False,
-        metadata={"help": "If set to True, the number of data files will be cut to 2."},
+        metadata={
+            "help": "If set to True, the number of data files will be cut to 1 and `num_hidden_layers` will be set to 1."
+        },
     )
     _block_size: Optional[int] = field(
         default=None,

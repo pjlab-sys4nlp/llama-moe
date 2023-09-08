@@ -1,52 +1,52 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-fpt-resume-200b
-#SBATCH --output=logs/%x-resume-%j.log
-#SBATCH --error=logs/%x-resume-%j.log
+#SBATCH --job-name=gate_loss_test
+#SBATCH --output=logs/%x-%j.log
+#SBATCH --error=logs/%x-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=32
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116
 
-#SBATCH --nodes=7
+#SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=7         # should match with --nodes
+num_nodes=1         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS=4
 export NCCL_DEBUG=INFO
 export LOGLEVEL=INFO
+export GATE_LOSS_RESULTS_DIR="results/RandomSplit-l2_norm-llama_7B-16Select4-up_proj"
 # export TORCH_DISTRIBUTED_DEBUG=DETAIL
 # export TORCH_SHOW_CPP_STACKTRACES=1
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
+    lr=1e-4
+
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
-    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    # pretrained_model=outputs/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random-l2_norm/llama_7B-16Select4-up_proj
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed_v2
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    lr=2e-5
-    final_lr_portion=0.5
     per_device_train_batch_size=16
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=2
+    gradient_accumulation_steps=20
     block_size=2048
-    num_tokens="2*10^11"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
-
-    max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
+    # max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_steps=20
+    max_train_samples=$(echo "10^11 / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
@@ -57,9 +57,8 @@ export LOGLEVEL=INFO
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     # output_dir=outputs/$SLURM_JOB_NAME
-    mkdir -p $output_dir
-    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -68,7 +67,7 @@ export LOGLEVEL=INFO
     echo "Node: $head_node"
     echo "Node IP: $head_node_ip"
 
-            # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
+            # --resume_from_checkpoint outputs/cpt-moe-fpt-64gpus-bs16_2-zero1default-1600316/checkpoint-23000 \
     srun torchrun \
         --nnodes ${num_nodes} \
         --nproc_per_node ${num_gpu_per_node} \
@@ -91,21 +90,20 @@ export LOGLEVEL=INFO
             --seed $RANDOM \
             --bf16 \
             --num_train_epochs 1 \
-            --final_lr_portion ${final_lr_portion} \
+            --final_lr_portion 0.1 \
             --optim adamw_torch \
             --adam_beta1 0.9 \
             --adam_beta2 0.95 \
             --learning_rate ${lr} \
             --weight_decay 0.1 \
             --max_grad_norm 1.0 \
-            --warmup_steps 2000 \
+            --warmup_steps 1 \
             --max_steps ${max_steps} \
-            --max_train_samples ${max_train_samples} \
+            --max_train_samples 48828125 \
             --logging_strategy steps \
             --logging_steps 1 \
-            --save_strategy steps \
-            --save_total_limit 2 \
-            --save_steps 1000 \
+            --save_strategy no \
+            --save_steps 9999999 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --block_size ${block_size} \
