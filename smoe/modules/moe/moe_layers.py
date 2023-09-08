@@ -73,10 +73,7 @@ class BaseMoELayer(nn.Module):
         self.gate.balance_loss_weight = balance_loss_weight
 
     def set_gate_add_noise(self, add_noise):
-        if self.gate_type != "TopKBalancedNoisyGate":
-            raise ValueError(self.gate_type)
-        else:
-            self.gate.add_noise = add_noise
+        self.gate.add_noise = add_noise
 
     def set_gate_noise_epsilon(self, noise_epsilon):
         if self.gate_type != "TopKBalancedNoisyGate":
