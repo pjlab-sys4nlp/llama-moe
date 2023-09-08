@@ -124,7 +124,7 @@ class GraphSplit(LayerSplit):
 
         dataset = ShardDataset(hidden_outputs_path, parallel_mode="workers")
         self.dataloader = DataLoader(
-            dataset, batch_size=1, shuffle=False, num_workers=16, pin_memory=True
+            dataset, batch_size=1, shuffle=False, num_workers=16, pin_memory=False
         )
 
     def load_param(self):
@@ -136,21 +136,17 @@ class GraphSplit(LayerSplit):
     def split_and_save(self):
         self.load_param()
         ffn = torch.tensor(self.ffn_weight)
-
-        cnt = 0
         adj = torch.zeros(ffn.shape[0], ffn.shape[0], device=self.device).float()
-        ffn = torch.tensor(ffn).to(self.device).transpose(0, 1)
         iter_train = iter(self.dataloader)
 
         for indx in tqdm(range(len(self.dataloader))):
             hidden = next(iter_train)
             hidden = hidden.to(self.device).float()
-            # res = hidden * hidden # 8192
             res = pass_kernel_function(hidden, self.metric)
             res = torch.clamp(
                 torch.bmm(res.transpose(1, 2), res).sum(0), max=self.threshold
             )
-            print(self.layer, indx, torch.nonzero(torch.isnan(res)), flush=True)
+            # print(self.layer, indx, torch.nonzero(torch.isnan(res)), flush=True)
             # tqdm.write(f"{self.layer} {indx} {torch.nonzero(torch.isnan(res))}")
             adj = adj + res
 
@@ -198,7 +194,7 @@ class GradientSplitGetGrads:
     SNIP: Single-shot Network Pruning based on Connection Sensitivity (ICLR 2019)
     """
 
-    def __init__(self, config, trainer, accumulate_level="total", kernel="l1_norm", importance_type="feature_grad", device="cpu"):
+    def __init__(self, config, trainer, accumulate_level="total", kernel="l1_norm", importance_type="feature_grad", device="cpu", global_rank=0):
         self.config = config
         self.trainer = trainer
 
@@ -206,24 +202,30 @@ class GradientSplitGetGrads:
         self.kernel = kernel
         self.importance_type = importance_type
         self.device = device
+        self.global_rank = global_rank
+        print("global_rank:", global_rank)
 
         self.layer_num = self.trainer.model.config.num_hidden_layers
         self.neuron_num = self.trainer.model.config.intermediate_size
 
         self.sample_count = 0
 
-        self.up_proj_features = {}
-        self.gate_proj_features = {}
+        self.up_proj_scores = {}
+        self.gate_proj_scores = {}
         for i in range(self.layer_num):
-            self.up_proj_features[i] = torch.zeros((self.neuron_num,), device=self.device)
-            self.gate_proj_features[i] = torch.zeros((self.neuron_num,), device=self.device)
+            self.up_proj_scores[i] = torch.zeros((self.neuron_num,), device=self.device)
+            self.gate_proj_scores[i] = torch.zeros((self.neuron_num,), device=self.device)
 
         if importance_type == "feature_change":
             self.up_proj_features = {}
             self.gate_proj_features = {}
-            for i in range(self.layer_num):
-                self.up_proj_features[i] = torch.zeros((self.neuron_num,), device=self.device)
-                self.gate_proj_features[i] = torch.zeros((self.neuron_num,), device=self.device)
+
+    def _forward_hook_up_proj(self, module, input, output):
+        self.up_proj_features[module.layer_index] = input[0].detach()
+
+        # if self.device == "cuda:0" and module.layer_index == 0:
+        #     print("input", len(input), input[0].shape)
+        #     print("up_proj_features", self.up_proj_features[module.layer_index])
 
     def _backward_hook_up_proj(self, module, grad_in, grad_out):
         if module.add_batch_size:
@@ -245,12 +247,21 @@ class GradientSplitGetGrads:
             raise NotImplementedError
 
         if self.accumulate_level == "sample":
-            self.up_proj_features[module.layer_index] += torch.sum(pass_kernel_function(importance_score, criterion=self.kernel), dim=0)
+            self.up_proj_scores[module.layer_index] += torch.sum(pass_kernel_function(importance_score, criterion=self.kernel), dim=0)
         elif self.accumulate_level == "total":
-            self.up_proj_features[module.layer_index] += torch.sum(importance_score, dim=0)
+            self.up_proj_scores[module.layer_index] += torch.sum(importance_score, dim=0)
         else:
             raise NotImplementedError
 
+        # if self.device == "cuda:0" and module.layer_index == 0:
+        #     print("up_proj_scores", self.up_proj_scores[module.layer_index])
+
+    def _forward_hook_gate_proj(self, module, input, output):
+        self.gate_proj_features[module.layer_index] = output.detach()
+
+        # if self.device == "cuda:0" and module.layer_index == 0:
+        #     print("output", len(output), output.shape)
+        #     print("gate_proj_features", self.gate_proj_features[module.layer_index])
 
     def _backward_hook_gate_proj(self, module, grad_in, grad_out):
         if module.add_batch_size:
@@ -272,20 +283,20 @@ class GradientSplitGetGrads:
             raise NotImplementedError
 
         if self.accumulate_level == "sample":
-            self.gate_proj_features[module.layer_index] += torch.sum(pass_kernel_function(importance_score, criterion=self.kernel), dim=0)
+            self.gate_proj_scores[module.layer_index] += torch.sum(pass_kernel_function(importance_score, criterion=self.kernel), dim=0)
         elif self.accumulate_level == "total":
-            self.gate_proj_features[module.layer_index] += torch.sum(importance_score, dim=0)
+            self.gate_proj_scores[module.layer_index] += torch.sum(importance_score, dim=0)
         else:
             raise NotImplementedError
 
         # if self.device == "cuda:0" and module.layer_index == 0:
-        #     print(self.gate_proj_grads[module.layer_index])
+        #     print("gate_proj_scores", self.gate_proj_scores[module.layer_index])
 
     def get_score(self):
         # initialization
         for layer_index, layer in enumerate(self.trainer.model.model.layers):  # locate block by the name template
             assert type(layer.mlp) == LlamaMLP
-            if layer_index == 31:
+            if layer_index == 0:
                 layer.mlp.down_proj.add_batch_size = True  # use the down_proj of layer0 to count for the batch_size
                 layer.mlp.gate_proj.add_batch_size = False
             else:
@@ -293,9 +304,11 @@ class GradientSplitGetGrads:
                 layer.mlp.gate_proj.add_batch_size = False
 
             layer.mlp.down_proj.layer_index = layer_index
-            layer.mlp.down_proj.register_backward_hook(self._backward_hook_up_proj)  # "grad_out" of "down_proj" <==> grad of "up_proj * gate_proj" output
+            layer.mlp.down_proj.register_forward_hook(self._forward_hook_up_proj)  # input of "down_proj" <==> "up_proj * gate_proj" output
+            layer.mlp.down_proj.register_backward_hook(self._backward_hook_up_proj)  # grad_in of "down_proj" <==> grad of "up_proj * gate_proj" output
             layer.mlp.gate_proj.layer_index = layer_index
-            layer.mlp.gate_proj.register_backward_hook(self._backward_hook_gate_proj)  # "grad_in" of "gate_proj" <==> grad of "gate_proj" output
+            layer.mlp.gate_proj.register_forward_hook(self._forward_hook_gate_proj)  # output of "gate_proj"
+            layer.mlp.gate_proj.register_backward_hook(self._backward_hook_gate_proj)  # grad_out of "gate_proj"
 
         # get scores
         self.trainer.train()
@@ -306,18 +319,18 @@ class GradientSplitGetGrads:
         gathered_sample_count = self.trainer.accelerator.gather(self.sample_count)
         gathered_sample_count = torch.sum(gathered_sample_count)
 
-        if self.device == "cuda:0":
+        if self.global_rank == 0:
             if not os.path.exists(self.config.save_path):
                 os.makedirs(self.config.save_path)
 
         for layer_index in tqdm(range(self.layer_num)):
             # gather results on different devices
-            gathered_up_proj_scores = self.trainer.accelerator.gather(self.up_proj_features[layer_index].reshape(1, -1))
+            gathered_up_proj_scores = self.trainer.accelerator.gather(self.up_proj_scores[layer_index].reshape(1, -1))
             gathered_up_proj_scores = torch.sum(gathered_up_proj_scores, dim=0)
-            gathered_gate_proj_scores = self.trainer.accelerator.gather(self.gate_proj_features[layer_index].reshape(1, -1))
+            gathered_gate_proj_scores = self.trainer.accelerator.gather(self.gate_proj_scores[layer_index].reshape(1, -1))
             gathered_gate_proj_scores = torch.sum(gathered_gate_proj_scores, dim=0)
 
-            if self.device == "cuda:0":
+            if self.global_rank == 0:
                 # accumulate at last if set to "total"
                 if self.accumulate_level == "total":
                     gathered_up_proj_scores = pass_kernel_function(gathered_up_proj_scores, criterion=self.kernel)
@@ -350,7 +363,6 @@ class GradientSplit(LayerSplit):
     def __init__(self, config, template, layer, score_list):
         super().__init__(config, template, layer)
         self.score_list = score_list
-        self.num_experts = len(score_list)
         self.neuron_num = score_list[0].size(0)
         self.labels = np.zeros((self.neuron_num,))
 
@@ -371,15 +383,15 @@ class GradientSplit(LayerSplit):
 
         return sorted_score_list, sorted_index_list
 
-    def split_without_neuron_sharing(self, expert_size, criterion):
+    def split_without_neuron_sharing(self, expert_num, expert_size, criterion):
         sorted_score_list, sorted_index_list = self.sort_by_criterion(criterion)
 
         # iterate over the "sorted_score_list" and compare
         # greedily select the maximum score from the highest score of each expert
-        # O(neuron_num * num_experts) complexity
+        # O(neuron_num * expert_num) complexity
         neuron_used_mark = [False] * self.neuron_num
-        expert_neuron_count = [0] * self.num_experts
-        expert_start_index = [0] * self.num_experts
+        expert_neuron_count = [0] * expert_num
+        expert_start_index = [0] * expert_num
 
         if criterion == "min":
             while sum(expert_neuron_count) < self.neuron_num:
@@ -387,7 +399,7 @@ class GradientSplit(LayerSplit):
                 now_selected_neuron = -1
                 now_selected_expert = -1
 
-                for expert_id in range(self.num_experts):
+                for expert_id in range(expert_num):
                     if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
                         continue
 
@@ -416,7 +428,7 @@ class GradientSplit(LayerSplit):
                 now_selected_neuron = -1
                 now_selected_expert = -1
 
-                for expert_id in range(self.num_experts):
+                for expert_id in range(expert_num):
                     if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
                         continue
 
@@ -446,14 +458,16 @@ class GradientSplit(LayerSplit):
         # print(expert_neuron_count)
         # print(expert_start_index)
 
-    def split_with_neuron_sharing(self, expert_size, criterion):
+    def split_with_neuron_sharing(self, expert_num, expert_size, criterion):
         sorted_score_list, sorted_index_list = self.sort_by_criterion(criterion)
-        self.labels = [sorted_index_list[i][:expert_size] for i in range(len(sorted_index_list))]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
+        self.labels = [sorted_index_list[i][:expert_size] for i in range(expert_num)]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
 
-    def split(self, expert_size, criterion="min", share_neurons=False):
+    def split(self, expert_num, expert_size, criterion="min", share_neurons=False):
+        assert expert_size <= self.neuron_num
         if not share_neurons:
-            assert expert_size * self.num_experts == self.neuron_num
-            self.split_without_neuron_sharing(expert_size, criterion)
+            # print("***", expert_size, expert_num, self.neuron_num)
+            assert expert_size * expert_num == self.neuron_num
+            self.split_without_neuron_sharing(expert_num, expert_size, criterion)
         else:
-            self.split_with_neuron_sharing(expert_size, criterion)
+            self.split_with_neuron_sharing(expert_num, expert_size, criterion)
     # fmt: on

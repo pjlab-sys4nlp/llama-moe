@@ -11,7 +11,7 @@ train_data_cache_path=${data_path}/data/moefication_LLAMA_data_cache
 
 gpus=0
 cpus=16
-OMP_NUM_THREADS=8 srun --partition=MoE --job-name=datasets --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+OMP_NUM_THREADS=2 srun --partition=MoE --job-name=datasets --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
   python -m smoe.entrypoint.moefication.llama_prepare_datasets \
   --model_path ${model_path} \
   --train_data_path ${train_data_path} \

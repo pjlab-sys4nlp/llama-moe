@@ -40,6 +40,7 @@ def main(args):
     calculator_type = "SwitchDropTokenCalculator"
     multiply_gate_scores = True
     drop_tokens = True
+    dropped_padding = "input"
     capacity_factor = 1.25
 
     # 随机生成各个专家的大小，添加到size_experts
@@ -68,6 +69,7 @@ def main(args):
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
         drop_tokens=drop_tokens,
+        dropped_padding=dropped_padding,
         capacity_factor=capacity_factor,
     )
 

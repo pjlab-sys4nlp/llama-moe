@@ -36,9 +36,13 @@ class SplitArguments:
 
 @record
 def main():
+    print(os.environ["RANK"])
+
     model_args, data_args, training_args, split_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments, SplitArguments
     )
+    training_args.dataloader_pin_memory = False
+
     model_name = os.path.split(model_args.model_name_or_path)[1]
     dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
     split_args.save_path = os.path.join(
@@ -118,6 +122,7 @@ def main():
         kernel=split_args.kernel,
         importance_type=split_args.importance_type,
         device=f"cuda:{training_args.local_rank}",
+        global_rank=os.environ["RANK"],
     )
     split.get_score()
     print(f"Device {training_args.local_rank} Done.")
