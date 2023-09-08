@@ -7,18 +7,18 @@ from tqdm import tqdm
 
 
 def line_plot_with_highlight(
-        xs,
-        label_to_nums,
-        highlight_label_to_nums=None,
-        title: str = None,
-        xlabel: str = None,
-        ylabel: str = None,
-        save_path: str = None,
+    xs,
+    label_to_nums,
+    highlight_label_to_nums=None,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    save_path: str = None,
 ):
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111)
 
-    cmap = plt.get_cmap('viridis')
+    cmap = plt.get_cmap("viridis")
     colors = np.linspace(0, 1, len(label_to_nums))
 
     for i, (label, nums) in enumerate(label_to_nums.items()):
