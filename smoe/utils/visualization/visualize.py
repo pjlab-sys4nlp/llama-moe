@@ -1,11 +1,12 @@
+import io
 import os
 from pathlib import Path
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy
 import numpy as np
 import torch
+from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -162,7 +163,7 @@ def visualize_swiglu_output(
     iterator = iter(dataloader)
 
     # 读取数据
-    total_bin_counts = numpy.zeros(num_bins)
+    total_bin_counts = np.zeros(num_bins)
     for step in tqdm(range(len(dataloader)), desc="iterating over data", leave=False):
         if step >= len(dataloader):
             break
@@ -189,12 +190,58 @@ def visualize_swiglu_output(
     # fmt: on
 
 
+def find_factors_with_minimal_sum(number):
+    # Initialize variables to keep track of the factors with the minimal sum
+    min_sum = float("inf")
+    min_factors = None
+
+    # Iterate through potential factors from 1 to half of the number
+    for factor1 in range(1, number // 2 + 1):
+        factor2 = number // factor1
+
+        # Check if factor1 * factor2 is equal to the original number
+        if factor1 * factor2 == number:
+            current_sum = factor1 + factor2
+
+            # Update the minimum sum and factors if the current sum is smaller
+            if current_sum < min_sum:
+                min_sum = current_sum
+                min_factors = (factor1, factor2)
+
+    return min_factors
+
+
+def plot_to_image(figure):
+    """Converts the matplotlib plot specified by 'figure' to a PNG image and
+    returns it. The supplied figure is closed and inaccessible after this call."""
+    # Save the plot to a PNG in memory.
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    # Closing the figure prevents it from being displayed directly inside
+    # the notebook.
+    plt.close(figure)
+    buf.seek(0)
+    # Convert PNG buffer to PyTorch tensor
+    image = Image.open(buf)
+    # Convert PIL Image to a NumPy array
+    numpy_array = np.array(image)
+    # Convert the NumPy array to a PyTorch tensor
+    torch_image = torch.from_numpy(numpy_array)
+    # # Ensure the data type and normalize if needed (optional)
+    # torch_image = torch_image.float() / 255.0  # Normalize to [0, 1] if the image has pixel values in [0, 255]
+    # Convert to CHW format by rearranging the dimensions
+    torch_image_chw = torch_image.permute(2, 0, 1)
+
+    return torch_image_chw
+
+
 def visualize_expert_load_heatmap(
     load_sum: np.ndarray,
     layer_idx: int,
     dataset_name: str,
     shape: tuple = (4, 4),
     save_dir: str = "results/expert_load_vis",
+    save_fig: bool = True,
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -211,13 +258,63 @@ def visualize_expert_load_heatmap(
 
     for i in range(shape[0]):
         for j in range(shape[1]):
-            ax.text(j, i, f"{data[i, j]:.0f}", ha="center", va="center", color="black")
+            ax.text(j, i, f"{data[i, j]:.5f}", ha="center", va="center", color="black")
 
     ax.set_title(f"{dataset_name} - Layer {layer_idx}")
     ax.set_axis_off()
     fig.colorbar(im)
     fig.tight_layout()
-    fig.savefig(path, dpi=320, bbox_inches="tight")
+    if save_fig:
+        fig.savefig(path, dpi=320, bbox_inches="tight")
+    return fig
+
+
+def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
+    if (
+        len(tensors) == 0
+        or not all(isinstance(t, torch.Tensor) for t in tensors)
+        or not all(t.shape == tensors[0].shape for t in tensors)
+    ):
+        return None
+    data = torch.stack(tensors, dim=0)
+    shape = find_factors_with_minimal_sum(data[0].numel())
+    data = data.reshape(-1, *shape)
+    img_grid = find_factors_with_minimal_sum(data.shape[0])
+
+    cmap = mpl.colormaps["OrRd"]
+    fig, axes = plt.subplots(*img_grid, figsize=[el * 5 for el in img_grid[::-1]])
+    axes = axes.reshape(*img_grid)
+    for i in range(data.shape[0]):
+        ax = axes[i // img_grid[1], i % img_grid[1]]
+        im = ax.imshow(
+            data[i].cpu().reshape(*shape).float().numpy(),
+            cmap=cmap,
+            interpolation="nearest",
+            # vmin=0.0,
+            # vmax=1.0,
+        )
+        for row in range(shape[0]):
+            for col in range(shape[1]):
+                ax.text(
+                    col,
+                    row,
+                    f"{data[i, row, col]:.5f}",
+                    ha="center",
+                    va="center",
+                    color="black",
+                )
+        ax.set_title(f"Layer {i}")
+        ax.set_axis_off()
+    fig.tight_layout()
+    return fig
+
+
+def get_heatmap_img_grid_for_tb(tensors: tuple[torch.FloatTensor]):
+    fig = vis_tuple_heatmaps(tensors)
+    if fig is None:
+        return None
+    img = plot_to_image(fig)
+    return img
 
 
 def visualize_expert_load_barv(

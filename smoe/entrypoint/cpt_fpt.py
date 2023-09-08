@@ -47,7 +47,7 @@ CONFIG_MAPPING.update(
 )
 
 
-@wechat_sender()
+# @wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -64,6 +64,11 @@ def main():
     logger.info(f"Model args: {model_args}")
     logger.info(f"Data args: {data_args}")
     logger.info(f"Training args: {training_args.to_json_string()}")
+
+    if training_args.debug_mode:
+        from smoe.utils.debugging import remote_breakpoint
+
+        remote_breakpoint()
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -116,6 +121,14 @@ def main():
     if training_args.gradient_checkpointing:
         config.use_cache = False
 
+    config.gate_type = model_args.gate_type
+    config.calculator_type = model_args.calculator_type
+    config.num_selects = model_args.num_selects
+
+    # zhutong: this is for debug usage only
+    if training_args.debug_mode:
+        config.num_hidden_layers = 2
+
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
         "use_fast": model_args.use_fast_tokenizer,
@@ -167,6 +180,15 @@ def main():
             "en_arxiv": 0.025,
             "en_stack": 0.02,
         }
+        # data_args.prob_map = {
+        #     "en_cc_v2": 0.67,
+        #     "en_c4_v2": 0.15,
+        #     "github_v2": 0.045,
+        #     "en_wikipedia": 0.045,
+        #     "en_book": 0.045,
+        #     "en_arxiv": 0.025,
+        #     "en_stack": 0.02,
+        # }
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
         lm_datasets = load_streaming_datasets(
@@ -216,6 +238,7 @@ def main():
         #             nn.init.zeros_(param)
         #     model.change_moe_gate_add_noise(True)
         #     model.change_moe_gate_use_balance(True)
+        # model.reset_gate_network()
         replace_xformers(model)
     else:
         model = AutoModelForCausalLM.from_config(config)

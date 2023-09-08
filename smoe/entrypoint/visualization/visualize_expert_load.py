@@ -1,5 +1,6 @@
 import argparse
 import os
+import pickle
 import types
 
 import torch
@@ -15,7 +16,7 @@ from smoe.utils.change_llama_moe_forward import (
     forward_linear_glu_moe_layer_with_padding_mask,
     forward_llama_moe_decoder_with_padding_mask,
     forward_llama_moe_model_with_padding_mask,
-    forward_mlp_moe_gate_with_load_recording,
+    forward_mlp_moe_gate_with_hidden_states_recording,
 )
 from smoe.utils.seed import set_seed
 from smoe.utils.string_operation import str2bool
@@ -26,7 +27,7 @@ from smoe.utils.visualization.visualize import (
 
 
 # fmt: off
-def change_forward(llama_model):
+def change_forward(llama_model, device):
     llama_model.forward = types.MethodType(forward_llama_moe_model_with_padding_mask, llama_model)  # change forward function for LlamaModel
 
     for layer_idx, layer in enumerate(llama_model.layers):  # locate block by the name template
@@ -34,9 +35,13 @@ def change_forward(llama_model):
 
         layer.forward = types.MethodType(forward_llama_moe_decoder_with_padding_mask, layer)  # change forward function for LlamaDecoderLayer
         layer.mlp.forward = types.MethodType(forward_linear_glu_moe_layer_with_padding_mask, layer.mlp)  # change forward function for LinearGLUMoELayer
-        layer.mlp.gate.forward = types.MethodType(forward_mlp_moe_gate_with_load_recording, layer.mlp.gate)  # change forward function TopKBalancedNoisyGate
+        layer.mlp.gate.forward = types.MethodType(forward_mlp_moe_gate_with_hidden_states_recording, layer.mlp.gate)  # change forward function TopKBalancedNoisyGate
 
-        layer.mlp.gate.load_sum = torch.zeros((llama_model.config.num_experts,))
+        layer.mlp.gate.samples_cnt = 0
+        layer.mlp.gate.importance_sum = torch.zeros((llama_model.config.num_experts,), device=device)
+        layer.mlp.gate.importance_loss_sum = torch.zeros((1,), device=device)
+        layer.mlp.gate.load_sum = torch.zeros((llama_model.config.num_experts,), device=device)
+        layer.mlp.gate.load_loss_sum = torch.zeros((1,), device=device)
 
 
 if __name__ == "__main__":
@@ -50,15 +55,15 @@ if __name__ == "__main__":
     parser.add_argument('--data_begin_index', type=int, default=0)
     parser.add_argument('--data_end_index', type=int, default=-1)
     parser.add_argument('--batch_size', type=int, default=8)  # 单次evaluate的batch_size
+    parser.add_argument('--use_cpu', type=str, default="False")
 
     args = parser.parse_args()
     args.reinit_gate = str2bool(args.reinit_gate)
+    args.use_cpu = str2bool(args.use_cpu)
     print("\n", args)
 
-    data_index_range = (args.data_begin_index, args.data_end_index)
-
     print("\ncuda is_available: " + str(torch.cuda.is_available()))
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() and not args.use_cpu else "cpu"
 
     """load tokenizer"""
     tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer_path)
@@ -66,6 +71,7 @@ if __name__ == "__main__":
 
     """prepare datasets"""
     print("\nReading dataset from file \"" + args.data_path + "\"...")
+    data_index_range = (args.data_begin_index, args.data_end_index)
     dataset = LineByLineJsonlTextDataset(tokenizer, file_path=args.data_path, block_size=2048, data_index_range=data_index_range)
     print(f"Dataset: {sum([torch.sum(dataset[i]['attention_mask']).item() for i in range(len(dataset))])} total tokens.")  # 统计非special token的数量
 
@@ -77,10 +83,8 @@ if __name__ == "__main__":
     model = LlamaMoEForCausalLM.from_pretrained(args.model_path).model
     if args.reinit_gate:
         set_seed(0)
-        # print(model.layers[0].mlp.gate.gate_network[0].weight)
         model.reset_gate_network()
-        # print(model.layers[0].mlp.gate.gate_network[0].weight)
-    change_forward(model)
+    change_forward(model, device)
 
     """evaluation"""
     print("Start evaluation...")
@@ -104,10 +108,33 @@ if __name__ == "__main__":
             dataset_name,
             save_dir=args.save_path + "-heat"
         )
-        visualize_expert_load_barv(
-            load_sum,
-            layer_idx,
-            dataset_name,
-            save_dir=args.save_path + "-bar"
-        )
+        # visualize_expert_load_barv(
+        #     load_sum,
+        #     layer_idx,
+        #     dataset_name,
+        #     save_dir=args.save_path + "-bar"
+        # )
+
+    """save evaluation results as cache"""
+    saved_dict = {
+        "samples_cnt": model.layers[0].mlp.gate.samples_cnt,
+        "importance_sum_list": [],
+        "importance_loss_sum_list": [],
+        "load_sum_list": [],
+        "load_loss_sum_list": [],
+    }
+    importance_sum_list = []
+    importance_loss_sum_list = []
+    load_sum_list = []
+    load_loss_sum_list = []
+
+    for layer_idx, layer in enumerate(model.layers):  # locate block by the name template
+        saved_dict["importance_sum_list"].append(layer.mlp.gate.importance_sum.cpu())
+        saved_dict["importance_loss_sum_list"].append(layer.mlp.gate.importance_loss_sum.cpu())
+        saved_dict["load_sum_list"].append(layer.mlp.gate.load_sum.cpu())
+        saved_dict["load_loss_sum_list"].append(layer.mlp.gate.load_loss_sum.cpu())
+
+    if not os.path.exists(args.save_path + "-results"):
+        os.makedirs(args.save_path + "-results")
+    torch.save(saved_dict, os.path.join(args.save_path + "-results", dataset_name + ".pt"), pickle_protocol=pickle.HIGHEST_PROTOCOL)
     print("Done.")

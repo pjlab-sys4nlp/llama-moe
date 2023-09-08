@@ -1,5 +1,15 @@
+from dataclasses import dataclass
+from typing import Optional
+
 import torch
 from torch import nn
+from transformers.utils import ModelOutput
+
+
+@dataclass
+class CalculatorOutput(ModelOutput):
+    hidden_states: Optional[torch.FloatTensor] = None
+    num_dropped_tokens: Optional[int] = None
 
 
 class UniversalCalculator(nn.Module):
@@ -16,7 +26,9 @@ class UniversalCalculator(nn.Module):
         self.multiply_gate_scores = multiply_gate_scores
         self.num_experts = experts.num_experts
 
-    def forward(self, x, topK_indices, topK_scores):
+    def forward(
+        self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+    ) -> CalculatorOutput:
         # fmt: off
         """正向传播"""
         """临时变量"""
@@ -32,9 +44,11 @@ class UniversalCalculator(nn.Module):
         """按照索引重新排列scores与batch_indices，并计算专家的batch_size"""
         sorted_topK_scores = topK_scores.index_select(0, index_sorted_topK_indices)  # 各个输出对应的权重
         sorted_batch_indices = batch_indices.index_select(0, index_sorted_topK_indices)  # 各个专家对应的batch编号
-        expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
-        if (len(expert_batch_size) < self.num_experts):  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
-            expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
+
+        if expert_batch_size is None:
+            expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
+            if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
+                expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
 
         """对每个专家重新组合batch"""
         sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)  # 将输入按照排序后的batch编号，重新编制
@@ -50,75 +64,84 @@ class UniversalCalculator(nn.Module):
             cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
         zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
-        # add eps to all zero values in order to avoid nans when going back to log space
-        # combined[combined == 0] = np.finfo(float).eps
-        # back to log space
-        return y
+
+        return CalculatorOutput(hidden_states=y)
         # fmt: on
 
 
-"""下述代码为失败方案，不要启用"""
-# class LinearKernel(nn.Module):
-#     def __init__(self):
-#         super(LinearKernel, self).__init__()
-#
-#     def forward(self, weight):
-#         return weight
-#
-# class MoE_FasterLinearCalculator(nn.Module): # aggregate expert weights for all inputs, forward 1 time with group-conv transformation optimization
-#     """
-#     使用优化方法，先合并权重，再正向传播，只需要1次计算
-#     """
-#
-#     def __init__(self, experts, kernel="linear", multiply_by_gates=True):
-#         super(MoE_FasterLinearCalculator, self).__init__()
-#         self.experts = experts
-#         self.kernel = get_kernel(kernel)
-#         self.multiply_by_gates = multiply_by_gates
-#         # 基本信息
-#         self.output_dim = experts.weight.size(1)
-#         self.input_dim = experts.weight.size(2)
-#         print("input_dim: ", self.input_dim)
-#         print("output_dim: ", self.output_dim)
-#
-#     def forward(self, x, topK_indices, topK_scores):
-#         """正向传播"""
-#         """临时变量"""
-#         batch_size = topK_indices.size(0)
-#         num_selects = topK_indices.size(1)
-#         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
-#         topK_scores_weights = topK_scores.reshape(batch_size * num_selects, 1, 1)  # shape(batch_size*num_selects, 1, 1)
-#         topK_scores_bias = topK_scores.reshape(batch_size * num_selects, 1)  # shape(batch_size*num_selects, 1)
-#         print("batch_size: ", batch_size)
-#
-#         """先将参数通过核函数"""
-#         kernel_weights = self.kernel(self.experts.weight)  # shape(num_experts, output_dim, input_dim)
-#         kernel_bias = self.kernel(self.experts.bias)  # shape(num_experts, output_dim)
-#         print("kernel_weights: ", kernel_weights.size())
-#
-#         """按照选出的专家编号，重新排列参数"""
-#         sorted_weights = kernel_weights.index_select(0, topK_indices)  # shape(batch_size*num_selects, output_dim, input_dim)
-#         sorted_bias = kernel_bias.index_select(0, topK_indices)  # shape(batch_size*num_selects, output_dim)
-#         print("sorted_weights: ", sorted_weights.size())
-#
-#         """计算新的参数"""
-#         # 先算新的weights参数
-#         sorted_weights.mul_(topK_scores_weights)  # 权重相乘
-#         sorted_weights = sorted_weights.reshape((batch_size, num_selects, self.output_dim, self.input_dim))  # 转换形状
-#         sorted_weights = sorted_weights.sum(1)  # 合并参数，shape(batch_size, output_dim, input_dim)
-#         print("sorted_weights after sum: ", sorted_weights.size())
-#
-#         # 再算新的bias参数
-#         sorted_bias.mul_(topK_scores_bias)  # 权重相乘
-#         sorted_bias = sorted_bias.reshape((batch_size, num_selects, self.output_dim))  # 转换形状
-#         sorted_bias = sorted_bias.sum(1)  # 合并参数，shape(batch_size, output_dim)
-#
-#         """转换全连接为卷积形式，使用分组卷积进行并行计算"""
-#         # https://zhuanlan.zhihu.com/p/208519425
-#         x = x.reshape(1, batch_size, self.input_dim, 1)  # 对应卷积图像shape(batch_size, channels, height, width)
-#         conv_weight = sorted_weights.reshape(batch_size * self.output_dim, 1, self.input_dim, 1)  # 对应卷积核权重shape(out_channels, in_channels, size[0], size[1])
-#         conv_bias = sorted_bias.reshape(batch_size * self.output_dim)  # 对应卷积核偏置shape(out_channels)
-#         y = F.conv2d(x, weight=conv_weight, bias=conv_bias, groups=batch_size)  # 分组卷积
-#         y = y.reshape(batch_size, self.output_dim)
-#
-#         return y
+class SwitchDropTokenCalculator(nn.Module):
+    """
+    https://arxiv.org/pdf/2101.03961.pdf
+    https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/switch/__init__.py
+    https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/moe.py
+    带有capacity_factor的计算器，自动丢弃超出容量的token
+    """
+
+    def __init__(
+        self,
+        experts,
+        multiply_gate_scores=True,
+        drop_tokens=True,
+        dropped_padding="zero",  # zero input
+        capacity_factor=1.25,
+    ):
+        super(SwitchDropTokenCalculator, self).__init__()
+        self.available_dropped_padding_choices = ("zero", "input")
+        assert dropped_padding in self.available_dropped_padding_choices
+        # 如果丢弃token，则必须保证输入输出维度相同
+        if drop_tokens and dropped_padding != "zero":
+            assert experts.in_features == experts.out_features
+
+        self.experts = experts
+        self.multiply_gate_scores = multiply_gate_scores
+        self.num_experts = experts.num_experts
+        self.out_features = experts.out_features
+
+        # capacity
+        self.drop_tokens = drop_tokens
+        self.dropped_padding = dropped_padding
+        self.capacity_factor = capacity_factor
+
+    def forward(self, x, topK_indices, topK_scores, **kwargs) -> CalculatorOutput:
+        """
+        Args:
+            x: (bsz*seq_len, hidden_size) bsz*seq_len is the total number of tokens in this batch
+            topK_indices: (bsz*seq_len,) each element represents the expert idx to consume the token
+                e.g. topK_indices[1] = 3 means the token-1 is assigned to expert-3
+        """
+        batch_size = topK_indices.size(0)
+        capacity = int(self.capacity_factor * batch_size / self.num_experts)
+        dropped_indices = []
+        y = torch.zeros((batch_size, self.out_features), device=x.device, dtype=x.dtype)
+
+        # 各专家分别正向传播，此处应该有并行优化的空间 (如果单次forward不足以占满显卡利用率)
+        num_dropped_tokens = -1
+        for i in range(self.num_experts):
+            # token_indices is a tensor of (num_tokens_in_this_expert,)
+            #   where each element denotes the token position idx
+            token_indices = (topK_indices == i).nonzero(as_tuple=True)[0]
+            num_assigned_tokens = token_indices.numel()
+            # Ignore if the expert is not over capacity
+            if self.drop_tokens and num_assigned_tokens > capacity:
+                shuffled_indices = torch.randperm(num_assigned_tokens, device=x.device)
+                # Shuffle indexes before dropping
+                token_indices = token_indices[shuffled_indices]
+                # Collect the tokens over capacity as dropped tokens
+                dropped_indices.append(token_indices[capacity:])
+                # Keep only the tokens upto the capacity of the expert
+                token_indices = token_indices[:capacity]
+                num_dropped_tokens = num_assigned_tokens - capacity
+
+            if num_assigned_tokens > 0:
+                expert_output = self.experts(x[token_indices, :], i)
+                y[token_indices, :] = expert_output
+
+        if self.dropped_padding == "input" and len(dropped_indices) > 0:
+            dropped_indices = torch.cat(dropped_indices, dim=0)
+            y[dropped_indices, :] = x[dropped_indices, :]
+
+        if self.multiply_gate_scores:
+            # 乘权重
+            y = torch.mul(y, topK_scores.reshape(-1, 1))
+
+        return CalculatorOutput(hidden_states=y, num_dropped_tokens=num_dropped_tokens)
