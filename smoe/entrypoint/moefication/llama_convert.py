@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('--split_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering")
     parser.add_argument('--select_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/7B-8Expert-Select-MLP")
     parser.add_argument('--save_path', type=str, default="/home/data/models/llama-moe-transformers/7B/")
-    parser.add_argument('--templates', type=str, default='layers.{}.mlp.gate_proj.weight')
+    parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of experts')
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
@@ -36,7 +36,7 @@ if __name__ == "__main__":
             args.split_file_path,
             args.select_file_path,
             args.save_path,
-            args.templates,
+            args.template,
             args.num_experts,
             args.num_selects,
             use_default_gate=args.use_default_gate
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             args.split_file_path,
             args.select_file_path,
             args.save_path,
-            args.templates,
+            args.template,
             args.num_experts,
             args.num_selects,
             use_default_gate=args.use_default_gate
@@ -58,7 +58,7 @@ if __name__ == "__main__":
             args.split_file_path,
             args.select_file_path,
             args.save_path,
-            args.templates,
+            args.template,
             args.num_experts,
             args.num_selects,
             use_default_gate=args.use_default_gate

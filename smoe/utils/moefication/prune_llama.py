@@ -41,4 +41,5 @@ class GradientPrune(LayerPrune):
     def prune(self, expert_size, criterion="min"):
         sorted_score, sorted_index = self.sort_by_criterion(criterion)
         self.labels = [sorted_index[:expert_size]]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
+        # print(self.labels)
         # fmt: on

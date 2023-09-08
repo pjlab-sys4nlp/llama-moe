@@ -91,6 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--data_use_percent', type=float, default=0.01)  # 所有数据集中数据的使用比例，用于调节训练使用的数据量
     parser.add_argument('--batch_size', type=int, default=4)  # 单次evaluate的batch_size
+    parser.add_argument('--block_size', type=int, default=2048)  # 单次evaluate的seq_len
     parser.add_argument('--save_interval', type=int, default=1)  # 保存参数的batch间隔，调大会影响显存占用，但可以减少保存的文件个数
 
     args = parser.parse_args()
@@ -135,7 +136,7 @@ if __name__ == "__main__":
                 else:
                     raw_file_path = os.path.join(args.train_data_path, file_name)
                     print("\nReading dataset \"" + key + "\" from raw file \"" + raw_file_path + "\"...")
-                    all_datasets[key] = LineByLineJsonlTextDataset(tokenizer, file_path=raw_file_path, block_size=2048)
+                    all_datasets[key] = LineByLineJsonlTextDataset(tokenizer, file_path=raw_file_path, block_size=args.block_size)
                     if not os.path.exists(args.train_data_cache_path):
                         os.makedirs(args.train_data_cache_path)
                     torch.save(all_datasets[key].examples, cached_file_path, pickle_protocol=pickle.HIGHEST_PROTOCOL)
@@ -165,6 +166,7 @@ if __name__ == "__main__":
     """load model"""
     print("Loading llama model...")
     model = LlamaForCausalLM.from_pretrained(args.model_path).model
+    model.half()
     num_layers = model.config.num_hidden_layers
     hidden_dim = model.config.hidden_size
     change_forward(model, args.local_rank, args.save_path, args.template, save_interval=args.save_interval)

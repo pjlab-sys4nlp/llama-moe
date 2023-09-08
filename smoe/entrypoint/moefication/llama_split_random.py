@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default="/home/data/models/llama-transformers/7B")
     parser.add_argument('--save_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/")
-    parser.add_argument('--templates', type=str, default='layers.{}.mlp.gate_proj.weight')
+    parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
 
     args = parser.parse_args()
@@ -21,11 +21,9 @@ if __name__ == "__main__":
     print("Loading llama config...")
     config = LlamaConfig.from_pretrained(args.model_path)
 
-    templates = args.templates.split(',')
-    for template in templates:
-        for i in tqdm(range(config.num_hidden_layers)):
-            split = RandomSplit(args, config, template, i)
-            split.split()
-            split.cnt()
-            split.save()
+    for i in tqdm(range(config.num_hidden_layers)):
+        split = RandomSplit(args, config, args.template, i)
+        split.split()
+        split.cnt()
+        split.save()
     print("Done.")
