@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-16select1-56gpus
+#SBATCH --job-name=cpt-16select4-64gpus
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
@@ -40,11 +40,11 @@ export LOGLEVEL=INFO
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    lr=1e-4
+    lr=3e-4
     final_lr_portion=0.1
-    per_device_train_batch_size=16
+    per_device_train_batch_size=8
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=2
+    gradient_accumulation_steps=4
     block_size=2048
     num_tokens="1*10^11"
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
@@ -83,7 +83,6 @@ export LOGLEVEL=INFO
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
             --tokenizer_name_or_path ${tokenizer_path} \
-            --num_selects 1 \
             --dataset_dir ${dataset_dir} \
             --data_cache_dir ${data_cache} \
             --validation_split_percentage 0.001 \
@@ -121,3 +120,14 @@ export LOGLEVEL=INFO
             --report_to none \
             --log_level info
 }
+#SBATCH --job-name=cpt-moe-fpt-test_lr_change
+#改动前：--logging_steps 10 \
+#改动后：--logging_steps 1 \
+#改动前：没有--resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1700831/checkpoint-10
+#改动后：有--resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1700831/checkpoint-10
+#改动前：max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+#改动后：max_steps=20
+#改动前：output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+#改动后：output_dir=outputs/cpt-moe-fpt-test_lr_change-1700831
+#改动前：--save_steps 1000 \
+#改动后：--save_steps 10 \1

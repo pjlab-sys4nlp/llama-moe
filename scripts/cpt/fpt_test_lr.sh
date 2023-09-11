@@ -1,58 +1,46 @@
 #!/usr/bin/bash
-
-#SBATCH --job-name=cpt-moe-fpt-13b-64gpus-bs8_4-task_test
+#SBATCH --job-name=cpt-moe-fpt-test_lr_change
+#SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
-
-#SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116
-#SBATCH --time=8:00:00
-
-#SBATCH --nodes=8
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
+#SBATCH --mem=0
+#SBATCH --time=6:00:00
 
 source ~/anaconda3/bin/activate smoe
+num_nodes=2         # should match with --nodes
+num_gpu_per_node=8  # should match with --gres
+
+# #cpu/#num_gpu_per_node
+export OMP_NUM_THREADS=4
+export NCCL_DEBUG=INFO
+export LOGLEVEL=INFO
+# export TORCH_DISTRIBUTED_DEBUG=DETAIL
+# export TORCH_SHOW_CPP_STACKTRACES=1
+# export CUDA_LAUNCH_BLOCKING=1
 
 {
-    num_nodes=8         # should match with --nodes
-    num_gpu_per_node=8  # should match with --gres
-
-    # #cpu/#num_gpu_per_node
-    export OMP_NUM_THREADS=4
-    export LOGLEVEL=INFO
-    # export NCCL_DEBUG=INFO
-    # export TORCH_DISTRIBUTED_DEBUG=DETAIL
-    # export TORCH_SHOW_CPP_STACKTRACES=1
-    # export CUDA_LAUNCH_BLOCKING=1
-
-    lr=3e-4
-
+    lr=1e-4
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    # pretrained_model=$1
-    echo "==================> $pretrained_model <=================="
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Graph-l2_norm/llama_13B-16Select4-up_proj
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_13B-16Select4-up_proj
-
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
+    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    per_device_train_batch_size=8
+    per_device_train_batch_size=16
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=4
+    gradient_accumulation_steps=2
     block_size=2048
-    max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    #max_tokens=3000000
+    max_tokens=-1
+    #max_steps=-1
+    #max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_steps=29
     max_train_samples=$(echo "10^11 / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
@@ -62,9 +50,10 @@ source ~/anaconda3/bin/activate smoe
     echo "#tokens/batch: $tokens_per_batch"
 
     data_cache=resources/cache
-    output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    #output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    output_dir=outputs/cpt-moe-fpt-test_lr_change-1872010
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero2_default.json
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -105,10 +94,10 @@ source ~/anaconda3/bin/activate smoe
             --max_steps ${max_steps} \
             --max_train_samples 48828125 \
             --logging_strategy steps \
-            --logging_steps 10 \
+            --logging_steps 1 \
             --save_strategy steps \
-            --save_total_limit 1 \
-            --save_steps 1000 \
+            --save_total_limit 2 \
+            --save_steps 10 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --block_size ${block_size} \
@@ -120,5 +109,20 @@ source ~/anaconda3/bin/activate smoe
             --ddp_find_unused_parameters False \
             --gradient_checkpointing \
             --report_to none \
-            --log_level info
+            --log_level info\
+            --max_tokens ${max_tokens}\
+            --torch_compile True \
+            --debug_mode \
+            --resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1872010/checkpoint-10
 }
+#SBATCH --job-name=cpt-moe-fpt-test_lr_change
+#改动前：--logging_steps 10 \
+#改动后：--logging_steps 1 \
+#改动前：没有--resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1700831/checkpoint-10
+#改动后：有--resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1700831/checkpoint-10
+#改动前：max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+#改动后：max_steps=20
+#改动前：output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+#改动后：output_dir=outputs/cpt-moe-fpt-test_lr_change-1700831
+#改动前：--save_steps 1000 \
+#改动后：--save_steps 10 \1
