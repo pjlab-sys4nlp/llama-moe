@@ -46,7 +46,7 @@ CONFIG_MAPPING.update(
 )
 
 
-# @wechat_sender()
+@wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments

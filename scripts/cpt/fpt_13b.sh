@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-13b-64gpus-bs4_8-zero2default
+#SBATCH --job-name=cpt-moe-fpt-13b-64gpus-bs8_4-task_test
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
@@ -9,40 +9,48 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116
+#SBATCH --time=8:00:00
 
 #SBATCH --nodes=8
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=8         # should match with --nodes
-num_gpu_per_node=8  # should match with --gres
-
-# #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=4
-export NCCL_DEBUG=INFO
-export LOGLEVEL=INFO
-# export TORCH_DISTRIBUTED_DEBUG=DETAIL
-# export TORCH_SHOW_CPP_STACKTRACES=1
-# export CUDA_LAUNCH_BLOCKING=1
-
 {
-    lr=1e-4
+    num_nodes=8         # should match with --nodes
+    num_gpu_per_node=8  # should match with --gres
+
+    # #cpu/#num_gpu_per_node
+    export OMP_NUM_THREADS=4
+    export LOGLEVEL=INFO
+    # export NCCL_DEBUG=INFO
+    # export TORCH_DISTRIBUTED_DEBUG=DETAIL
+    # export TORCH_SHOW_CPP_STACKTRACES=1
+    # export CUDA_LAUNCH_BLOCKING=1
+
+    lr=3e-4
 
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     model_type="llama_moe"
-    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # pretrained_model=$1
+    echo "==================> $pretrained_model <=================="
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Graph-l2_norm/llama_13B-16Select4-up_proj
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_13B-16Select4-up_proj
 
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    per_device_train_batch_size=4
+    per_device_train_batch_size=8
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=8
+    gradient_accumulation_steps=4
     block_size=2048
     max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "10^11 / $block_size" | bc)
@@ -99,7 +107,7 @@ export LOGLEVEL=INFO
             --logging_strategy steps \
             --logging_steps 10 \
             --save_strategy steps \
-            --save_total_limit 2 \
+            --save_total_limit 1 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
