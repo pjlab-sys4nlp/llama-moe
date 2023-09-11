@@ -5,24 +5,29 @@
 #SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --nodes=1
+#SBATCH --cpus-per-task=64
+#SBATCH --nodes=6
 #SBATCH --gres=gpu:8
+#SBATCH --mem=0
 
-num_nodes=1        # should match with --nodes
+
+num_nodes=6        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
 
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=2
-export NCCL_DEBUG=INFO
 export LOGLEVEL=INFO
+export NCCL_DEBUG=INFO
+export TORCH_DISTRIBUTED_DEBUG=DETAIL
+export TORCH_SHOW_CPP_STACKTRACES=1
+export CUDA_LAUNCH_BLOCKING=1
 
 ###################################################################
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama_13B"
 
-accumulate_level=total         #  sample  total
+accumulate_level=sample        #  sample  total
 kernel=l1_norm                 #  plain  l1_norm  l2_norm
 importance_type=feature_change #  feature_grad  feature_change
 
@@ -39,13 +44,16 @@ tokenizer_path=${data_path}/models/${llama_size}
 #dataset_name=("16.jsonl" "17.jsonl" "18.jsonl" "19.jsonl" "20.jsonl" "21.jsonl" "22.jsonl" "23.jsonl")
 #dataset_name=("24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
 
-dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
+#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
+
+#dataset_name=("5.jsonl" "9.jsonl")
+dataset_name=("2.jsonl")
 
 dataset_dir=${data_path}/data/16clusters
 #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
 ###################################################################
 
-per_device_train_batch_size=8
+per_device_train_batch_size=2
 block_size=2048
 
 output_dir=/mnt/petrelfs/dongdaize.d/workspace/train-moe/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID

@@ -254,6 +254,7 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "Final lr = learning_rate * final_lr_portion. Default is 0.0"
         },
     )
+
     debug_mode: Optional[bool] = field(
         default=False,
         metadata={
@@ -278,6 +279,10 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "The maximum number of saved optimizer states, 0 means no limit."
         },
     )
+    max_tokens: Optional[int] = field(
+        default=-1,
+        metadata={"help": "the number of max_tokens"},
+    )
 
     @property
     def block_size(self):
@@ -296,6 +301,19 @@ class EnhancedTrainingArguments(TrainingArguments):
             * self.gradient_accumulation_steps
             * self.world_size
         )
+        self._max_tokens2max_steps()
+
+    def _max_tokens2max_steps(self):
+        if self.max_tokens > 0 and self.max_steps > 0:
+            raise ValueError(
+                "max_tokens and max_steps cannot be greater than 0 simultaneously."
+            )
+        if self.max_tokens > 0:
+            self.max_steps = int(self.max_tokens / self.num_tokens_per_batch)
+
+    def __post_init__(self):
+        super().__post_init__()
+        self._max_tokens2max_steps()
 
 
 @dataclass

@@ -23,7 +23,10 @@ if __name__ == "__main__":
     parser.add_argument('--importance_type', type=str, default="feature_grad", choices=("feature_grad", "feature_change"))
     parser.add_argument('--criterion', type=str, default="min", choices=("min", "max"))
 
+    parser.add_argument('--use_grad_sum', type=str, default="False")
+
     args = parser.parse_args()
+    args.use_grad_sum = str2bool(args.use_grad_sum)
     print(args, "\n")
 
     print("Loading llama config...")
@@ -45,11 +48,17 @@ if __name__ == "__main__":
         for expert_folder_name in os.listdir(args.grad_file_path):
             grad_file_path = os.path.join(args.grad_file_path, expert_folder_name, args.template.format(i) + file_postfix)
             grad = torch.load(grad_file_path, map_location="cpu")
+            # grad = torch.zeros_like(grad)  ##################################
             grad_list.append(grad)
-        grad_list = grad_list[args.expert_index]
+
+        if args.use_grad_sum:
+            grad_list = torch.stack(grad_list, dim=0).sum(0)
+        else:
+            grad_list = grad_list[args.expert_index]
 
         args.save_path = os.path.join(
             save_root_path,
+            # "Random",
             f"{os.path.split(args.model_path)[1]}-Prune-Gradient-{args.criterion}-{args.kernel}-{args.accumulate_level}-{args.importance_type}",
             f"{args.expert_index}-{format(args.retain_percent, '.2f')}Percent-{expert_size}Neurons"
         )

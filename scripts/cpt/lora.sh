@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-llama-moe-lora-bs16
+#SBATCH --job-name=cpt-llama-moe-lora-bs16-dropout=0.1
 #SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log

@@ -1,56 +1,47 @@
 #!/usr/bin/bash
-
-#SBATCH --job-name=cpt-16select4-64gpus
+#SBATCH --job-name=cpt-moe-fpt-test_lr_change
+#SBATCH --partition=MoE
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
-
-#SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116
-
-#SBATCH --nodes=7
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
+#SBATCH --mem=0
+#SBATCH --time=6:00:00
 
 source ~/anaconda3/bin/activate smoe
-
-num_nodes=7         # should match with --nodes
+num_nodes=2         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=4
+export NCCL_DEBUG=INFO
 export LOGLEVEL=INFO
-# export NCCL_DEBUG=INFO
 # export TORCH_DISTRIBUTED_DEBUG=DETAIL
 # export TORCH_SHOW_CPP_STACKTRACES=1
 # export CUDA_LAUNCH_BLOCKING=1
 
 {
+    lr=1e-4
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     model_type="llama_moe"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    # model_type="llama_moe"
-    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/random_16select4_moe"
-
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    lr=3e-4
-    final_lr_portion=0.1
-    per_device_train_batch_size=8
+    per_device_train_batch_size=16
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=4
+    gradient_accumulation_steps=2
     block_size=2048
-    num_tokens="1*10^11"
-    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
-
-    max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
+    #max_tokens=3000000
+    max_tokens=-1
+    #max_steps=-1
+    #max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_steps=29
+    max_train_samples=$(echo "10^11 / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
@@ -59,10 +50,10 @@ export LOGLEVEL=INFO
     echo "#tokens/batch: $tokens_per_batch"
 
     data_cache=resources/cache
-    output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
-    mkdir -p $output_dir
-    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
+    #output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    output_dir=outputs/cpt-moe-fpt-test_lr_change-1872010
     echo "output_dir: $output_dir"
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -92,7 +83,7 @@ export LOGLEVEL=INFO
             --seed $RANDOM \
             --bf16 \
             --num_train_epochs 1 \
-            --final_lr_portion ${final_lr_portion} \
+            --final_lr_portion 0.1 \
             --optim adamw_torch \
             --adam_beta1 0.9 \
             --adam_beta2 0.95 \
@@ -101,12 +92,12 @@ export LOGLEVEL=INFO
             --max_grad_norm 1.0 \
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
-            --max_train_samples ${max_train_samples} \
+            --max_train_samples 48828125 \
             --logging_strategy steps \
-            --logging_steps 10 \
+            --logging_steps 1 \
             --save_strategy steps \
             --save_total_limit 2 \
-            --save_steps 1000 \
+            --save_steps 10 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --block_size ${block_size} \
@@ -118,7 +109,11 @@ export LOGLEVEL=INFO
             --ddp_find_unused_parameters False \
             --gradient_checkpointing \
             --report_to none \
-            --log_level info
+            --log_level info\
+            --max_tokens ${max_tokens}\
+            --torch_compile True \
+            --debug_mode \
+            --resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1872010/checkpoint-10
 }
 #SBATCH --job-name=cpt-moe-fpt-test_lr_change
 #改动前：--logging_steps 10 \

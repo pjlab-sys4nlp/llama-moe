@@ -44,6 +44,8 @@ def main(args):
 
     if model_llama_moe.config.calculator_type == "SwitchDropTokenCalculator":
         model_llama_moe.set_moe_calculator_drop_tokens(True)  # 重新设置是否丢弃超出专家容量的token
+        model_llama_moe.set_moe_calculator_dropped_padding("input")
+        model_llama_moe.set_moe_calculator_capacity_factor(1.25)
 
     """prepare data"""
     sentence_list = [
