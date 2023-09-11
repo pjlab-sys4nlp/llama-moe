@@ -273,6 +273,12 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "the number of tokens per batch, should be calculated automatically after `block_size`"
         },
     )
+    save_optim_limit: Optional[int] = field(
+        default=1,
+        metadata={
+            "help": "The maximum number of saved optimizer states, 0 means no limit."
+        },
+    )
     max_tokens: Optional[int] = field(
         default=-1,
         metadata={"help": "the number of max_tokens"},

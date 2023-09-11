@@ -1,9 +1,11 @@
 import math
 import os
+import re
 import shutil
 import sys
 import time
 from functools import partial
+from pathlib import Path
 from typing import Any, Dict, Union
 
 from packaging import version
@@ -22,7 +24,7 @@ from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
 from transformers.deepspeed import deepspeed_init, deepspeed_load_checkpoint
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
-from transformers.trainer import TRAINER_STATE_NAME, Trainer
+from transformers.trainer import OPTIMIZER_NAME, TRAINER_STATE_NAME, Trainer
 from transformers.trainer_callback import TrainerState
 from transformers.trainer_pt_utils import get_model_param_count
 from transformers.trainer_utils import (
@@ -266,6 +268,53 @@ class LlamaLrSchedulingTrainer(Trainer):
             self.control = self.callback_handler.on_save(
                 self.args, self.state, self.control
             )
+
+    def _rotate_checkpoints(self, use_mtime=False, output_dir=None) -> None:
+        if self.args.save_total_limit is None or self.args.save_total_limit <= 0:
+            return
+
+        # Check if we should delete older checkpoint(s)
+        checkpoints_sorted = self._sorted_checkpoints(
+            use_mtime=use_mtime, output_dir=output_dir
+        )
+        if len(checkpoints_sorted) <= self.args.save_total_limit:
+            return
+
+        # If save_total_limit=1 with load_best_model_at_end=True, we could end up deleting the last checkpoint, which
+        # we don't do to allow resuming.
+        save_total_limit = self.args.save_total_limit
+        if (
+            self.state.best_model_checkpoint is not None
+            and self.args.save_total_limit == 1
+            and checkpoints_sorted[-1] != self.state.best_model_checkpoint
+        ):
+            save_total_limit = 2
+
+        number_of_checkpoints_to_delete = max(
+            0, len(checkpoints_sorted) - save_total_limit
+        )
+        checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
+        for checkpoint in checkpoints_to_be_deleted:
+            logger.info(
+                f"Deleting older checkpoint [{checkpoint}] due to args.save_total_limit"
+            )
+            shutil.rmtree(checkpoint, ignore_errors=True)
+
+        save_optim_limit = self.args.save_optim_limit
+        number_of_checkpoints_to_delete = max(
+            0, len(checkpoints_sorted) - save_optim_limit
+        )
+        checkpoints_to_be_deleted = checkpoints_sorted[:number_of_checkpoints_to_delete]
+        for checkpoint in checkpoints_to_be_deleted:
+            logger.info(
+                f"Deleting older checkpoint's optim states [{checkpoint}] due to args.save_total_limit"
+            )
+            if os.path.exists(os.path.join(checkpoint, OPTIMIZER_NAME)):
+                os.remove(os.path.join(checkpoint, OPTIMIZER_NAME))
+            ds_optim_dirs = Path(checkpoint).glob("global_step*")
+            for optim_folder in ds_optim_dirs:
+                if re.search(r"global_step\d+", str(optim_folder)):
+                    shutil.rmtree(optim_folder, ignore_errors=True)
 
     def _inner_training_loop(
         self,
