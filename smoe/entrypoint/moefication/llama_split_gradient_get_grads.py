@@ -29,9 +29,8 @@ class SplitArguments:
     accumulate_level: Optional[str] = field(default="sample")  # sample total
     data_use_range_begin: Optional[float] = field(default=0.0)
     data_use_range_end: Optional[float] = field(default=1.0)
-    importance_type: Optional[str] = field(
-        default="feature_grad"
-    )  # feature_grad feature_change
+    # feature_grad feature_change
+    importance_type: Optional[str] = field(default="feature_change")
 
 
 @record
@@ -42,6 +41,9 @@ def main():
         ModelArguments, DataArguments, EnhancedTrainingArguments, SplitArguments
     )
     training_args.dataloader_pin_memory = False
+
+    print(data_args)
+    print(split_args)
 
     model_name = os.path.split(model_args.model_name_or_path)[1]
     dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
@@ -122,7 +124,7 @@ def main():
         kernel=split_args.kernel,
         importance_type=split_args.importance_type,
         device=f"cuda:{training_args.local_rank}",
-        global_rank=os.environ["RANK"],
+        global_rank=int(os.environ["RANK"]),
     )
     split.get_score()
     print(f"Device {training_args.local_rank} Done.")

@@ -46,9 +46,9 @@ class UniversalCalculator(nn.Module):
         sorted_batch_indices = batch_indices.index_select(0, index_sorted_topK_indices)  # 各个专家对应的batch编号
 
         if expert_batch_size is None:
-            expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
-            if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
-                expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
+            expert_batch_size = topK_indices.bincount(minlength=self.num_experts).tolist()  # 各个专家对应的batch_size
+            # if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
+            #     expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
 
         """对每个专家重新组合batch"""
         sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)  # 将输入按照排序后的batch编号，重新编制

@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from smoe.models.llama_moefication.modeling_llama_moe import (
+from smoe.models.llama_moe.modeling_llama_moe import (
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,

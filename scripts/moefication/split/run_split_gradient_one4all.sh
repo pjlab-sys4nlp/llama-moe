@@ -7,11 +7,9 @@ llama_size="llama_13B"
 intermediate_size=13824 #  11008  13824
 
 kernel=l1_norm
-
 accumulate_level=sample        #  sample  total
 importance_type=feature_change #  feature_grad  feature_change
 criterion=max                  #  min  max
-
 proj_type=up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
@@ -27,7 +25,7 @@ for expert_num in 16; do
   for expert_size in 864; do
     # 688 1376 2752 5504 11008
     # 864 1728 3456 6912 13824
-    echo ${expert_num} ${expert_size}
+    echo ${expert_num} ${expert_size} ${share_neurons}
     OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
       python -m smoe.entrypoint.moefication.llama_split_gradient \
       --model_path ${model_path} \
@@ -49,7 +47,7 @@ expert_num=16
 scale_factor=1
 share_neurons=False
 expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
-echo ${expert_num} ${expert_size}
+echo ${expert_num} ${expert_size} ${share_neurons}
 
 OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
   python -m smoe.entrypoint.moefication.llama_split_gradient \

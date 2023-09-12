@@ -145,5 +145,11 @@ if __name__ == "__main__":
     process_bar.close()
 
     if args.save_visualization_path != "":
-        visualize_expert_select_mlp(args.save_path, args.save_visualization_path)
+        if "gate_proj" in args.template:
+            proj_type = "gate_proj"
+        elif "up_proj" in args.template:
+            proj_type = "up_proj"
+        else:
+            raise ValueError
+        visualize_expert_select_mlp(args.save_path, args.save_visualization_path, proj_type)
     print("Done.")

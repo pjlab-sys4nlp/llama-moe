@@ -2,20 +2,20 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama_13B"
 
 num_experts=8                    #  2  4  8  16
-num_selects=1                    #  1  2  4
-expert_size=5504                 #  688  1376  2752  5504  11008
+num_selects=2                    #  1  2  4
+#expert_size=5504                #  688  1376  2752  5504  11008
+expert_size=1728                 #  864  1728  3456  6912  13824
+share_neurons=False              #  True  False
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
-proj_type=up_proj                #  gate_proj  up_proj
 
 kernel=l1_norm
-
 criterion=max                  #  min  max
 accumulate_level=sample        #  sample  total
 importance_type=feature_change #  feature_grad  feature_change
-share_neurons=True             #  True  False
+proj_type=up_proj              #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}

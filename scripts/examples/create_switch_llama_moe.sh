@@ -6,7 +6,7 @@ base_model=llama_7B
 
 model_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
 
-tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/${base_model}/
+tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/${base_model}
 
 gpus=0
 cpus=16

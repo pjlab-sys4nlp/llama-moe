@@ -10,7 +10,7 @@ from transformers import LlamaTokenizer
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import LineByLineJsonlTextDataset
-from smoe.models.llama_moefication import LlamaMoEForCausalLM
+from smoe.models.llama_moe import LlamaMoEForCausalLM
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
 from smoe.utils.change_llama_moe_forward import (
     forward_linear_glu_moe_layer_with_padding_mask,

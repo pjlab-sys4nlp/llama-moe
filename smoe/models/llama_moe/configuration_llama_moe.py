@@ -41,8 +41,8 @@ class LlamaMoEConfig(PretrainedConfig):
         gate_use_softmax=True,
         gate_use_balance=True,
         gate_balance_loss_weight=1e-2,
-        # TopKBalancedNoisyGate
         gate_add_noise=True,
+        # TopKBalancedNoisyGate
         gate_noise_epsilon=1e-2,
         #### -------- moe calculator configs -------- ####
         calculator_type="UniversalCalculator",

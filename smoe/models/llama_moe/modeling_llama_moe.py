@@ -19,7 +19,7 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.utils import ModelOutput, logging
 
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
 from smoe.modules.moe.moe_layers import LinearGLUMoELayer, MoEMlpOutput
 
 logger = logging.get_logger(__name__)
@@ -74,8 +74,8 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             "gate_use_softmax": config.gate_use_softmax,
             "gate_use_balance": config.gate_use_balance,
             "gate_balance_loss_weight": config.gate_balance_loss_weight,
-            # TopKBalancedNoisyGate
             "gate_add_noise": config.gate_add_noise,
+            # TopKBalancedNoisyGate
             "gate_noise_epsilon": config.gate_noise_epsilon,
         }
         calculator_config = {

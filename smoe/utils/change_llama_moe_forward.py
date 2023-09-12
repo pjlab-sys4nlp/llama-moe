@@ -1,7 +1,7 @@
 import torch
 from transformers.utils import logging
 
-from smoe.models.llama_moefication import BaseMoEModelOutputWithPast
+from smoe.models.llama_moe import BaseMoEModelOutputWithPast
 
 logger = logging.get_logger(__name__)
 

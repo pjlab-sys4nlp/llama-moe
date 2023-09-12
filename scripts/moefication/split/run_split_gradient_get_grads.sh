@@ -6,21 +6,20 @@
 #SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
-#SBATCH --nodes=6
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 #SBATCH --mem=0
 
-
-num_nodes=6        # should match with --nodes
+num_nodes=2        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
 
 # #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=2
 export LOGLEVEL=INFO
-export NCCL_DEBUG=INFO
-export TORCH_DISTRIBUTED_DEBUG=DETAIL
-export TORCH_SHOW_CPP_STACKTRACES=1
-export CUDA_LAUNCH_BLOCKING=1
+#export NCCL_DEBUG=INFO
+#export TORCH_DISTRIBUTED_DEBUG=DETAIL
+#export TORCH_SHOW_CPP_STACKTRACES=1
+#export CUDA_LAUNCH_BLOCKING=1
 
 ###################################################################
 #  llama_7B  llama_13B  llama_30B  llama_base
@@ -46,8 +45,25 @@ tokenizer_path=${data_path}/models/${llama_size}
 
 #dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
 
-#dataset_name=("5.jsonl" "9.jsonl")
-dataset_name=("2.jsonl")
+#dataset_name=("0.jsonl")
+#dataset_name=("1.jsonl")
+#dataset_name=("2.jsonl")
+#dataset_name=("3.jsonl")
+#dataset_name=("4.jsonl")
+#dataset_name=("5.jsonl")
+#dataset_name=("6.jsonl")
+#dataset_name=("7.jsonl")
+#dataset_name=("8.jsonl")
+#dataset_name=("9.jsonl")
+#dataset_name=("10.jsonl")
+#dataset_name=("11.jsonl")
+#dataset_name=("12.jsonl")
+#dataset_name=("13.jsonl")
+#dataset_name=("14.jsonl")
+#dataset_name=("15.jsonl")
+
+dataset_name=("10.jsonl" "14.jsonl")
+
 
 dataset_dir=${data_path}/data/16clusters
 #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
@@ -65,6 +81,7 @@ nodes=($(scontrol show hostnames $SLURM_JOB_NODELIS))
 nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
+port=$((6000 + $RANDOM))
 echo "Node: $head_node"
 echo "Node IP: $head_node_ip"
 
@@ -75,7 +92,7 @@ for name in "${dataset_name[@]}"; do
     --node_rank $SLURM_NODEID \
     --rdzv_id $RANDOM \
     --rdzv_backend c10d \
-    --rdzv_endpoint $head_node:21212 \
+    --rdzv_endpoint $head_node:$port \
     smoe/entrypoint/moefication/llama_split_gradient_get_grads.py \
     --deepspeed ${deepspeed_config_file} \
     --model_name_or_path ${pretrained_model} \
@@ -88,9 +105,7 @@ for name in "${dataset_name[@]}"; do
     --bf16 \
     --num_train_epochs 1 \
     --final_lr_portion 0.1 \
-    --optim adamw_torch \
-    --adam_beta1 0.9 \
-    --adam_beta2 0.95 \
+    --optim sgd \
     --learning_rate 0 \
     --weight_decay 0 \
     --max_grad_norm 1.0 \

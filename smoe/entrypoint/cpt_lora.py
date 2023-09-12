@@ -21,8 +21,8 @@ from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.modeling_llama_moe import LlamaMoEForCausalLM
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (

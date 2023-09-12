@@ -8,8 +8,8 @@ import numpy as np
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import (
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.modeling_llama_moe import (
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,

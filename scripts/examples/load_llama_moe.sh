@@ -12,8 +12,8 @@ select_type=l2_norm            #  plain  positive  l2_norm
 proj_type=up_proj              #  gate_proj  up_proj
 
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/${base_model}/
-#model_path=/mnt/petrelfs/share_data/quxiaoye/models/${model_type}/${split_type}-${select_type}/${base_model}-${num_experts}Select${num_selects}-${proj_type}/
-model_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-Prune/Gradient-max-l1_norm-total-feature_grad/llama2_7B-0-0.20Percent-2201Neurons
+model_path=/mnt/petrelfs/share_data/quxiaoye/models/${model_type}/${split_type}-${select_type}/${base_model}-${num_experts}Select${num_selects}-${proj_type}/
+#model_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-Prune/Gradient-max-l1_norm-total-feature_grad/llama2_7B-0-0.20Percent-2201Neurons
 
 gpus=0
 cpus=16

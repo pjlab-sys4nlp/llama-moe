@@ -4,8 +4,8 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size=llama_13B
 
-num_experts=8                        #  8  16
-metric=l1_norm                        #  l1_norm l2_norm plain
+num_experts=8                         #  8  16
+metric=l2_norm                        #  l1_norm l2_norm plain
 template=layers.{}.mlp.up_proj.weight #  gate_proj  up_proj
 threshold=1
 

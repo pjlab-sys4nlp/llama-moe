@@ -2,21 +2,19 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama_13B"
 
-intermediate_size=11008
-expert_num=16
-scale_factor=4
+intermediate_size=13824 #  11008  13824
+expert_num=8
+scale_factor=1
+share_neurons=False #  True  False
 expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
-echo ${expert_size}
+echo ${expert_num} ${expert_size} ${share_neurons}
 
 kernel=l1_norm
-
 accumulate_level=sample        #  sample  total
 importance_type=feature_change #  feature_grad  feature_change
-criterion=min                  #  min  max
-share_neurons=True             #  True  False
-
+criterion=max                  #  min  max
 proj_type=up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
@@ -31,6 +29,7 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --model_path ${model_path} \
   --score_file_path ${score_file_path} \
   --save_path ${save_path} \
+  --expert_num ${expert_num} \
   --expert_size ${expert_size} \
   --template layers.{}.mlp.${proj_type}.weight \
   --kernel ${kernel} \

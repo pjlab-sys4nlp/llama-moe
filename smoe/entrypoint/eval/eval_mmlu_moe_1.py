@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score
 from tqdm import tqdm
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.models.llama_moe.modeling_llama_moe import LlamaMoEForCausalLM
 from smoe.utils.eval.crop import crop
 from smoe.utils.eval.gather_results import gather_results
 

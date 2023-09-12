@@ -7,7 +7,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaForSequenceClassification, LlamaModel
 
-from smoe.models.llama_moefication import (
+from smoe.models.llama_moe import (
     LlamaMoEConfig,
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,

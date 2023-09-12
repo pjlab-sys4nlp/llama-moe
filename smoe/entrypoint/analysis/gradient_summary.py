@@ -47,6 +47,7 @@ def line_plot_with_highlight(
 
 if __name__ == "__main__":
     # fmt: off
+    # OMP_NUM_THREADS=4 srun --partition=MoE --job-name=test --mpi=pmi2 --gres=gpu:0 -n1 --ntasks-per-node=1 -c 64 --job-name=example --kill-on-bad-exit=1
 
     grad_file_path = "/mnt/petrelfs/share_data/quxiaoye/moefication_results/split/Gradients/llama_13B-Gradients-l1_norm-sample-feature_change"
     save_path = "/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization_change_13B/"

@@ -30,6 +30,54 @@ class BaseMoELayer(nn.Module):
         self.gate: Union[SwitchBalancedGate, TopKBalancedNoisyGate]
         self.calculator: Union[SwitchDropTokenCalculator, UniversalCalculator]
 
+    def _create_gate(self, **kwargs):
+        self.gate_type = kwargs.get("gate_type", "TopKBalancedNoisyGate")
+
+        if self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
+            self.gate = TopKBalancedNoisyGate(
+                self.input_size,
+                self.num_experts,
+                self.num_selects,
+                gate_network=kwargs.get("gate_network", "mlp"),
+                use_softmax=kwargs.get("gate_use_softmax", True),
+                use_balance=kwargs.get("gate_use_balance", True),
+                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
+                add_noise=kwargs.get("gate_add_noise", True),
+                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
+            )
+        elif self.gate_type == "SwitchBalancedGate":  # switch gate
+            self.gate = SwitchBalancedGate(
+                self.input_size,
+                self.num_experts,
+                self.num_selects,
+                gate_network=kwargs.get("gate_network", "mlp"),
+                use_softmax=kwargs.get("gate_use_softmax", True),
+                use_balance=kwargs.get("gate_use_balance", True),
+                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
+                add_noise=kwargs.get("gate_add_noise", True),
+            )
+        else:
+            raise NotImplementedError
+
+    def _create_calculator(self, experts, **kwargs):
+        self.calculator_type = kwargs.get("calculator_type", "UniversalCalculator")
+
+        if self.calculator_type == "UniversalCalculator":  # top K calculator
+            self.calculator = UniversalCalculator(
+                experts,
+                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+            )
+        elif self.calculator_type == "SwitchDropTokenCalculator":  # switch calculator
+            self.calculator = SwitchDropTokenCalculator(
+                experts,
+                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+                drop_tokens=kwargs.get("drop_tokens", True),
+                dropped_padding=kwargs.get("dropped_padding", "zero"),
+                capacity_factor=kwargs.get("capacity_factor", 1.25),
+            )
+        else:
+            raise NotImplementedError
+
     def forward(self, x) -> MoEMlpOutput:
         original_shape = x.shape[:-1]
         # shape(batch_size*seq_len, input_size)
@@ -88,9 +136,9 @@ class BaseMoELayer(nn.Module):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
         elif (
-            drop_tokens
-            and self.calculator.dropped_padding != "zero"
-            and self.input_size != self.output_size
+                drop_tokens
+                and self.calculator.dropped_padding != "zero"
+                and self.input_size != self.output_size
         ):
             raise Warning(
                 'Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!'
@@ -106,12 +154,12 @@ class BaseMoELayer(nn.Module):
                 f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})"
             )
         elif (
-            self.calculator.drop_tokens
-            and dropped_padding != "zero"
-            and self.input_size != self.output_size
+                self.calculator.drop_tokens
+                and dropped_padding != "zero"
+                and self.input_size != self.output_size
         ):
             raise Warning(
-                'Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!'
+                f'Setting "dropped_padding={dropped_padding}" with "drop_tokens=True" when "input_size != output_size" will cause error!'
             )
         else:
             self.calculator.dropped_padding = dropped_padding
@@ -128,7 +176,7 @@ class BaseMoELayer(nn.Module):
 
 class LinearMoELayer(BaseMoELayer):
     def __init__(
-        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
+            self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -137,72 +185,32 @@ class LinearMoELayer(BaseMoELayer):
         self.output_size = output_size
         self.num_experts = num_experts
         self.num_selects = num_selects
-
-        self.gate_type = kwargs.get("gate_type", "TopKBalancedNoisyGate")
-        self.calculator_type = kwargs.get("calculator_type", "UniversalCalculator")
+        self.bias = bias
 
         experts = LinearExperts(
             input_size,
             output_size,
             num_experts,
-            bias=bias
+            bias=bias,
         )
 
-        if self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
-            self.gate = TopKBalancedNoisyGate(
-                input_size,
-                num_experts,
-                num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", True),
-                use_balance=kwargs.get("gate_use_balance", True),
-                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
-                add_noise=kwargs.get("gate_add_noise", True),
-                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
-            )
-        elif self.gate_type == "SwitchBalancedGate":  # switch gate
-            self.gate = SwitchBalancedGate(
-                input_size,
-                num_experts,
-                num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", True),
-                use_balance=kwargs.get("gate_use_balance", True),
-                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
-            )
-        else:
-            raise NotImplementedError
-
-        if self.calculator_type == "UniversalCalculator":  # top K calculator
-            self.calculator = UniversalCalculator(
-                experts,
-                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
-            )
-        elif self.calculator_type == "SwitchDropTokenCalculator":  # switch calculator
-            self.calculator = SwitchDropTokenCalculator(
-                experts,
-                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
-                drop_tokens=kwargs.get("drop_tokens", True),
-                dropped_padding=kwargs.get("dropped_padding", "zero"),
-                capacity_factor=kwargs.get("capacity_factor", 1.25),
-            )
-        else:
-            raise NotImplementedError
+        self._create_gate(**kwargs)
+        self._create_calculator(experts, **kwargs)
         # fmt: on
 
 
 class LinearGLUMoELayer(BaseMoELayer):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        **kwargs,
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            **kwargs,
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()
@@ -213,9 +221,8 @@ class LinearGLUMoELayer(BaseMoELayer):
         self.hidden_act = hidden_act
         self.num_experts = num_experts
         self.num_selects = num_selects
-
-        self.gate_type = kwargs.get("gate_type", "TopKBalancedNoisyGate")
-        self.calculator_type = kwargs.get("calculator_type", "UniversalCalculator")
+        self.size_experts = size_experts
+        self.bias = bias
 
         experts = LinearGLUExperts(
             input_size,
@@ -227,44 +234,6 @@ class LinearGLUMoELayer(BaseMoELayer):
             bias=bias
         )
 
-        if self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
-            self.gate = TopKBalancedNoisyGate(
-                input_size,
-                num_experts,
-                num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", True),
-                use_balance=kwargs.get("gate_use_balance", True),
-                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
-                add_noise=kwargs.get("gate_add_noise", True),
-                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
-            )
-        elif self.gate_type == "SwitchBalancedGate":  # switch gate
-            self.gate = SwitchBalancedGate(
-                input_size,
-                num_experts,
-                num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", True),
-                use_balance=kwargs.get("gate_use_balance", True),
-                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
-            )
-        else:
-            raise NotImplementedError
-
-        if self.calculator_type == "UniversalCalculator":  # top K calculator
-            self.calculator = UniversalCalculator(
-                experts,
-                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
-            )
-        elif self.calculator_type == "SwitchDropTokenCalculator":  # switch calculator
-            self.calculator = SwitchDropTokenCalculator(
-                experts,
-                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
-                drop_tokens=kwargs.get("drop_tokens", True),
-                dropped_padding=kwargs.get("dropped_padding", "zero"),
-                capacity_factor=kwargs.get("capacity_factor", 1.25),
-            )
-        else:
-            raise NotImplementedError
+        self._create_gate(**kwargs)
+        self._create_calculator(experts, **kwargs)
         # fmt: on
