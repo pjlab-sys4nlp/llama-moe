@@ -3,8 +3,15 @@ from torch import nn
 from transformers.utils import logging
 
 from smoe.models.llama_moe import LlamaMoEDecoderLayer
-from smoe.models.llama_moe.modeling_llama_moe import  LlamaMoEPreTrainedModel, LlamaMoEModel, LlamaMoEForCausalLM, LlamaMoEForSequenceClassification
-from smoe.models.llama_moe_residual.configuration_llama_moe_residual import LlamaMoEResidualConfig
+from smoe.models.llama_moe.modeling_llama_moe import (
+    LlamaMoEForCausalLM,
+    LlamaMoEForSequenceClassification,
+    LlamaMoEModel,
+    LlamaMoEPreTrainedModel,
+)
+from smoe.models.llama_moe_residual.configuration_llama_moe_residual import (
+    LlamaMoEResidualConfig,
+)
 from smoe.modules.moe_residual.moe_residual_layers import LinearGLUMoEResidualLayer
 
 logger = logging.get_logger(__name__)
@@ -32,7 +39,10 @@ class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
     def __init__(self, config: LlamaMoEResidualConfig):
         super().__init__(config)
         self.layers = nn.ModuleList(
-            [LlamaMoEResidualDecoderLayer(config, i) for i in range(config.num_hidden_layers)]
+            [
+                LlamaMoEResidualDecoderLayer(config, i)
+                for i in range(config.num_hidden_layers)
+            ]
         )
 
 

@@ -136,9 +136,9 @@ class BaseMoELayer(nn.Module):
         if self.calculator_type != "SwitchDropTokenCalculator":
             raise ValueError(self.calculator_type)
         elif (
-                drop_tokens
-                and self.calculator.dropped_padding != "zero"
-                and self.input_size != self.output_size
+            drop_tokens
+            and self.calculator.dropped_padding != "zero"
+            and self.input_size != self.output_size
         ):
             raise Warning(
                 'Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!'
@@ -154,9 +154,9 @@ class BaseMoELayer(nn.Module):
                 f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})"
             )
         elif (
-                self.calculator.drop_tokens
-                and dropped_padding != "zero"
-                and self.input_size != self.output_size
+            self.calculator.drop_tokens
+            and dropped_padding != "zero"
+            and self.input_size != self.output_size
         ):
             raise Warning(
                 f'Setting "dropped_padding={dropped_padding}" with "drop_tokens=True" when "input_size != output_size" will cause error!'
@@ -176,7 +176,7 @@ class BaseMoELayer(nn.Module):
 
 class LinearMoELayer(BaseMoELayer):
     def __init__(
-            self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
+        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -201,16 +201,16 @@ class LinearMoELayer(BaseMoELayer):
 
 class LinearGLUMoELayer(BaseMoELayer):
     def __init__(
-            self,
-            input_size,
-            hidden_size,
-            output_size,
-            hidden_act,
-            num_experts,
-            num_selects,
-            size_experts=None,
-            bias=True,
-            **kwargs,
+        self,
+        input_size,
+        hidden_size,
+        output_size,
+        hidden_act,
+        num_experts,
+        num_selects,
+        size_experts=None,
+        bias=True,
+        **kwargs,
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()

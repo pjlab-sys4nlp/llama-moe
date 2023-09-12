@@ -1,9 +1,8 @@
 import math
 
 import torch
-from torch import nn
 import torch.nn.functional as F
-
+from torch import nn
 from transformers.activations import ACT2FN
 
 
@@ -21,14 +20,14 @@ class LinearGLU(nn.Module):
     ]
 
     def __init__(
-            self,
-            in_features,
-            hidden_features,
-            out_features,
-            hidden_act,
-            bias=True,
-            device=None,
-            dtype=None,
+        self,
+        in_features,
+        hidden_features,
+        out_features,
+        hidden_act,
+        bias=True,
+        device=None,
+        dtype=None,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super(LinearGLU, self).__init__()
@@ -39,14 +38,26 @@ class LinearGLU(nn.Module):
 
         self.act_fn = ACT2FN[hidden_act]
 
-        self.weight_gate = nn.Parameter(torch.empty((hidden_features, in_features), **factory_kwargs))
-        self.weight_up = nn.Parameter(torch.empty((hidden_features, in_features), **factory_kwargs))
-        self.weight_down = nn.Parameter(torch.empty((out_features, hidden_features), **factory_kwargs))
+        self.weight_gate = nn.Parameter(
+            torch.empty((hidden_features, in_features), **factory_kwargs)
+        )
+        self.weight_up = nn.Parameter(
+            torch.empty((hidden_features, in_features), **factory_kwargs)
+        )
+        self.weight_down = nn.Parameter(
+            torch.empty((out_features, hidden_features), **factory_kwargs)
+        )
 
         if bias:
-            self.bias_gate = nn.Parameter(torch.empty((hidden_features,), **factory_kwargs))
-            self.bias_up = nn.Parameter(torch.empty((hidden_features,), **factory_kwargs))
-            self.bias_down = nn.Parameter(torch.empty((out_features,), **factory_kwargs))
+            self.bias_gate = nn.Parameter(
+                torch.empty((hidden_features,), **factory_kwargs)
+            )
+            self.bias_up = nn.Parameter(
+                torch.empty((hidden_features,), **factory_kwargs)
+            )
+            self.bias_down = nn.Parameter(
+                torch.empty((out_features,), **factory_kwargs)
+            )
         else:
             self.register_parameter("bias_gate", None)
             self.register_parameter("bias_up", None)
@@ -78,12 +89,10 @@ class LinearGLU(nn.Module):
         return down
 
     def extra_repr(self):
-        return (
-            "in_features={}, hidden_features={}, out_features={}, hidden_act={}, bias={}".format(
-                self.in_features,
-                self.hidden_features,
-                self.out_features,
-                self.hidden_act,
-                self.bias_gate is not None,
-            )
+        return "in_features={}, hidden_features={}, out_features={}, hidden_act={}, bias={}".format(
+            self.in_features,
+            self.hidden_features,
+            self.out_features,
+            self.hidden_act,
+            self.bias_gate is not None,
         )

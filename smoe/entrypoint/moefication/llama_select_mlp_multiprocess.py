@@ -151,5 +151,7 @@ if __name__ == "__main__":
             proj_type = "up_proj"
         else:
             raise ValueError
-        visualize_expert_select_mlp(args.save_path, args.save_visualization_path, proj_type)
+        visualize_expert_select_mlp(
+            args.save_path, args.save_visualization_path, proj_type
+        )
     print("Done.")
