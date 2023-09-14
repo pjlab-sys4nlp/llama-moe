@@ -10,7 +10,7 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
             self._init_summary_writer(args)
 
         if self.tb_writer is not None:
-            logs.update({"Total_FLOPs": state.get("total_flos", -1)})
+            logs.update({"Total_FLOPs": state.total_flos})
             logs = rewrite_logs(logs)
             for k, v in logs.items():
                 if isinstance(v, (int, float)):
