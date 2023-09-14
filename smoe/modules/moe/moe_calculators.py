@@ -32,7 +32,7 @@ class UniversalCalculator(nn.Module):
         # fmt: off
         """正向传播"""
         """临时变量"""
-        batch_size = topK_indices.size(0)
+        batch_size = topK_indices.size(0)  # topK_indices: (bsz*seq_len, num_selects)
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
@@ -58,6 +58,7 @@ class UniversalCalculator(nn.Module):
         expert_outputs = [self.experts(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
 
         """重组各个专家的输出，并进行加权"""
+        # (bsz*seq_len*num_selects, hidden_size)
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:

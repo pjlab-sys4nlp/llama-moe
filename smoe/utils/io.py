@@ -34,21 +34,30 @@ def load_compressed_file_gz(path):  # gz
     return data
 
 
-def load_jsonlines_iter(filepath):
-    with open(filepath, "rt", encoding="utf8") as fin:
-        for line in fin:
+class load_jsonlines_iter:
+    def __init__(self, filepath, start_from: int = None) -> None:
+        self.fin = open(filepath, "r", encoding="utf8")
+        if start_from:
+            self.fin.seek(start_from, os.SEEK_SET)
+
+    def tell(self):
+        return self.fin.tell()
+
+    def __iter__(self):
+        for line in self.fin:
             yield json.loads(line)
+        self.fin.close()
 
 
 def load_jsonlines(filepath):
     data = []
-    with open(filepath, "rt", encoding="utf8") as fin:
+    with open(filepath, "r", encoding="utf8") as fin:
         for line in fin:
             data.append(json.loads(line))
     return data
 
 
 def dump_jsonlines(obj, filepath, **kwargs):
-    with open(filepath, "wt", encoding="utf8") as fout:
+    with open(filepath, "w", encoding="utf8") as fout:
         for ins in obj:
             fout.write(f"{json.dumps(ins, ensure_ascii=False, **kwargs)}\n")

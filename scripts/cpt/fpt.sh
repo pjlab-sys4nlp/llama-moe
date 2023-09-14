@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-16select4-64gpus
+#SBATCH --job-name=cpt-7b-test
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 
@@ -8,18 +8,18 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116
+#SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70
 
-#SBATCH --nodes=7
+#SBATCH --nodes=8
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=7         # should match with --nodes
+num_nodes=8         # should match with --nodes
 num_gpu_per_node=8  # should match with --gres
 
 # #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=4
+export OMP_NUM_THREADS=16
 export LOGLEVEL=INFO
 # export NCCL_DEBUG=INFO
 # export TORCH_DISTRIBUTED_DEBUG=DETAIL
@@ -40,13 +40,14 @@ export LOGLEVEL=INFO
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    lr=3e-4
+    lr=1e-4
     final_lr_portion=0.1
-    per_device_train_batch_size=8
+    per_device_train_batch_size=16
     per_device_eval_batch_size=1
-    gradient_accumulation_steps=4
+    gradient_accumulation_steps=2
     block_size=2048
     num_tokens="1*10^11"
+    seed=1227
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
@@ -78,7 +79,7 @@ export LOGLEVEL=INFO
         --rdzv_id $RANDOM \
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
-        smoe/entrypoint/cpt_fpt.py \
+        smoe/entrypoint/cpt/cpt_fpt.py \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
@@ -89,7 +90,7 @@ export LOGLEVEL=INFO
             --per_device_train_batch_size ${per_device_train_batch_size} \
             --per_device_eval_batch_size ${per_device_eval_batch_size} \
             --do_train \
-            --seed $RANDOM \
+            --seed ${seed} \
             --bf16 \
             --num_train_epochs 1 \
             --final_lr_portion ${final_lr_portion} \

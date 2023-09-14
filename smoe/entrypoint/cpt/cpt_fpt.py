@@ -47,7 +47,7 @@ CONFIG_MAPPING.update(
 )
 
 
-@wechat_sender()
+# @wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -66,9 +66,12 @@ def main():
     logger.info(f"Training args: {training_args.to_json_string()}")
 
     if training_args.debug_mode:
+        import torch.distributed as dist
+
         from smoe.utils.debugging import remote_breakpoint
 
-        remote_breakpoint()
+        if dist.get_rank() == 0:
+            remote_breakpoint()
 
     # Detecting last checkpoint.
     last_checkpoint = None

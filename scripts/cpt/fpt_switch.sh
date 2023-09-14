@@ -82,7 +82,7 @@ export LOGLEVEL=INFO
         --rdzv_id $RANDOM \
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
-        smoe/entrypoint/cpt_fpt.py \
+        smoe/entrypoint/cpt/cpt_fpt.py \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
