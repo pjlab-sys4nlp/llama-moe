@@ -1,11 +1,9 @@
 import os
 import pickle
 import random
-import types
 from collections import Counter
 
 import numpy as np
-import sklearn
 import torch
 from k_means_constrained import KMeansConstrained
 from sklearn.preprocessing import Normalizer
@@ -14,7 +12,6 @@ from tqdm import tqdm
 from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.datasets_moefication import ShardDataset
-from smoe.utils.change_llama_forward import forward_llama_mlp_with_backward_hook_bug_fix
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
 
@@ -295,7 +292,7 @@ class GradientSplitGetGrads:
     def get_score(self):
         # initialization
         for layer_index, layer in enumerate(self.trainer.model.model.layers):  # locate block by the name template
-            assert type(layer.mlp) == LlamaMLP
+            assert isinstance(layer.mlp, LlamaMLP)
             if layer_index == 0:
                 layer.mlp.down_proj.add_batch_size = True  # use the down_proj of layer0 to count for the batch_size
                 layer.mlp.gate_proj.add_batch_size = False

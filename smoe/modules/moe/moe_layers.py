@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass
 from typing import Optional, Union
 
@@ -125,7 +126,7 @@ class BaseMoELayer(nn.Module):
 
     def set_gate_noise_epsilon(self, noise_epsilon):
         if self.gate_type != "TopKBalancedNoisyGate":
-            raise ValueError(self.gate_type)
+            raise TypeError(self.gate_type)
         else:
             self.gate.noise_epsilon = noise_epsilon
 
@@ -134,13 +135,13 @@ class BaseMoELayer(nn.Module):
 
     def set_calculator_drop_tokens(self, drop_tokens):
         if self.calculator_type != "SwitchDropTokenCalculator":
-            raise ValueError(self.calculator_type)
+            raise TypeError(self.calculator_type)
         elif (
             drop_tokens
             and self.calculator.dropped_padding != "zero"
             and self.input_size != self.output_size
         ):
-            raise Warning(
+            warnings.warn(
                 'Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!'
             )
         else:
@@ -148,7 +149,7 @@ class BaseMoELayer(nn.Module):
 
     def set_calculator_dropped_padding(self, dropped_padding):
         if self.calculator_type != "SwitchDropTokenCalculator":
-            raise ValueError(self.calculator_type)
+            raise TypeError(self.calculator_type)
         elif dropped_padding not in self.calculator.available_dropped_padding_choices:
             raise ValueError(
                 f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})"
@@ -158,7 +159,7 @@ class BaseMoELayer(nn.Module):
             and dropped_padding != "zero"
             and self.input_size != self.output_size
         ):
-            raise Warning(
+            warnings.warn(
                 f'Setting "dropped_padding={dropped_padding}" with "drop_tokens=True" when "input_size != output_size" will cause error!'
             )
         else:
@@ -166,7 +167,7 @@ class BaseMoELayer(nn.Module):
 
     def set_calculator_capacity_factor(self, capacity_factor):
         if self.calculator_type != "SwitchDropTokenCalculator":
-            raise ValueError(self.calculator_type)
+            raise TypeError(self.calculator_type)
         else:
             self.calculator.capacity_factor = capacity_factor
 

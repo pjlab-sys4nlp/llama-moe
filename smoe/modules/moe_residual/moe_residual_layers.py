@@ -26,8 +26,8 @@ class BaseMoEResidualLayer(nn.Module):
         if self.weighting_network is not None:
             output_weights = self.weighting_network(x)
             moe_output.hidden_states = (
-                moe_output.hidden_states * output_weights[..., 0]
-                + residual_output * output_weights[..., 1]
+                    moe_output.hidden_states * output_weights[..., 0]
+                    + residual_output * output_weights[..., 1]
             )
         else:
             moe_output.hidden_states += residual_output
@@ -70,20 +70,29 @@ class BaseMoEResidualLayer(nn.Module):
 
 class LinearMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-        self,
-        input_size,
-        output_size,
-        num_experts,
-        num_selects,
-        bias=True,
-        use_weighting=True,
-        **kwargs,
+            self,
+            input_size,
+            output_size,
+            num_experts,
+            num_selects,
+            bias=True,
+            use_weighting=True,
+            moe_layer=None,
+            **kwargs,
     ):
         super(LinearMoEResidualLayer, self).__init__()
 
-        self.moe_layer = LinearMoELayer(
-            input_size, output_size, num_experts, num_selects, bias=bias, **kwargs
-        )
+        if moe_layer is not None:  # override configs
+            self.moe_layer = moe_layer
+            input_size = moe_layer.input_size
+            output_size = moe_layer.output_size
+            num_experts = moe_layer.num_experts
+            num_selects = moe_layer.num_selects
+            bias = moe_layer.bias
+        else:
+            self.moe_layer = LinearMoELayer(
+                input_size, output_size, num_experts, num_selects, bias=bias, **kwargs
+            )
 
         self.residual_block = nn.Linear(input_size, output_size, bias=bias)
 
@@ -103,29 +112,38 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
             moe_layer.num_selects,
             bias=moe_layer.bias,
             use_weighting=use_weighting,
+            moe_layer=moe_layer,
         )
 
 
 class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        size_residual=None,
-        use_weighting=False,
-        moe_layer=None,
-        **kwargs,
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            size_residual=None,
+            use_weighting=False,
+            moe_layer=None,
+            **kwargs,
     ):
         super(LinearGLUMoEResidualLayer, self).__init__()
 
-        if moe_layer is not None:
+        if moe_layer is not None:  # override configs
             self.moe_layer = moe_layer
+            input_size = moe_layer.input_size
+            hidden_size = moe_layer.hidden_size
+            output_size = moe_layer.output_size
+            hidden_act = moe_layer.hidden_act
+            num_experts = moe_layer.num_experts
+            num_selects = moe_layer.num_selects
+            size_experts = moe_layer.size_experts
+            bias = moe_layer.bias
         else:
             self.moe_layer = LinearGLUMoELayer(
                 input_size,
@@ -165,4 +183,5 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
             bias=moe_layer.bias,
             size_residual=size_residual,
             use_weighting=use_weighting,
+            moe_layer=moe_layer,
         )

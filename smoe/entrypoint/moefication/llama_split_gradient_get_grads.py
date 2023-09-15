@@ -10,7 +10,7 @@ from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer, set_seed
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.single_file import load_cached_dataset
 from smoe.trainer.moefication.expert_split_gradient import ExpertSplitGradientTrainer
-from smoe.utils.change_llama_forward import forward_llama_mlp_with_backward_hook_bug_fix
+from smoe.utils.model_operation.change_llama_forward import forward_llama_mlp_with_backward_hook_bug_fix
 from smoe.utils.config import (
     DataArguments,
     EnhancedTrainingArguments,

@@ -5,8 +5,9 @@
 llama_size="llama_7B" ################ 修改修改修改修改 ################
 
 reinit_gate=False ############## 修改修改修改修改 ##############
-cpt_tokens=100B    ############ 修改修改修改修改 ############
+cpt_tokens=100B   ############ 修改修改修改修改 ############
 batch_size=8
+block_size=2048
 
 share_path=/mnt/petrelfs/share_data/quxiaoye
 tokenizer_path=${share_path}/models/${llama_size}
@@ -74,7 +75,7 @@ for data_path in \
   ${share_path}/data/vis_data/github-part-003227-16de0c55-head1000.jsonl \
   ${share_path}/data/vis_data/commoncrawl-part-000203-16de0c55-head1000.jsonl \
   ${share_path}/data/vis_data/head30_shuffled_output/shuffled_20.txt; do
-  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.visualization.visualize_expert_load \
     --tokenizer_path ${tokenizer_path} \
     --model_path ${model_path} \
@@ -85,6 +86,7 @@ for data_path in \
     --data_begin_index 0 \
     --data_end_index 200 \
     --batch_size ${batch_size} \
+    --block_size ${block_size} \
     --use_cpu ${use_cpu} &
   sleep 0.7
 done
@@ -93,7 +95,7 @@ for data_path in \
   ${share_path}/data/vis_data/wikipedia-part-003428-16de0c55-head1000.jsonl \
   ${share_path}/data/vis_data/github-part-003227-16de0c55-head1000.jsonl \
   ${share_path}/data/vis_data/commoncrawl-part-000203-16de0c55-head1000.jsonl; do
-  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.visualization.visualize_expert_load \
     --tokenizer_path ${tokenizer_path} \
     --model_path ${model_path} \
@@ -104,6 +106,7 @@ for data_path in \
     --data_begin_index 200 \
     --data_end_index 400 \
     --batch_size ${batch_size} \
+    --block_size ${block_size} \
     --use_cpu ${use_cpu} &
   sleep 0.7
 done

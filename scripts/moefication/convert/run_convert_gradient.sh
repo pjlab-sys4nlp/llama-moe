@@ -27,7 +27,7 @@ cpus=16
 if [ ${share_neurons} = "True" ]; then
   split_file_path=${split_file_path}-Share
   save_path=${save_path}-Share
-  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.moefication.llama_convert_neuron_index \
     --model_path ${model_path} \
     --split_file_path ${split_file_path} \
@@ -39,7 +39,7 @@ if [ ${share_neurons} = "True" ]; then
     --convert_type ${convert_type} \
     --use_default_gate True
 else
-  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.moefication.llama_convert \
     --model_path ${model_path} \
     --split_file_path ${split_file_path} \
@@ -52,4 +52,4 @@ else
     --use_default_gate True
 fi
 
-chmod -R 777 ${save_path} >/dev/null 2>&1
+chmod -R 755 ${save_path} >/dev/null 2>&1

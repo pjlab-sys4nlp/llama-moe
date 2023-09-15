@@ -13,13 +13,13 @@ from smoe.utils.kernel_function import pass_kernel_function
 
 class BaseGate:
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
     ):
         assert type(llama_model) == LlamaModel
 
@@ -39,16 +39,16 @@ class BaseGate:
 
 class MLPGate(BaseGate):
     def __init__(
-        self,
-        config,
-        llama_model,
-        train_loader,
-        valid_loader,
-        expert_indices,
-        layer_index,
-        select_criterion="plain",
-        mlp_init_criterion="weight",
-        criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
+            self,
+            config,
+            llama_model,
+            train_loader,
+            valid_loader,
+            expert_indices,
+            layer_index,
+            select_criterion="plain",
+            mlp_init_criterion="weight",
+            criterion_config=None,  # 用于训练中的一些参数配置，现已暂时废弃
     ):
         super().__init__(
             config, llama_model, train_loader, valid_loader, expert_indices, layer_index
@@ -115,16 +115,16 @@ class MLPGate(BaseGate):
         # fmt: on
 
     def train(
-        self,
-        device,
-        batch_size=1024,
-        train_epochs=100,
-        lr=0.01,
-        accumulate_steps=1,
-        use_balance=False,
-        add_noise=False,
-        use_softmax=False,
-        balance_loss_lambda=0.0005,
+            self,
+            device,
+            batch_size=1024,
+            train_epochs=100,
+            lr=0.01,
+            accumulate_steps=1,
+            use_balance=False,
+            add_noise=False,
+            use_softmax=False,
+            balance_loss_lambda=0.0005,
     ):
         """
         每轮epoch训练一层
@@ -153,6 +153,7 @@ class MLPGate(BaseGate):
         self.mlp_model = TopKBalancedNoisyGate(self.hidden_dim, self.config.num_experts, self.config.num_selects, gate_network="mlp",
                                                use_balance=use_balance, add_noise=add_noise, use_softmax=use_softmax)
         self.mlp_model.gate_network.apply(self.mlp_gate_weights_init)
+        self.mlp_model.balance_loss_weight = balance_loss_lambda
         self.mlp_model = self.mlp_model.to(device)
 
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
@@ -218,7 +219,9 @@ class MLPGate(BaseGate):
                     hidden_inputs = hidden_inputs_examples[batch_id]
                     hidden_outputs = hidden_outputs_examples[batch_id]
 
-                    pred, gate_loss = self.mlp_model.forward_return_scores(hidden_inputs, gate_loss_lambda=balance_loss_lambda)  # MoE gate选择的各个专家的scores，shape(batch_size, expert_num)
+                    output = self.mlp_model.forward_return_scores(hidden_inputs)  # MoE gate选择的各个专家的scores，shape(batch_size, expert_num)
+                    pred = output["scores"]
+                    gate_loss = output["balance_loss"]
                     pred_topk, pred_labels = torch.topk(pred, k=int(self.config.num_selects), dim=-1)
 
                     scores = self.calculate_scores(hidden_outputs, expert_masks, use_softmax=use_softmax)  # 根据当前层激活后的输出所计算出的各个专家的分数
@@ -275,7 +278,8 @@ class MLPGate(BaseGate):
                         hidden_inputs = hidden_inputs_examples[batch_id]
                         hidden_outputs = hidden_outputs_examples[batch_id]
 
-                        pred, gate_loss = self.mlp_model.forward_return_scores(hidden_inputs, gate_loss_lambda=balance_loss_lambda)  # MoE gate选择的各个专家的scores，shape(batch, expert_num)
+                        output = self.mlp_model.forward_return_scores(hidden_inputs)  # MoE gate选择的各个专家的scores，shape(batch, expert_num)
+                        pred = output["scores"]
                         pred_topk, pred_labels = torch.topk(pred, k=int(self.config.num_selects), dim=-1)
 
                         scores = self.calculate_scores(hidden_outputs, expert_masks, use_softmax=use_softmax)  # 根据当前层激活后的输出所计算出的各个专家的分数

@@ -24,7 +24,7 @@ save_path=${data_path}/moefication_results/split
 
 gpus=0
 cpus=8
-OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
   python -m smoe.entrypoint.moefication.llama_split_gradient \
   --model_path ${model_path} \
   --score_file_path ${score_file_path} \
@@ -38,4 +38,4 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --criterion ${criterion} \
   --share_neurons ${share_neurons}
 
-chmod -R 777 ${save_path} >/dev/null 2>&1
+chmod -R 755 ${save_path} >/dev/null 2>&1

@@ -490,7 +490,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             num_dropped_tokens=outputs.num_dropped_tokens,
-            balance_loss=outputs.balance_loss.item(),
+            balance_loss=outputs.balance_loss,
             gate_load=outputs.gate_load,
             gate_importance=outputs.gate_importance,
         )

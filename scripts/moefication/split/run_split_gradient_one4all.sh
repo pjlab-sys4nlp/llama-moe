@@ -26,7 +26,7 @@ for expert_num in 16; do
     # 688 1376 2752 5504 11008
     # 864 1728 3456 6912 13824
     echo ${expert_num} ${expert_size} ${share_neurons}
-    OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+    OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
       python -m smoe.entrypoint.moefication.llama_split_gradient \
       --model_path ${model_path} \
       --score_file_path ${score_file_path} \
@@ -49,7 +49,7 @@ share_neurons=False
 expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
 echo ${expert_num} ${expert_size} ${share_neurons}
 
-OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
   python -m smoe.entrypoint.moefication.llama_split_gradient \
   --model_path ${model_path} \
   --score_file_path ${score_file_path} \
@@ -64,4 +64,4 @@ OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --share_neurons ${share_neurons}
 
 wait
-chmod -R 777 ${save_path} >/dev/null 2>&1
+chmod -R 755 ${save_path} >/dev/null 2>&1

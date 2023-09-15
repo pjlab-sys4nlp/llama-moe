@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
+from smoe.utils.io import torch_load_template_score_file
 from smoe.utils.moefication.expert_split import GradientSplit
 from smoe.utils.string_operation import str2bool
 
@@ -42,13 +43,7 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     for i in tqdm(range(config.num_hidden_layers)):
-        score_list = []
-
-        for expert_folder_name in os.listdir(args.score_file_path):
-            score_file_path = os.path.join(args.score_file_path, expert_folder_name, args.template.format(i) + file_postfix)
-            score = torch.load(score_file_path, map_location="cpu")
-            score_list.append(score)
-        # print(score_list)
+        score_list = torch_load_template_score_file(args.score_file_path, args.template + file_postfix, i)
 
         if args.expert_num is None:
             args.expert_num = len(score_list)

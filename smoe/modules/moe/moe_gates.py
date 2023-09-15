@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
@@ -19,7 +21,7 @@ def get_gate_network(gate_type, input_size, num_experts):
             torch.nn.Linear(num_experts, num_experts, bias=False),
         )
     else:
-        raise ValueError('Expected "gate_type" in', valid_gate_type, "got", gate_type)
+        raise ValueError(f'Expected "gate_type" in {valid_gate_type}, got {gate_type}')
 
     return gate_network
 
@@ -31,16 +33,16 @@ class TopKBalancedNoisyGate(nn.Module):
     """
 
     def __init__(
-        self,
-        input_size,
-        num_experts,
-        num_selects,
-        gate_network="mlp",
-        use_softmax=True,
-        use_balance=True,
-        balance_loss_weight=1e-2,
-        add_noise=True,
-        noise_epsilon=1e-2,
+            self,
+            input_size,
+            num_experts,
+            num_selects,
+            gate_network="mlp",
+            use_softmax=True,
+            use_balance=True,
+            balance_loss_weight=1e-2,
+            add_noise=True,
+            noise_epsilon=1e-2,
     ):
         super(TopKBalancedNoisyGate, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
@@ -108,33 +110,39 @@ class TopKBalancedNoisyGate(nn.Module):
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
 
-        """专家平衡选择"""
-        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下gate loss输出值设备不匹配的错误
-        if self.training and self.use_balance:
-            """计算importance"""
-            zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
-            scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
-            importance = scores_filtered.sum(0)  # shape(num_experts)
+        """计算importance"""
+        zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+        scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+        importance = scores_filtered.sum(0)  # shape(num_experts)
 
-            """计算load"""
-            batch_size = logits_gate.size(0)
-            m = top_logits.size(1)
-            top_values_flat = top_logits.flatten()
-            threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
-            threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
-            is_in = torch.gt(logits_noise, threshold_if_in)
-            threshold_positions_if_out = threshold_positions_if_in - 1
-            threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-            # is each value currently in the top k.
-            prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
-            prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
-            prob = torch.where(is_in, prob_if_in, prob_if_out)
-            load = prob.sum(0)
+        """计算load"""
+        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        if self.training:
+            if self.add_noise:
+                batch_size = top_logits.size(0)
+                m = top_logits.size(1)
+                top_values_flat = top_logits.flatten()
+                threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
+                threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
+                is_in = torch.gt(logits_noise, threshold_if_in)
+                threshold_positions_if_out = threshold_positions_if_in - 1
+                threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
+                # is each value currently in the top k.
+                prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
+                prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
+                prob = torch.where(is_in, prob_if_in, prob_if_out)
+                load = prob.sum(0)
+            else:
+                load = (scores_filtered > 0).sum(0)
+                warnings.warn("Gradient-trackable implementation for load calculation is only available when \"add_noise=True\". "
+                              "Training without noise will block the gradient from load path and lead to inconsistency in optimization objective.")
+        else:
+            load = (scores_filtered > 0).sum(0)
 
-            """计算balance loss"""
+        """计算balance loss"""
+        if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
-
         else:
             balance_loss = None
 
@@ -165,16 +173,16 @@ class TopKBalancedNoisyGate(nn.Module):
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
 
-        """专家平衡选择"""
-        if self.use_balance:
-            """计算importance"""
-            zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
-            scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
-            importance = scores_filtered.sum(0)  # shape(num_experts)
+        """计算importance"""
+        zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+        scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+        importance = scores_filtered.sum(0)  # shape(num_experts)
 
-            """计算load"""
-            if self.training:  # 计算各分数在处于topK范围内的概率，可传递梯度
-                batch_size = logits_gate.size(0)
+        """计算load"""
+        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        if self.training:
+            if self.add_noise:
+                batch_size = top_logits.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
                 threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
@@ -188,19 +196,26 @@ class TopKBalancedNoisyGate(nn.Module):
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
                 load = prob.sum(0)
             else:
-                load = (scores_filtered > 0).sum(0)  # shape(num_experts)
+                load = (scores_filtered > 0).sum(0)
+                warnings.warn("Gradient-trackable implementation for load calculation is only available when \"add_noise=True\". "
+                              "Training without noise will block the gradient from load path and lead to inconsistency in optimization objective.")
+        else:
+            load = (scores_filtered > 0).sum(0)
 
-            """计算balance loss"""
+        """计算balance loss"""
+        if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
-
         else:
             balance_loss = None
 
         return {
             "scores": scores,
             "balance_loss": balance_loss,
+            "load": load.tolist(),
+            "importance": importance.tolist(),
         }
+
     # fmt: on
 
     def reset_gate_network(self):
@@ -217,15 +232,15 @@ class SwitchBalancedGate(nn.Module):
     """
 
     def __init__(
-        self,
-        input_size,
-        num_experts,
-        num_selects,
-        gate_network="mlp",
-        use_softmax=True,
-        use_balance=True,
-        balance_loss_weight=1e-1,
-        add_noise=True,
+            self,
+            input_size,
+            num_experts,
+            num_selects,
+            gate_network="mlp",
+            use_softmax=True,
+            use_balance=True,
+            balance_loss_weight=1e-1,
+            add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
         assert num_selects == 1

@@ -23,7 +23,7 @@ for idx in "${!num_selects_array[@]}"; do
 
         # 若result_path存在，则执行可视化
         if [ -d "$result_path" ]; then
-          OMP_NUM_THREADS=8 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+          OMP_NUM_THREADS=2 srun --partition=MoE --job-name=visualize --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
             python -m smoe.entrypoint.visualization.visualize_expert_select_mlp \
             --result_path ${result_path} \
             --save_path ${save_path} \
