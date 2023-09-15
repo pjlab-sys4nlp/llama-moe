@@ -7,7 +7,9 @@ from smoe.modules.moe.moe_calculators import CalculatorOutput
 logger = logging.get_logger(__name__)
 
 
-def forward_universal_calculator_with_scaled_gate_score(self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs) -> CalculatorOutput:
+def forward_universal_calculator_with_scaled_gate_score(
+    self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+) -> CalculatorOutput:
     # fmt: off
     """正向传播"""
     """临时变量"""
@@ -85,7 +87,9 @@ def forward_topk_balanced_noisy_gate_with_fixed_expert_selection(self, x):
     # fmt: on
 
 
-def forward_topk_balanced_noisy_gate_with_hidden_states_recording(self, x, padding_mask, **kwargs):
+def forward_topk_balanced_noisy_gate_with_hidden_states_recording(
+    self, x, padding_mask, **kwargs
+):
     # fmt: off
     self.samples_cnt += torch.sum(padding_mask).item()  ####################################
 
@@ -127,9 +131,9 @@ def forward_topk_balanced_noisy_gate_with_hidden_states_recording(self, x, paddi
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-        self,
-        x,
-        padding_mask,
+    self,
+    x,
+    padding_mask,
 ):
     # fmt: off
     original_shape = x.shape[:-1]
@@ -145,14 +149,14 @@ def forward_linear_glu_moe_layer_with_padding_mask(
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-        self,
-        hidden_states,
-        padding_mask,  # ----- add padding_mask -----
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+    self,
+    hidden_states,
+    padding_mask,  # ----- add padding_mask -----
+    attention_mask=None,
+    position_ids=None,
+    past_key_value=None,
+    output_attentions=False,
+    use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -192,16 +196,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+    self,
+    input_ids=None,
+    attention_mask=None,
+    position_ids=None,
+    past_key_values=None,
+    inputs_embeds=None,
+    use_cache=None,
+    output_attentions=None,
+    output_hidden_states=None,
+    return_dict=None,
 ):
     output_attentions = (
         output_attentions

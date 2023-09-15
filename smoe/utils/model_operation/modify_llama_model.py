@@ -3,7 +3,11 @@ import types
 
 from transformers.models.llama.modeling_llama import LlamaMLP, LlamaModel
 
-from smoe.utils.model_operation.change_llama_forward import forward_llama_model_with_padding_mask, forward_llama_decoder_with_padding_mask, forward_llama_mlp_with_feature_dumping
+from smoe.utils.model_operation.change_llama_forward import (
+    forward_llama_decoder_with_padding_mask,
+    forward_llama_mlp_with_feature_dumping,
+    forward_llama_model_with_padding_mask,
+)
 
 
 def llama_with_feature_dumping(model, device_id, save_path, template, save_interval=1):

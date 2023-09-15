@@ -5,8 +5,15 @@ import torch
 from smoe.models.llama_moe import LlamaMoEModel
 from smoe.modules.moe.moe_calculators import UniversalCalculator
 from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
-from smoe.utils.model_operation.change_llama_moe_forward import forward_llama_moe_model_with_padding_mask, forward_llama_moe_decoder_with_padding_mask, forward_linear_glu_moe_layer_with_padding_mask, \
-    forward_topk_balanced_noisy_gate_with_hidden_states_recording, forward_universal_calculator_with_scaled_gate_score, forward_topk_balanced_noisy_gate_with_fixed_expert_selection, forward_topk_balanced_noisy_gate_with_random_expert_selection
+from smoe.utils.model_operation.change_llama_moe_forward import (
+    forward_linear_glu_moe_layer_with_padding_mask,
+    forward_llama_moe_decoder_with_padding_mask,
+    forward_llama_moe_model_with_padding_mask,
+    forward_topk_balanced_noisy_gate_with_fixed_expert_selection,
+    forward_topk_balanced_noisy_gate_with_hidden_states_recording,
+    forward_topk_balanced_noisy_gate_with_random_expert_selection,
+    forward_universal_calculator_with_scaled_gate_score,
+)
 
 
 def llama_moe_with_random_expert_selection(model):
@@ -20,6 +27,7 @@ def llama_moe_with_random_expert_selection(model):
 
     return model
     # fmt: on
+
 
 def llama_moe_with_fixed_expert_selection(model):
     """专家只会选择按照顺序排列的前n个"""

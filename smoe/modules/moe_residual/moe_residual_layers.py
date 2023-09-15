@@ -26,8 +26,8 @@ class BaseMoEResidualLayer(nn.Module):
         if self.weighting_network is not None:
             output_weights = self.weighting_network(x)
             moe_output.hidden_states = (
-                    moe_output.hidden_states * output_weights[..., 0]
-                    + residual_output * output_weights[..., 1]
+                moe_output.hidden_states * output_weights[..., 0]
+                + residual_output * output_weights[..., 1]
             )
         else:
             moe_output.hidden_states += residual_output
@@ -70,15 +70,15 @@ class BaseMoEResidualLayer(nn.Module):
 
 class LinearMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-            self,
-            input_size,
-            output_size,
-            num_experts,
-            num_selects,
-            bias=True,
-            use_weighting=True,
-            moe_layer=None,
-            **kwargs,
+        self,
+        input_size,
+        output_size,
+        num_experts,
+        num_selects,
+        bias=True,
+        use_weighting=True,
+        moe_layer=None,
+        **kwargs,
     ):
         super(LinearMoEResidualLayer, self).__init__()
 
@@ -118,19 +118,19 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
 
 class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-            self,
-            input_size,
-            hidden_size,
-            output_size,
-            hidden_act,
-            num_experts,
-            num_selects,
-            size_experts=None,
-            bias=True,
-            size_residual=None,
-            use_weighting=False,
-            moe_layer=None,
-            **kwargs,
+        self,
+        input_size,
+        hidden_size,
+        output_size,
+        hidden_act,
+        num_experts,
+        num_selects,
+        size_experts=None,
+        bias=True,
+        size_residual=None,
+        use_weighting=False,
+        moe_layer=None,
+        **kwargs,
     ):
         super(LinearGLUMoEResidualLayer, self).__init__()
 

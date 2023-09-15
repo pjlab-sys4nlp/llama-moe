@@ -3,12 +3,12 @@ import numpy as np
 
 
 def line_plot(
-        xs,
-        label_to_nums,
-        title: str = None,
-        xlabel: str = None,
-        ylabel: str = None,
-        save_path: str = None,
+    xs,
+    label_to_nums,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    save_path: str = None,
 ):
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111)
@@ -31,17 +31,17 @@ def line_plot(
 
 
 def line_plot_with_highlight(
-        xs,
-        label_to_nums,
-        highlight_label_to_nums: dict = None,
-        highlight_linewidth: int = 4,
-        highlight_color: str = "black",
-        cmap: str = "viridis",
-        legend_columns: int = 1,
-        title: str = None,
-        xlabel: str = None,
-        ylabel: str = None,
-        save_path: str = None,
+    xs,
+    label_to_nums,
+    highlight_label_to_nums: dict = None,
+    highlight_linewidth: int = 4,
+    highlight_color: str = "black",
+    cmap: str = "viridis",
+    legend_columns: int = 1,
+    title: str = None,
+    xlabel: str = None,
+    ylabel: str = None,
+    save_path: str = None,
 ):
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot(111)
@@ -54,7 +54,9 @@ def line_plot_with_highlight(
 
     if highlight_label_to_nums is not None:
         for i, (label, nums) in enumerate(highlight_label_to_nums.items()):
-            ax.plot(xs, nums, label=label, linewidth=highlight_linewidth, c=highlight_color)
+            ax.plot(
+                xs, nums, label=label, linewidth=highlight_linewidth, c=highlight_color
+            )
 
     ax.set_xticks(xs)
     if title:

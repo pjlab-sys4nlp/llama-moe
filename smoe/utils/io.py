@@ -12,11 +12,10 @@ def torch_load_template_file(path, template, layer):
     return torch.load(target)
 
 
-
 def torch_load_template_score_file(path, template, layer):
     score_list = []
     for expert_folder_name in os.listdir(path):
-        score_file = os.path.join(path, expert_folder_name,template.format(layer))
+        score_file = os.path.join(path, expert_folder_name, template.format(layer))
         score = torch.load(score_file, map_location="cpu")
         score_list.append(score)
     return score_list
