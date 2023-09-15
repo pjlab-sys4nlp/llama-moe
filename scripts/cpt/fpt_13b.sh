@@ -8,17 +8,17 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70
+#SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70,SH-IDCA1404-10-140-54-47
 
-#SBATCH --nodes=1
-#SBATCH --gres=gpu:4
+#SBATCH --nodes=2
+#SBATCH --gres=gpu:8
 #SBATCH --quotatype=auto
 
 source ~/anaconda3/bin/activate smoe
 
 {
-    num_nodes=1         # should match with --nodes
-    num_gpu_per_node=4  # should match with --gres
+    num_nodes=2         # should match with --nodes
+    num_gpu_per_node=8  # should match with --gres
 
     # #cpu/#num_gpu_per_node
     export OMP_NUM_THREADS=16
