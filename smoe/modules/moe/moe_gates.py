@@ -142,8 +142,8 @@ class TopKBalancedNoisyGate(nn.Module):
             "topK_indices": top_k_indices,
             "topK_scores": top_k_scores,
             "balance_loss": balance_loss,
-            "load": load.tolist(),
-            "importance": importance.tolist(),
+            "load": load,
+            "importance": importance,
         }
 
     def forward_return_scores(self, x):
@@ -224,7 +224,7 @@ class SwitchBalancedGate(nn.Module):
         gate_network="mlp",
         use_softmax=True,
         use_balance=True,
-        balance_loss_weight=1e-1,
+        balance_loss_weight=1e-2,
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
@@ -276,8 +276,8 @@ class SwitchBalancedGate(nn.Module):
             "topK_scores": top1_scores,
             "expert_batch_size": load.tolist(),
             "balance_loss": balance_loss,
-            "load": load_mean.tolist(),
-            "importance": importance_mean.tolist(),
+            "load": load_mean,
+            "importance": importance_mean,
         }
 
     def reset_gate_network(self):

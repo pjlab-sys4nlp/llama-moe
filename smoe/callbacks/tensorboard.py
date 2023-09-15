@@ -31,10 +31,18 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                         token_loss_key = "train/loss_on_tokens"
                         self.tb_writer.add_scalar(token_loss_key, v, tokens)
                 elif (
+                    k == "train/balance_loss"
+                    and isinstance(v, torch.Tensor)
+                    and hasattr(v, "item")
+                ):
+                    self.tb_writer.add_scalar(k, v.item(), state.global_step)
+                elif (
                     k == "train/num_dropped_tokens"
                     and isinstance(v, tuple)
-                    and all(isinstance(n, (int, float)) for n in v)
+                    and all(isinstance(n, torch.Tensor) for n in v)
                 ):
+                    # (tensor(1.0), tensor(2.3)) -> [1.0, 2.3]
+                    v = [n.item() for n in v]
                     self.tb_writer.add_scalars(
                         f"{k}/layer",
                         {str(i): n for i, n in enumerate(v)},
@@ -42,19 +50,18 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                     )
                     self.tb_writer.add_scalar(f"{k}/total", sum(v), state.global_step)
                 elif (
-                    k == "train/gate_load"
-                    or k == "train/gate_importance"
+                    (k == "train/gate_load" or k == "train/gate_importance")
                     and isinstance(v, tuple)
-                    and all(isinstance(n, list) for n in v)
+                    and all(isinstance(n, torch.Tensor) for n in v)
                 ):
-                    _v = [torch.tensor(n) for n in v]
+                    # v: (tensor([1.0, 2.3, ... num_experts]), tensor([3.0, 4.5, ... num_experts]), ... num_layers)
                     self.tb_writer.add_scalars(
                         f"{k}/std/layer",
-                        {str(i): n.std().item() for i, n in enumerate(_v)},
+                        {str(i): n.std().item() for i, n in enumerate(v)},
                         state.global_step,
                     )
                     self.tb_writer.add_image(
-                        k, get_heatmap_img_grid_for_tb(_v), state.global_step
+                        k, get_heatmap_img_grid_for_tb(v), state.global_step
                     )
                 else:
                     logger.warning(

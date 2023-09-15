@@ -66,7 +66,7 @@ class UniversalCalculator(nn.Module):
         zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
 
-        return CalculatorOutput(hidden_states=y)
+        return CalculatorOutput(hidden_states=y, num_dropped_tokens=torch.tensor(-1.0))
         # fmt: on
 
 

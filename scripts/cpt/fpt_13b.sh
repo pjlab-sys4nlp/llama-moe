@@ -10,14 +10,15 @@
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70
 
-#SBATCH --nodes=8
-#SBATCH --gres=gpu:8
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:4
+#SBATCH --quotatype=auto
 
 source ~/anaconda3/bin/activate smoe
 
 {
-    num_nodes=8         # should match with --nodes
-    num_gpu_per_node=8  # should match with --gres
+    num_nodes=1         # should match with --nodes
+    num_gpu_per_node=4  # should match with --gres
 
     # #cpu/#num_gpu_per_node
     export OMP_NUM_THREADS=16
@@ -32,7 +33,7 @@ source ~/anaconda3/bin/activate smoe
     # model_type="llama_moe"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj"
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     # pretrained_model=$1
     echo "==================> $pretrained_model <=================="
@@ -108,10 +109,8 @@ source ~/anaconda3/bin/activate smoe
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
             --max_train_samples ${max_train_samples} \
-            --logging_strategy steps \
-            --logging_steps 10 \
             --save_strategy steps \
-            --save_total_limit 1 \
+            --save_total_limit 2 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
@@ -123,6 +122,11 @@ source ~/anaconda3/bin/activate smoe
             --torch_dtype bfloat16 \
             --ddp_find_unused_parameters False \
             --gradient_checkpointing \
-            --report_to none \
-            --log_level info
+            --logging_strategy steps \
+            --logging_steps 10 \
+            --log_level info \
+            --log_level_replica warning \
+            --log_on_each_node False \
+            --report_to none
+
 }
