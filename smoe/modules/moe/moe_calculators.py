@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import torch
+from einops import einsum, rearrange
 from torch import nn
 from transformers.utils import ModelOutput
 
@@ -145,3 +146,25 @@ class SwitchDropTokenCalculator(nn.Module):
             y = torch.mul(y, topK_scores.reshape(-1, 1))
 
         return CalculatorOutput(hidden_states=y, num_dropped_tokens=num_dropped_tokens)
+
+
+class SoftMoECalculator(nn.Module):
+    def __init__(
+        self,
+        experts,
+    ):
+        super().__init__()
+        self.experts = experts
+
+    def forward(self, x, dispatch_weights, combine_weights, **kwargs):
+        print(
+            "SoftMoECalculator",
+            x.size(),
+            dispatch_weights.size(),
+            combine_weights.size(),
+        )
+        x = einsum(x, dispatch_weights, "b m d, b m n p -> b n p d")  # Xs
+        x = self.experts(x)  # Ys
+        x = einsum(x, combine_weights, "b n p d, b m n p -> b m d")  # Y
+
+        return CalculatorOutput(hidden_states=x)

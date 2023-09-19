@@ -4,6 +4,7 @@ coverage==7.2.7
 datasets==2.14.1
 debugpy==1.6.7
 deepspeed==0.10.0
+einops==0.6.1
 flake8==6.0.0
 huggingface-hub==0.16.4
 isort==5.12.0

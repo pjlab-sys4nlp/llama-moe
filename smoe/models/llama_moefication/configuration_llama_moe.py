@@ -44,6 +44,8 @@ class LlamaMoEConfig(PretrainedConfig):
         # TopKBalancedNoisyGate
         gate_add_noise=True,
         gate_noise_epsilon=1e-2,
+        # SoftMoEGate
+        gate_slots_per_expert=1,
         #### -------- moe calculator configs -------- ####
         calculator_type="UniversalCalculator",
         multiply_gate_scores=True,
@@ -78,6 +80,7 @@ class LlamaMoEConfig(PretrainedConfig):
         self.gate_balance_loss_weight = gate_balance_loss_weight
         self.gate_add_noise = gate_add_noise
         self.gate_noise_epsilon = gate_noise_epsilon
+        self.gate_slots_per_expert = gate_slots_per_expert
 
         self.calculator_type = calculator_type
         self.multiply_gate_scores = multiply_gate_scores
