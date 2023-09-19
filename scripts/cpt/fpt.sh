@@ -28,6 +28,7 @@ export LOGLEVEL=INFO
 
 {
     # model_type="llama"
+    # pretrained_model="outputs/llama1_7B_random"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     model_type="llama_moe"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm_bak
@@ -62,8 +63,9 @@ export LOGLEVEL=INFO
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     mkdir -p $output_dir
-    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
+    git diff > $output_dir/diff.patch
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -103,8 +105,6 @@ export LOGLEVEL=INFO
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
             --max_train_samples ${max_train_samples} \
-            --logging_strategy steps \
-            --logging_steps 10 \
             --save_strategy steps \
             --save_total_limit 2 \
             --save_steps 1000 \
@@ -114,12 +114,16 @@ export LOGLEVEL=INFO
             --output_dir ${output_dir} \
             --overwrite_output_dir \
             --ddp_timeout 30000 \
-            --logging_first_step True \
-            --torch_dtype bfloat16 \
             --ddp_find_unused_parameters False \
+            --torch_dtype bfloat16 \
             --gradient_checkpointing \
-            --report_to none \
-            --log_level info
+            --logging_first_step True \
+            --logging_strategy steps \
+            --logging_steps 10 \
+            --log_level info \
+            --log_level_replica warning \
+            --log_on_each_node False \
+            --report_to none
 }
 #SBATCH --job-name=cpt-moe-fpt-test_lr_change
 #改动前：--logging_steps 10 \

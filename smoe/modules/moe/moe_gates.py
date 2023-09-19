@@ -110,6 +110,9 @@ class TopKBalancedNoisyGate(nn.Module):
 
         """专家平衡选择"""
         # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下gate loss输出值设备不匹配的错误
+        load = torch.tensor(-1.0)
+        importance = torch.tensor(-1.0)
+
         if self.training and self.use_balance:
             """计算importance"""
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)

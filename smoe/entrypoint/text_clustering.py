@@ -5,6 +5,7 @@ srun -p MoE -n 1 -N 1 --mem 128G python -m smoe.entrypoint.text_clustering --do_
 import argparse
 import json
 import logging
+import os
 from collections import defaultdict
 from pathlib import Path
 
@@ -63,6 +64,8 @@ def main(args):
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--do_train", action="store_true")
     parser.add_argument("--do_eval", action="store_true")

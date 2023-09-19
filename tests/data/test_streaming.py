@@ -1,8 +1,10 @@
 import tempfile
+from pathlib import Path
 
+import pytest
 from torch.utils.data import DataLoader
 
-from smoe.data.streaming import JsonlDataset
+from smoe.data.streaming import JsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.utils.io import load_jsonlines
 
 
@@ -36,5 +38,20 @@ def test_jsonl_dataset():
     new_dataset = JsonlDataset.from_pretrained(temp_dir)
 
 
+@pytest.mark.skipif(
+    Path("resources/data_test").exists(), reason="Test data dir not found"
+)
+def test_subdir_weighted_pack():
+    from tqdm import tqdm
+
+    dataset = SubDirWeightedPackedJsonlDataset(
+        "resources/data_test",
+        weights={"en_arxiv": 0.5, "en_book": 0.2, "en_c4": 0.3},
+    )
+    for _ in tqdm(dataset):
+        pass
+
+
 if __name__ == "__main__":
-    test_jsonl_dataset()
+    # test_jsonl_dataset()
+    test_subdir_weighted_pack()

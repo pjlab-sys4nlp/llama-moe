@@ -30,10 +30,10 @@ source ~/anaconda3/bin/activate smoe
 
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     # pretrained_model=$1
     echo "==================> $pretrained_model <=================="
@@ -68,8 +68,9 @@ source ~/anaconda3/bin/activate smoe
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     mkdir -p $output_dir
-    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     echo "output_dir: $output_dir"
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
+    git diff > $output_dir/diff.patch
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -118,10 +119,10 @@ source ~/anaconda3/bin/activate smoe
             --output_dir ${output_dir} \
             --overwrite_output_dir \
             --ddp_timeout 30000 \
-            --logging_first_step True \
-            --torch_dtype bfloat16 \
             --ddp_find_unused_parameters False \
+            --torch_dtype bfloat16 \
             --gradient_checkpointing \
+            --logging_first_step True \
             --logging_strategy steps \
             --logging_steps 10 \
             --log_level info \
@@ -130,3 +131,7 @@ source ~/anaconda3/bin/activate smoe
             --report_to none
 
 }
+
+            # --gate_type "TopKBalancedNoisyGate" \
+            # --calculator_type "UniversalCalculator" \
+            # --num_selects 1 \

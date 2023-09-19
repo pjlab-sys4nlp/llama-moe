@@ -145,4 +145,6 @@ class SwitchDropTokenCalculator(nn.Module):
             # 乘权重
             y = torch.mul(y, topK_scores.reshape(-1, 1))
 
-        return CalculatorOutput(hidden_states=y, num_dropped_tokens=num_dropped_tokens)
+        return CalculatorOutput(
+            hidden_states=y, num_dropped_tokens=torch.tensor(num_dropped_tokens)
+        )

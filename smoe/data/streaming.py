@@ -13,8 +13,11 @@ import torch
 from torch.utils.data import IterableDataset
 
 from smoe.utils.io import load_jsonlines_iter
+from smoe.utils.logging import get_logger
 from smoe.utils.random import get_random_string
 from smoe.utils.vars import JSONL_DATASET_CACHE_NAME
+
+logger = get_logger(__file__)
 
 
 class JsonlDataset(IterableDataset):
@@ -97,33 +100,30 @@ class JsonlDataset(IterableDataset):
 
     def __iter__(self) -> Iterator:
         self.buffer = []
-        try:
-            for ins in self.load_fh:
-                if self.num_skip and self.num_yield < self.num_skip:
-                    self.num_yield += 1
-                    continue
+        for ins in self.load_fh:
+            if self.num_skip and self.num_yield < self.num_skip:
+                self.num_yield += 1
+                continue
 
-                if self.buffer_size <= 1:
-                    yield ins
-                    continue
+            if self.buffer_size <= 1:
+                yield ins
+                continue
 
-                if len(self.buffer) >= self.buffer_size:
-                    if len(self.buffer) > 0:
-                        self.rng.shuffle(self.buffer)
-                        yield from self.buffer
-                        self.num_yield += len(self.buffer)
-                        self.buffer.clear()
+            if len(self.buffer) >= self.buffer_size:
+                if len(self.buffer) > 0:
+                    self.rng.shuffle(self.buffer)
+                    yield from self.buffer
+                    self.num_yield += len(self.buffer)
+                    self.buffer.clear()
 
-                self.buffer.append(ins)
+            self.buffer.append(ins)
 
-            # for the last batch < buffer_size
-            if len(self.buffer) > 0:
-                self.rng.shuffle(self.buffer)
-                yield from self.buffer
-                self.num_yield += len(self.buffer)
-                self.buffer.clear()
-        finally:
-            self.save_pretrained(self.cache_dir)
+        # for the last batch < buffer_size
+        if len(self.buffer) > 0:
+            self.rng.shuffle(self.buffer)
+            yield from self.buffer
+            self.num_yield += len(self.buffer)
+            self.buffer.clear()
 
 
 class WeightedPackedDataset(IterableDataset):
@@ -141,9 +141,8 @@ class WeightedPackedDataset(IterableDataset):
 
     def __iter__(self):
         while len(self.datasets) > 0:
-            choice = self.rng.choices(range(self.datasets), weights=self.weights, k=1)[
-                0
-            ]
+            candidate_ids = list(range(self.datasets))
+            choice = self.rng.choices(candidate_ids, weights=self.weights, k=1)[0]
             try:
                 yield next(self.datasets[choice])
             except StopIteration:
@@ -191,3 +190,116 @@ class WeightedPackedDatasetBuilder:
     def __iter__(self) -> Iterator:
         for ds in self.datasets:
             yield from ds
+
+
+class PackedJsonlDataset(IterableDataset):
+    def __init__(self, data_dir: str, seed: int = 1227, buffer_size: int = 32) -> None:
+        super().__init__()
+        self.rng = random.Random(seed)
+        self.buffer_size = buffer_size
+
+        data_dir_path = Path(data_dir)
+        filepaths = sorted(data_dir_path.glob("**/*.jsonl"))
+        self.rng.shuffle(filepaths)
+
+        self.filepaths = filepaths
+        self.buffer = []
+
+    def __iter__(self) -> Iterator:
+        self.buffer = []
+        for filepath in self.filepaths:
+            logger.debug(f"Iter over jsonl file: {filepath}")
+            for ins in load_jsonlines_iter(filepath):
+                if self.buffer_size <= 1:
+                    yield ins
+                    continue
+
+                if len(self.buffer) >= self.buffer_size:
+                    if len(self.buffer) > 0:
+                        self.rng.shuffle(self.buffer)
+                        yield from self.buffer
+                        self.buffer.clear()
+
+                self.buffer.append(ins)
+
+        # for the last batch < buffer_size
+        if len(self.buffer) > 0:
+            self.rng.shuffle(self.buffer)
+            yield from self.buffer
+            self.buffer.clear()
+
+
+class SubDirWeightedPackedJsonlDataset(IterableDataset):
+    """
+    Example:
+        >>> dataset = SubDirWeightedPackedJsonlDataset(
+        ...     "/mnt/petrelfs/share_data/redpajama/tokenized",
+        ...     weights={
+        ...         "en_cc": 0.67,
+        ...         "en_c4": 0.15,
+        ...         "github": 0.045,
+        ...         "en_wikipedia": 0.045,
+        ...         "en_book": 0.045,
+        ...         "en_arxiv": 0.025,
+        ...         "en_stack": 0.02,
+        ...     }
+        ... )
+        >>> for ins in dataset:
+        ...     print(ins)
+
+    Inputs:
+        dataset_dir: folder structure is:
+            task1 dir: 1.jsonl, 2.jsonl, ...
+            task2 dir: 1.jsonl, ...
+        weights: dirname to sampling weight.
+            e.g. {"task1 dir": 0.3, "task2 dir": 0.7}
+    """
+
+    def __init__(
+        self,
+        dataset_dir: str,
+        weights: dict[str, float] = None,
+        seed: int = 1227,
+        buffer_size: int = 32,
+    ) -> None:
+        self.rng = random.Random(seed)
+        self.buffer_size = buffer_size
+        self.dataset_dir_path = Path(dataset_dir)
+
+        task_types = [p.stem for p in self.dataset_dir_path.glob("*") if p.is_dir()]
+
+        if weights is None:
+            weights = {str(task_type): 1.0 for task_type in task_types}
+        for task_type in task_types:
+            assert task_type in weights
+        for task_type in weights:
+            if task_type not in task_types:
+                logger.warning(
+                    f"Task type {task_type} not found in dataset dir. Skip it."
+                )
+        self.weights = weights
+
+        self.task_type_to_dataset = {}
+        for task_type in task_types:
+            # zhutong: use iter to support next() calling, since the dataset itself
+            #          does not implement __next__().
+            ds = iter(
+                PackedJsonlDataset(
+                    str(self.dataset_dir_path.joinpath(task_type)),
+                    seed=seed,
+                    buffer_size=buffer_size,
+                )
+            )
+            self.task_type_to_dataset[task_type] = ds
+
+    def __iter__(self) -> Iterator:
+        while len(self.task_type_to_dataset) > 0:
+            candidate_task_types = list(self.task_type_to_dataset.keys())
+            weights = [self.weights[task_type] for task_type in candidate_task_types]
+            choice = self.rng.choices(candidate_task_types, weights=weights, k=1)[0]
+            try:
+                yield next(self.task_type_to_dataset[choice])
+            except StopIteration:
+                self.task_type_to_dataset.pop(choice)
+                logger.debug(f"Task type {choice} finished, drop it")
+                yield from self
