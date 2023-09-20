@@ -281,7 +281,6 @@ class SoftGLUExperts(nn.Module):
             nn.init.uniform_(self.bias_down, -bound, bound)
 
     def forward(self, x):
-        print(1000000000, x.size())
         if x.size(-1) != self.in_features:
             raise ValueError(
                 f"Expected input with embed_dim={self.in_features} (dim=-1), but "
@@ -299,7 +298,6 @@ class SoftGLUExperts(nn.Module):
         gate = self.act_fn(
             einsum(x, self.weight_gate, "b n ... di, n di dh -> b n ... dh")
         )
-        print(11111111, gate.size())
         if self.bias_gate is not None:
             if gate.ndim == 3:
                 bias_gate = rearrange(self.bias_gate, "n d -> () n d")
@@ -312,7 +310,6 @@ class SoftGLUExperts(nn.Module):
             gate = gate + bias_gate
 
         up = einsum(x, self.weight_up, "b n ... di, n di dh -> b n ... dh")
-        print(22222222, up.size())
         if self.bias_up is not None:
             if up.ndim == 3:
                 bias_up = rearrange(self.bias_up, "n d -> () n d")
@@ -325,7 +322,6 @@ class SoftGLUExperts(nn.Module):
             up = up + bias_up
 
         down = einsum(gate * up, self.weight_down, "b n ... di, n di do -> b n ... do")
-        print(333333333, down.size())
         if self.bias_down is not None:
             if down.ndim == 3:
                 bias_down = rearrange(self.bias_down, "n d -> () n d")
