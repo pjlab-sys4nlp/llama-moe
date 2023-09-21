@@ -142,14 +142,14 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
 
 def visualize_swiglu_output(
-    hidden_outputs_path,
-    save_path,
-    neuron_type,
-    layer_idx,
-    criterion="plain",
-    num_bins=1000,
-    edge=(-1.0, 1.0),
-    device="cpu",
+        hidden_outputs_path,
+        save_path,
+        neuron_type,
+        layer_idx,
+        criterion="plain",
+        num_bins=1000,
+        edge=(-1.0, 1.0),
+        device="cpu",
 ):
     # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
@@ -237,9 +237,9 @@ def plot_to_image(figure):
 
 def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
     if (
-        len(tensors) == 0
-        or not all(isinstance(t, torch.Tensor) for t in tensors)
-        or not all(t.shape == tensors[0].shape for t in tensors)
+            len(tensors) == 0
+            or not all(isinstance(t, torch.Tensor) for t in tensors)
+            or not all(t.shape == tensors[0].shape for t in tensors)
     ):
         return None
     data = torch.stack(tensors, dim=0)
@@ -284,12 +284,12 @@ def get_heatmap_img_grid_for_tb(tensors: tuple[torch.FloatTensor]):
 
 
 def visualize_expert_load_heatmap(
-    load_sum: np.ndarray,
-    layer_idx: int,
-    dataset_name: str,
-    shape: tuple = (4, 4),
-    save_dir: str = "results/expert_load_vis",
-    save_fig: bool = True,
+        load_sum: np.ndarray,
+        layer_idx: int,
+        dataset_name: str,
+        shape: tuple = (4, 4),
+        save_dir: str = "results/expert_load_vis",
+        save_fig: bool = True,
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -318,14 +318,56 @@ def visualize_expert_load_heatmap(
 
 
 def visualize_expert_neuron_overlap(
-    overlap_rate: np.ndarray,
-    overlap_count: np.ndarray,
-    total_neurons: int,
-    expert_size: int,
-    layer_idx: int,
-    save_dir: str = "./",
-    save_fig: bool = True,
+        selected_masks: torch.Tensor,
+        num_experts: int,
+        intermediate_size: int,
+        expert_size: int,
+        layer_idx: int,
+        save_dir: str = "./",
+        save_fig: bool = True,
 ):
+    # fmt: off
+    torch.set_printoptions(
+        precision=4,  # 精度，保留小数点后几位，默认4
+        threshold=100000,
+        edgeitems=3,
+        linewidth=160,  # 每行最多显示的字符数，默认80，超过则换行显示
+        profile="full",
+        sci_mode=False  # 用科学技术法显示数据，默认True
+    )
+
+    """overlap rate between each expert pair"""
+    # rate calculation: intersection(Ei, Ej) / union(Ei, Ej)
+    intersection_num = torch.mm(selected_masks, selected_masks.transpose(0, 1))
+    union_num = torch.full_like(intersection_num, fill_value=intermediate_size) - torch.mm((1 - selected_masks), (1 - selected_masks).transpose(0, 1))
+    overlap_rate = intersection_num / union_num
+
+    # print(intersection_num)
+    # print(union_num)
+    print("overlap_rate", overlap_rate, sep="\n")
+
+    """overlap count for each expert"""
+    # rows: overlap count,  columns: different experts
+    overlap_count = torch.zeros((num_experts, num_experts), dtype=torch.int)
+
+    sum_count = selected_masks.sum(0)  # shape(intermediate_size,)
+    selected_masks = selected_masks.bool()
+    for overlap_times in range(num_experts):
+        this_overlap_neurons = (sum_count == (overlap_times + 1))  # shape(intermediate_size,)
+        # print(this_overlap_neurons.sum())
+        each_expert_overlap_neurons = selected_masks & this_overlap_neurons  # shape(num_experts, intermediate_size)
+        # print(each_expert_overlap_neurons.sum())
+        overlap_count[overlap_times, :] = each_expert_overlap_neurons.sum(1)
+        # print(overlap_count[overlap_times, :])
+
+    # print(overlap_count.sum(0))
+    print("overlap_count", overlap_count, sep="\n")
+
+    """save graphs"""
+    total_neurons = (sum_count > 0).sum().item()
+    overlap_rate = overlap_rate.numpy()
+    overlap_count = overlap_count.numpy()
+
     path_overlap_rate = Path(os.path.join(save_dir, "overlap_rate"))
     if path_overlap_rate.is_file():
         raise ValueError(f"{save_dir} is a file, not a directory")
@@ -339,25 +381,11 @@ def visualize_expert_neuron_overlap(
     """overlap_rate"""
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    im = ax.imshow(
-        overlap_rate,
-        vmin=0.0,
-        vmax=1.0,
-        cmap=mpl.colormaps["Greens"],
-        interpolation="nearest",
-    )
+    im = ax.imshow(overlap_rate, vmin=0.0, vmax=1.0, cmap=mpl.colormaps["Greens"], interpolation="nearest", )
 
     for i in range(overlap_rate.shape[0]):
         for j in range(overlap_rate.shape[1]):
-            ax.text(
-                j,
-                i,
-                f"{overlap_rate[i, j]:.4f}",
-                ha="center",
-                va="center",
-                color="black",
-                fontsize=4,
-            )
+            ax.text(j, i, f"{overlap_rate[i, j]:.4f}", ha="center", va="center", color="black", fontsize=4, )
 
     ax.set_title(f"Total Selected Neurons {total_neurons} -- Layer {layer_idx}")
     ax.set_axis_off()
@@ -365,35 +393,17 @@ def visualize_expert_neuron_overlap(
     fig.tight_layout()
 
     if save_fig:
-        fig.savefig(
-            path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"),
-            dpi=480,
-            bbox_inches="tight",
-        )
+        fig.savefig(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
     plt.close(fig)
 
     """overlap_count"""
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    im = ax.imshow(
-        overlap_count,
-        vmin=0,
-        vmax=expert_size,
-        cmap=mpl.colormaps["Blues"],
-        interpolation="nearest",
-    )
+    im = ax.imshow(overlap_count, vmin=0, vmax=expert_size, cmap=mpl.colormaps["Blues"], interpolation="nearest", )
 
     for i in range(overlap_count.shape[0]):
         for j in range(overlap_count.shape[1]):
-            ax.text(
-                j,
-                i,
-                f"{overlap_count[i, j]}",
-                ha="center",
-                va="center",
-                color="black",
-                fontsize=4,
-            )
+            ax.text(j, i, f"{overlap_count[i, j]}", ha="center", va="center", color="black", fontsize=4, )
 
     ax.set_title(f"Expert Size {expert_size} -- Layer {layer_idx}")
     ax.set_axis_off()
@@ -401,21 +411,18 @@ def visualize_expert_neuron_overlap(
     fig.tight_layout()
 
     if save_fig:
-        fig.savefig(
-            path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"),
-            dpi=480,
-            bbox_inches="tight",
-        )
+        fig.savefig(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
     plt.close(fig)
+    # fmt: on
 
 
 def visualize_expert_load_barv(
-    load_sum: np.ndarray,
-    layer_idx: int,
-    dataset_name: str,
-    y_max: float = None,
-    x_label: str = None,
-    save_dir: str = "results/expert_load_vis",
+        load_sum: np.ndarray,
+        layer_idx: int,
+        dataset_name: str,
+        y_max: float = None,
+        x_label: str = None,
+        save_dir: str = "results/expert_load_vis",
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():

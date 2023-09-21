@@ -47,6 +47,7 @@ class LlamaMoEConfig(PretrainedConfig):
         #### -------- moe calculator configs -------- ####
         calculator_type="UniversalCalculator",
         multiply_gate_scores=True,
+        score_scale_factor=1.0,
         # SwitchDropTokenCalculator
         drop_tokens=True,
         dropped_padding="zero",
@@ -81,6 +82,7 @@ class LlamaMoEConfig(PretrainedConfig):
 
         self.calculator_type = calculator_type
         self.multiply_gate_scores = multiply_gate_scores
+        self.score_scale_factor = score_scale_factor
         self.drop_tokens = drop_tokens
         self.dropped_padding = dropped_padding
         self.capacity_factor = capacity_factor

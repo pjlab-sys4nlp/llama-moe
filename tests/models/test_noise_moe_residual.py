@@ -3,34 +3,33 @@ import torch
 from smoe.modules.moe_residual.moe_residual_layers import LinearGLUMoEResidualLayer
 
 input_size = 4096
-hidden_size = 688 * 13
+hidden_size = 688 * 14
 output_size = 4096
 hidden_act = "silu"
-num_experts = 13
-num_selects = 1
+num_experts = 14
+num_selects = 2
 size_experts = None
 bias = True
 
-num_experts_residual = 3
+num_experts_residual = 2
 size_experts_residual = None  # 688
-score_scale_factor_residual = 12.0
+score_scale_factor_residual = 8.0
 use_weighting = False
 
 gating_config = {
-    "gate_type": "SwitchBalancedGate",
+    "gate_type": "TopKBalancedNoisyGate",
     "gate_network": "mlp",
     "gate_use_softmax": True,
     "gate_use_balance": True,
     "gate_balance_loss_weight": 0.01,
-    "gate_add_noise": False,
+    "gate_add_noise": True,
+    "gate_noise_epsilon": 0.01,
 }
 
 calculator_config = {
-    "calculator_type": "SwitchDropTokenCalculator",
+    "calculator_type": "UniversalCalculator",
     "multiply_gate_scores": True,
-    "score_scale_factor": 4.0,
-    "drop_tokens": True,
-    "capacity_factor": 1.25,
+    "score_scale_factor": 8.0,
 }
 
 layer = LinearGLUMoEResidualLayer(

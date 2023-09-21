@@ -1,4 +1,4 @@
-""" PyTorch LLaMA-MoE model with residual block (shared param among experts)."""
+""" PyTorch LLaMA-MoE model with residual block (shared experts among all tokens)."""
 from torch import nn
 from transformers.utils import logging
 
@@ -21,12 +21,58 @@ _CONFIG_FOR_DOC = "LlamaMoEResidualConfig"
 
 class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
     def __init__(self, config: LlamaMoEResidualConfig, layer_index):
-        super().__init__(config, layer_index)
+        super(LlamaMoEDecoderLayer, self).__init__(config)
+        assert config.intermediate_size == (config.intermediate_size_moe + config.intermediate_size_residual)
+        if config.size_experts_residual is None:  # all experts have the same size
+            assert (config.intermediate_size_moe // config.num_experts) == (config.intermediate_size_residual // config.num_experts_residual)
+        else:
+            assert config.intermediate_size_residual == sum(config.size_experts_residual)
 
-        self.mlp = LinearGLUMoEResidualLayer.from_moe_layer(
-            self.mlp,
-            size_residual=config.size_residual,
-            use_weighting=config.residual_use_weighting,
+        gating_config = {
+            # all gates
+            "gate_type": config.gate_type,
+            "gate_network": config.gate_network,
+            "gate_use_softmax": config.gate_use_softmax,
+            "gate_use_balance": config.gate_use_balance,
+            "gate_balance_loss_weight": config.gate_balance_loss_weight,
+            "gate_add_noise": config.gate_add_noise,
+            # TopKBalancedNoisyGate
+            "gate_noise_epsilon": config.gate_noise_epsilon,
+        }
+        calculator_config = {
+            # all calculators
+            "calculator_type": config.calculator_type,
+            "multiply_gate_scores": config.multiply_gate_scores,
+            "score_scale_factor": config.score_scale_factor,
+            # SwitchDropTokenCalculator
+            "drop_tokens": config.drop_tokens,
+            "dropped_padding": config.dropped_padding,
+            "capacity_factor": config.capacity_factor,
+        }
+
+        self.mlp = LinearGLUMoEResidualLayer(
+            input_size=self.hidden_size,
+            # ---- different here ---- #
+            hidden_size=config.intermediate_size_moe,
+            # ------------------------ #
+            output_size=self.hidden_size,
+            hidden_act=config.hidden_act,
+            num_experts=config.num_experts,
+            num_selects=config.num_selects,
+            size_experts=(
+                config.size_experts[layer_index]
+                if config.size_experts is not None
+                else None
+            ),
+            bias=False,
+            # ---- different here ---- #
+            num_experts_residual=config.num_experts_residual,
+            size_experts_residual=config.size_experts_residual,
+            score_scale_factor_residual=config.score_scale_factor_residual,
+            use_weighting=config.use_weighting,
+            # ------------------------ #
+            **gating_config,
+            **calculator_config,
         )
 
 
@@ -37,7 +83,7 @@ class LlamaMoEResidualPreTrainedModel(LlamaMoEPreTrainedModel):
 
 class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
     def __init__(self, config: LlamaMoEResidualConfig):
-        super().__init__(config)
+        super(LlamaMoEModel, self).__init__(config)
         self.layers = nn.ModuleList(
             [
                 LlamaMoEResidualDecoderLayer(config, i)
@@ -48,7 +94,7 @@ class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
 
 class LlamaMoEResidualForCausalLM(LlamaMoEForCausalLM, LlamaMoEResidualPreTrainedModel):
     def __init__(self, config):
-        super().__init__(config)
+        super(LlamaMoEForCausalLM, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
 
 
@@ -56,5 +102,5 @@ class LlamaMoEResidualForSequenceClassification(
     LlamaMoEForSequenceClassification, LlamaMoEResidualPreTrainedModel
 ):
     def __init__(self, config):
-        super().__init__(config)
+        super(LlamaMoEForSequenceClassification, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)

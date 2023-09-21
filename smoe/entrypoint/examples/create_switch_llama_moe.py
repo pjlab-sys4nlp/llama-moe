@@ -40,6 +40,7 @@ def main(args):
     # MoE计算方法配置
     calculator_type = "SwitchDropTokenCalculator"
     multiply_gate_scores = True
+    score_scale_factor=1.0
     drop_tokens = True
     dropped_padding = "input"
     capacity_factor = 1.25
@@ -70,6 +71,7 @@ def main(args):
         gate_add_noise=gate_add_noise,
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
+        score_scale_factor=score_scale_factor,
         drop_tokens=drop_tokens,
         dropped_padding=dropped_padding,
         capacity_factor=capacity_factor,

@@ -1,5 +1,5 @@
 """
-Create a LLaMA MoE model with TopKBalancedNoisyGate.
+Create a LLaMA MoE Residual model with TopKBalancedNoisyGate.
 """
 
 import argparse
@@ -8,12 +8,8 @@ import numpy as np
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moe.modeling_llama_moe import (
-    LlamaMoEForCausalLM,
-    LlamaMoEForSequenceClassification,
-    LlamaMoEModel,
-)
+from smoe.models.llama_moe_residual.configuration_llama_moe_residual import LlamaMoEResidualConfig
+from smoe.models.llama_moe_residual.modeling_llama_moe_residual import LlamaMoEResidualModel, LlamaMoEResidualForSequenceClassification, LlamaMoEResidualForCausalLM
 
 
 def main(args):
@@ -22,12 +18,20 @@ def main(args):
     """set up configs"""
     # 模型大小参数
     intermediate_size = 11008
+    intermediate_size_moe = 9632  # 🔍
+    intermediate_size_residual = 1376  # 🔍
     num_hidden_layers = 32
 
     # MoE专家配置
-    num_experts = 16
-    num_selects = 8
-    size_experts = []  # 每个专家拥有的神经元数量，如果为None则各个专家大小相同
+    num_experts = 14
+    num_selects = 2
+    size_experts = None  # 每个专家拥有的神经元数量，如果为None则各个专家大小相同
+
+    # Residual模块配置 🔍
+    num_experts_residual = 2
+    size_experts_residual = None  # 688
+    score_scale_factor_residual = 8.0
+    use_weighting = False
 
     # MoE门控网络配置
     gate_type = "TopKBalancedNoisyGate"
@@ -41,26 +45,32 @@ def main(args):
     # MoE计算方法配置
     calculator_type = "UniversalCalculator"
     multiply_gate_scores = True
-    score_scale_factor = 1.0
+    score_scale_factor = 8.0
 
     # 随机生成各个专家的大小，添加到size_experts
-    for i in range(num_hidden_layers):
-        this_size = np.random.randint(
-            1, high=intermediate_size // num_experts + 1, size=num_experts
-        )
-        diff = intermediate_size - np.sum(this_size)  # 调整列表中的数字，使总和达到目标值
-        this_size[-1] += diff
-        size_experts.append(this_size)
-    print("size_experts: ", size_experts)
+    # for i in range(num_hidden_layers):
+    #     this_size = np.random.randint(
+    #         1, high=intermediate_size // num_experts + 1, size=num_experts
+    #     )
+    #     diff = intermediate_size - np.sum(this_size)  # 调整列表中的数字，使总和达到目标值
+    #     this_size[-1] += diff
+    #     size_experts.append(this_size)
+    # print("size_experts: ", size_experts)
 
     """create model"""
     print("Creating model...")
-    config_llama_moe = LlamaMoEConfig(
+    config_llama_moe_residual = LlamaMoEResidualConfig(
         intermediate_size=intermediate_size,
+        intermediate_size_moe=intermediate_size_moe,
+        intermediate_size_residual=intermediate_size_residual,
         num_hidden_layers=num_hidden_layers,
         num_experts=num_experts,
         num_selects=num_selects,
         size_experts=size_experts,
+        num_experts_residual=num_experts_residual,
+        size_experts_residual=size_experts_residual,
+        score_scale_factor_residual=score_scale_factor_residual,
+        use_weighting=use_weighting,
         gate_type=gate_type,
         gate_network=gate_network,
         gate_use_softmax=gate_use_softmax,
@@ -73,12 +83,12 @@ def main(args):
         score_scale_factor=score_scale_factor,
     )
 
-    if args.model_type == "LlamaMoEModel":
-        model_llama_moe = LlamaMoEModel(config_llama_moe)
-    elif args.model_type == "LlamaMoEForCausalLM":
-        model_llama_moe = LlamaMoEForCausalLM(config_llama_moe)
+    if args.model_type == "LlamaMoEResidualModel":
+        config_llama_moe_residual = LlamaMoEResidualModel(config_llama_moe_residual)
+    elif args.model_type == "LlamaMoEResidualForCausalLM":
+        config_llama_moe_residual = LlamaMoEResidualForCausalLM(config_llama_moe_residual)
     elif args.model_type == "LlamaMoEForSequenceClassification":
-        model_llama_moe = LlamaMoEForSequenceClassification(config_llama_moe)
+        config_llama_moe_residual = LlamaMoEResidualForSequenceClassification(config_llama_moe_residual)
     else:
         raise ValueError
 
@@ -98,9 +108,9 @@ def main(args):
 
     """forward test"""
     print("Forwarding inputs...")
-    model_llama_moe.to(device)
+    config_llama_moe_residual.to(device)
     tokens.to(device)
-    result = model_llama_moe(**tokens)  # noqa: F841
+    result = config_llama_moe_residual(**tokens)  # noqa: F841
     # print(result)
 
 
@@ -111,9 +121,9 @@ if __name__ == "__main__":
         "--model_type",
         type=str,
         choices=(
-            "LlamaMoEModel",
-            "LlamaMoEForCausalLM",
-            "LlamaMoEForSequenceClassification",
+            "LlamaMoEResidualModel",
+            "LlamaMoEResidualForCausalLM",
+            "LlamaMoEResidualForSequenceClassification",
         ),
     )
     args = parser.parse_args()

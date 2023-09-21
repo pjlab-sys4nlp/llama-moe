@@ -82,6 +82,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             # all calculators
             "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
+            "score_scale_factor": config.score_scale_factor,
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -106,13 +107,13 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         )
 
     def forward(
-        self,
-        hidden_states,
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+            self,
+            hidden_states,
+            attention_mask=None,
+            position_ids=None,
+            past_key_value=None,
+            output_attentions=False,
+            use_cache=False,
     ) -> MoEDecoderLayerOutput:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
@@ -167,6 +168,9 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.mlp.set_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        self.mlp.set_calculator_score_scale_factor(score_scale_factor)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.mlp.set_calculator_drop_tokens(drop_tokens)
 
@@ -200,16 +204,16 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         )
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         output_attentions = (
             output_attentions
@@ -398,6 +402,10 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_calculator_score_scale_factor(score_scale_factor)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_drop_tokens(drop_tokens)
@@ -421,18 +429,18 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-        **kwargs
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+            **kwargs
     ):
         output_attentions = (
             output_attentions
@@ -516,6 +524,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        self.model.set_moe_calculator_score_scale_factor(score_scale_factor)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
 
@@ -539,17 +550,17 @@ class LlamaMoEForSequenceClassification(
         self.model = LlamaMoEModel(config)
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            position_ids=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            labels=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
@@ -584,7 +595,7 @@ class LlamaMoEForSequenceClassification(
         else:
             if input_ids is not None:
                 sequence_lengths = (
-                    torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
+                        torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1
                 ).to(logits.device)
             else:
                 sequence_lengths = -1
@@ -600,7 +611,7 @@ class LlamaMoEForSequenceClassification(
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
                 elif self.num_labels > 1 and (
-                    labels.dtype == torch.long or labels.dtype == torch.int
+                        labels.dtype == torch.long or labels.dtype == torch.int
                 ):
                     self.config.problem_type = "single_label_classification"
                 else:
@@ -654,6 +665,9 @@ class LlamaMoEForSequenceClassification(
 
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        self.model.set_moe_calculator_score_scale_factor(score_scale_factor)
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)

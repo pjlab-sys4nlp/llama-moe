@@ -21,8 +21,11 @@ if __name__ == "__main__":
     parser.add_argument('--select_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/7B-8Expert-Select-MLP")
     parser.add_argument('--save_path', type=str, default="/home/data/models/llama-moe-transformers/7B/")
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
+
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
-    parser.add_argument('--num_selects', type=int, default=2, help='number of experts')
+    parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
+    parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for experts')
+
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
     parser.add_argument('--use_default_gate', type=str, default="False")
 

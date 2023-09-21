@@ -390,66 +390,40 @@ class GradientSplit(LayerSplit):
         expert_neuron_count = [0] * expert_num
         expert_start_index = [0] * expert_num
 
-        if criterion == "min":
-            while sum(expert_neuron_count) < self.neuron_num:
-                now_selected_score = float('inf')
-                now_selected_neuron = -1
-                now_selected_expert = -1
+        while sum(expert_neuron_count) < self.neuron_num:
+            now_selected_score = float('inf')
+            now_selected_neuron = -1
+            now_selected_expert = -1
 
-                for expert_id in range(expert_num):
-                    if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
-                        continue
+            for expert_id in range(expert_num):
+                if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
+                    continue
 
-                    while expert_start_index[expert_id] < self.neuron_num:
-                        if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
-                            expert_start_index[expert_id] += 1
-                        else:
-                            break
+                while expert_start_index[expert_id] < self.neuron_num:
+                    if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
+                        expert_start_index[expert_id] += 1
+                    else:
+                        break
 
+                if criterion == "min":
                     if sorted_score_list[expert_id][expert_start_index[expert_id]] <= now_selected_score:  # ----- different here -----
                         now_selected_score = sorted_score_list[expert_id][expert_start_index[expert_id]]
                         now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
                         now_selected_expert = expert_id
-
-                self.labels[now_selected_neuron] = now_selected_expert
-                assert (not neuron_used_mark[now_selected_neuron])
-                neuron_used_mark[now_selected_neuron] = True
-                expert_neuron_count[now_selected_expert] += 1
-                expert_start_index[now_selected_expert] += 1
-
-                # print(now_selected_neuron, now_selected_expert)
-
-        elif criterion == "max":
-            while sum(expert_neuron_count) < self.neuron_num:
-                now_selected_score = float('-inf')
-                now_selected_neuron = -1
-                now_selected_expert = -1
-
-                for expert_id in range(expert_num):
-                    if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
-                        continue
-
-                    while expert_start_index[expert_id] < self.neuron_num:
-                        if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
-                            expert_start_index[expert_id] += 1
-                        else:
-                            break
-
+                elif criterion == "max":
                     if sorted_score_list[expert_id][expert_start_index[expert_id]] >= now_selected_score:  # ----- different here -----
                         now_selected_score = sorted_score_list[expert_id][expert_start_index[expert_id]]
                         now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
                         now_selected_expert = expert_id
+                else:
+                    raise NotImplementedError
 
-                self.labels[now_selected_neuron] = now_selected_expert
-                assert (not neuron_used_mark[now_selected_neuron])
-                neuron_used_mark[now_selected_neuron] = True
-                expert_neuron_count[now_selected_expert] += 1
-                expert_start_index[now_selected_expert] += 1
-
-                # print(now_selected_neuron, now_selected_expert)
-
-        else:
-            raise NotImplementedError
+            self.labels[now_selected_neuron] = now_selected_expert
+            assert (not neuron_used_mark[now_selected_neuron])
+            neuron_used_mark[now_selected_neuron] = True
+            expert_neuron_count[now_selected_expert] += 1
+            expert_start_index[now_selected_expert] += 1
+            # print(now_selected_neuron, now_selected_expert)
 
         # print(neuron_used_mark)
         # print(expert_neuron_count)

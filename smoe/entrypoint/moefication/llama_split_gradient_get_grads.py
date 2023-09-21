@@ -26,7 +26,7 @@ from smoe.utils.param import get_trainable_parameters
 @dataclass
 class SplitArguments:
     save_path: str = field(default=None)
-    expert_size: int = field(default=None)
+    total_clusters: int = field(default=None)
     kernel: Optional[str] = field(default="l1_norm")  # plain l1_norm l2_norm
     accumulate_level: Optional[str] = field(default="sample")  # sample total
     data_use_range_begin: Optional[float] = field(default=0.0)
@@ -51,7 +51,7 @@ def main():
     dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
     split_args.save_path = os.path.join(
         split_args.save_path,
-        "Gradients",
+        f"Gradients{split_args.total_clusters}",
         f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}-{split_args.importance_type}",
         dataset_name,
     )

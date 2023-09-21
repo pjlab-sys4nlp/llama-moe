@@ -20,14 +20,15 @@ class UniversalCalculator(nn.Module):
     原理依旧是重新分配各个专家的batch。
     """
 
-    def __init__(self, experts, multiply_gate_scores=True):
+    def __init__(self, experts, multiply_gate_scores=True, score_scale_factor=1.0):
         super(UniversalCalculator, self).__init__()
         self.experts = experts
         self.multiply_gate_scores = multiply_gate_scores
+        self.score_scale_factor = score_scale_factor
         self.num_experts = experts.num_experts
 
     def forward(
-        self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+            self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
     ) -> CalculatorOutput:
         # fmt: off
         """正向传播"""
@@ -61,7 +62,7 @@ class UniversalCalculator(nn.Module):
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
-            cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
+            cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1) * self.score_scale_factor)  # 乘权重
         zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
 
@@ -78,12 +79,13 @@ class SwitchDropTokenCalculator(nn.Module):
     """
 
     def __init__(
-        self,
-        experts,
-        multiply_gate_scores=True,
-        drop_tokens=True,
-        dropped_padding="zero",  # zero input
-        capacity_factor=1.25,
+            self,
+            experts,
+            multiply_gate_scores=True,
+            score_scale_factor=1.0,
+            drop_tokens=True,
+            dropped_padding="zero",  # zero input
+            capacity_factor=1.25,
     ):
         super(SwitchDropTokenCalculator, self).__init__()
         self.available_dropped_padding_choices = ("zero", "input")
@@ -94,6 +96,7 @@ class SwitchDropTokenCalculator(nn.Module):
 
         self.experts = experts
         self.multiply_gate_scores = multiply_gate_scores
+        self.score_scale_factor = score_scale_factor
         self.num_experts = experts.num_experts
         self.out_features = experts.out_features
 
@@ -142,6 +145,6 @@ class SwitchDropTokenCalculator(nn.Module):
 
         if self.multiply_gate_scores:
             # 乘权重
-            y = torch.mul(y, topK_scores.reshape(-1, 1))
+            y = torch.mul(y, topK_scores.reshape(-1, 1) * self.score_scale_factor)
 
         return CalculatorOutput(hidden_states=y, num_dropped_tokens=num_dropped_tokens)

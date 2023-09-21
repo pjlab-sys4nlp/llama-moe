@@ -16,7 +16,7 @@ class BaseMoEResidualLayer(nn.Module):
         super(BaseMoEResidualLayer, self).__init__()
 
         self.moe_layer: BaseMoELayer
-        self.residual_block: nn.Module
+        self.residual_block: BaseMoELayer
         self.weighting_network: Optional[nn.Module] = None
 
     def forward(self, x) -> MoEMlpOutput:
@@ -26,11 +26,11 @@ class BaseMoEResidualLayer(nn.Module):
         if self.weighting_network is not None:
             output_weights = self.weighting_network(x)
             moe_output.hidden_states = (
-                moe_output.hidden_states * output_weights[..., 0]
-                + residual_output * output_weights[..., 1]
+                    moe_output.hidden_states * output_weights[..., 0]
+                    + residual_output * output_weights[..., 1]
             )
         else:
-            moe_output.hidden_states += residual_output
+            moe_output.hidden_states += residual_output.hidden_states
 
         return moe_output
 
@@ -70,15 +70,17 @@ class BaseMoEResidualLayer(nn.Module):
 
 class LinearMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-        self,
-        input_size,
-        output_size,
-        num_experts,
-        num_selects,
-        bias=True,
-        use_weighting=True,
-        moe_layer=None,
-        **kwargs,
+            self,
+            input_size,
+            output_size,
+            num_experts,
+            num_selects,
+            bias=True,
+            num_experts_residual=1,
+            score_scale_factor_residual=1.0,
+            use_weighting=True,
+            moe_layer=None,
+            **kwargs,
     ):
         super(LinearMoEResidualLayer, self).__init__()
 
@@ -94,7 +96,21 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
                 input_size, output_size, num_experts, num_selects, bias=bias, **kwargs
             )
 
-        self.residual_block = nn.Linear(input_size, output_size, bias=bias)
+        # self.residual_block = nn.Linear(input_size, output_size, bias=bias)
+        self.residual_block = LinearMoELayer(
+            input_size,
+            output_size,
+            num_experts_residual,
+            num_experts_residual,
+            bias=bias,
+            **{
+                "gate_type": "UniformPlainGate",
+                "gate_use_softmax": True,
+                "calculator_type": "UniversalCalculator",
+                "multiply_gate_scores": True,
+                "score_scale_factor": score_scale_factor_residual,
+            }
+        )
 
         if use_weighting:
             self.weighting_network = nn.Sequential(
@@ -103,7 +119,14 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
         else:
             self.weighting_network = None
 
-    def from_moe_layer(moe_layer, use_weighting=None):
+    def from_moe_layer(
+            moe_layer,
+            num_experts_residual=1,
+            score_scale_factor_residual=1.0,
+            use_weighting=None
+    ):
+        # create the moe residual layer using an existing moe layer
+        # the residual block will be added as a plug-in module
         assert isinstance(moe_layer, LinearMoELayer)
         return LinearMoEResidualLayer(
             moe_layer.input_size,
@@ -111,6 +134,8 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
             moe_layer.num_experts,
             moe_layer.num_selects,
             bias=moe_layer.bias,
+            num_experts_residual=num_experts_residual,
+            score_scale_factor_residual=score_scale_factor_residual,
             use_weighting=use_weighting,
             moe_layer=moe_layer,
         )
@@ -118,19 +143,21 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
 
 class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        size_residual=None,
-        use_weighting=False,
-        moe_layer=None,
-        **kwargs,
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            num_experts_residual=1,
+            size_experts_residual=None,
+            score_scale_factor_residual=1.0,
+            use_weighting=False,
+            moe_layer=None,
+            **kwargs,
     ):
         super(LinearGLUMoEResidualLayer, self).__init__()
 
@@ -157,10 +184,30 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
                 **kwargs,
             )
 
-        if size_residual is None:
-            size_residual = hidden_size // num_experts
-        self.residual_block = LinearGLU(
-            input_size, size_residual, output_size, hidden_act, bias=bias
+        if size_experts_residual is None:
+            residual_hidden_size = (hidden_size // num_experts) * num_experts_residual
+        else:
+            residual_hidden_size = sum(size_experts_residual)
+
+        # self.residual_block = LinearGLU(
+        #     input_size, size_experts_residual, output_size, hidden_act, bias=bias
+        # )
+        self.residual_block = LinearGLUMoELayer(
+            input_size,
+            residual_hidden_size,
+            output_size,
+            hidden_act,
+            num_experts_residual,
+            num_experts_residual,
+            size_experts=size_experts_residual,
+            bias=bias,
+            **{
+                "gate_type": "UniformPlainGate",
+                "gate_use_softmax": True,
+                "calculator_type": "UniversalCalculator",
+                "multiply_gate_scores": True,
+                "score_scale_factor": score_scale_factor_residual,
+            }
         )
 
         if use_weighting:
@@ -170,7 +217,15 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
         else:
             self.weighting_network = None
 
-    def from_moe_layer(moe_layer, size_residual=None, use_weighting=None):
+    def from_moe_layer(
+            moe_layer,
+            num_experts_residual=None,
+            size_experts_residual=None,
+            score_scale_factor_residual=1.0,
+            use_weighting=None
+    ):
+        # create the moe residual layer using an existing moe layer
+        # the residual block will be added as a plug-in module
         assert isinstance(moe_layer, LinearGLUMoELayer)
         return LinearGLUMoEResidualLayer(
             moe_layer.input_size,
@@ -181,7 +236,9 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
             moe_layer.num_selects,
             size_experts=moe_layer.size_experts,
             bias=moe_layer.bias,
-            size_residual=size_residual,
+            num_experts_residual=num_experts_residual,
+            size_experts_residual=size_experts_residual,
+            score_scale_factor_residual=score_scale_factor_residual,
             use_weighting=use_weighting,
             moe_layer=moe_layer,
         )

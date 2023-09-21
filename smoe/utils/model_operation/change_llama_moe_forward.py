@@ -8,7 +8,7 @@ logger = logging.get_logger(__name__)
 
 
 def forward_universal_calculator_with_scaled_gate_score(
-    self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+        self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
 ) -> CalculatorOutput:
     # fmt: off
     """正向传播"""
@@ -57,9 +57,15 @@ def forward_universal_calculator_with_scaled_gate_score(
 def forward_topk_balanced_noisy_gate_with_random_expert_selection(self, x):
     # fmt: off
     batch_size = x.shape[0]
-    top_k_indices = torch.stack([torch.randperm(self.num_experts, device=x.device)[:self.num_selects] for i in range(batch_size)], dim=0)
-    # print(top_k_indices)
-    top_k_scores = self.softmax(torch.rand_like(top_k_indices, dtype=x.dtype))
+
+    logits = torch.rand((batch_size, self.num_experts), device=x.device, dtype=x.dtype)
+    top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # 选择并排序前k+1个权重
+    top_k_logits = top_logits[:, :self.num_selects]
+    top_k_indices = top_indices[:, :self.num_selects]
+    top_k_scores = self.softmax(top_k_logits)
+
+    # top_k_indices = torch.stack([torch.randperm(self.num_experts, device=x.device)[:self.num_selects] for i in range(batch_size)], dim=0)
+    # top_k_scores = torch.sort(self.softmax(torch.rand_like(top_k_indices, dtype=x.dtype)), dim=1, descending=True)[0]
 
     return {
         "topK_indices": top_k_indices,
@@ -75,7 +81,7 @@ def forward_topk_balanced_noisy_gate_with_fixed_expert_selection(self, x):
     # fmt: off
     batch_size = x.shape[0]
     top_k_indices = torch.arange(self.num_selects, device=x.device).unsqueeze(0).repeat(batch_size, 1)
-    top_k_scores = self.softmax(torch.rand_like(top_k_indices, dtype=x.dtype))
+    top_k_scores = torch.sort(self.softmax(torch.rand_like(top_k_indices, dtype=x.dtype)), dim=1, descending=True)[0]
 
     return {
         "topK_indices": top_k_indices,
@@ -88,7 +94,7 @@ def forward_topk_balanced_noisy_gate_with_fixed_expert_selection(self, x):
 
 
 def forward_topk_balanced_noisy_gate_with_hidden_states_recording(
-    self, x, padding_mask, **kwargs
+        self, x, padding_mask, **kwargs
 ):
     # fmt: off
     self.samples_cnt += torch.sum(padding_mask).item()  ####################################
@@ -131,9 +137,9 @@ def forward_topk_balanced_noisy_gate_with_hidden_states_recording(
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-    self,
-    x,
-    padding_mask,
+        self,
+        x,
+        padding_mask,
 ):
     # fmt: off
     original_shape = x.shape[:-1]
@@ -149,14 +155,14 @@ def forward_linear_glu_moe_layer_with_padding_mask(
 
 
 def forward_llama_moe_decoder_with_padding_mask(
-    self,
-    hidden_states,
-    padding_mask,  # ----- add padding_mask -----
-    attention_mask=None,
-    position_ids=None,
-    past_key_value=None,
-    output_attentions=False,
-    use_cache=False,
+        self,
+        hidden_states,
+        padding_mask,  # ----- add padding_mask -----
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -196,16 +202,16 @@ def forward_llama_moe_decoder_with_padding_mask(
 
 
 def forward_llama_moe_model_with_padding_mask(
-    self,
-    input_ids=None,
-    attention_mask=None,
-    position_ids=None,
-    past_key_values=None,
-    inputs_embeds=None,
-    use_cache=None,
-    output_attentions=None,
-    output_hidden_states=None,
-    return_dict=None,
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
 ):
     output_attentions = (
         output_attentions

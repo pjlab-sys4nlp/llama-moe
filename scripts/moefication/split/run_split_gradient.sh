@@ -1,13 +1,13 @@
 #!/usr/bin/bash
 
-#  llama_7B  llama_13B  llama_30B  llama_base
+#  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
+llama_size="llama_3B"
 
-intermediate_size=13824 #  11008  13824
-expert_num=8
-scale_factor=1
-share_neurons=False #  True  False
+intermediate_size=8640 #  8640  11008  13824
+expert_num=16
+scale_factor=4
+share_neurons=True #  True  False
 expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
 echo ${expert_num} ${expert_size} ${share_neurons}
 
@@ -19,7 +19,7 @@ proj_type=up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
-score_file_path=${data_path}/moefication_results/split/Gradients/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
+score_file_path=${data_path}/moefication_results/split/Gradients${expert_num}/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
 save_path=${data_path}/moefication_results/split
 
 gpus=0

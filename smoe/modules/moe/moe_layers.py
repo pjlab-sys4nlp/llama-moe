@@ -12,7 +12,7 @@ from .moe_calculators import (
     UniversalCalculator,
 )
 from .moe_experts import LinearExperts, LinearGLUExperts
-from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate
+from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate, UniformPlainGate
 
 
 @dataclass
@@ -57,6 +57,12 @@ class BaseMoELayer(nn.Module):
                 balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
                 add_noise=kwargs.get("gate_add_noise", True),
             )
+        elif self.gate_type == "UniformPlainGate":  # all select gate
+            self.gate = UniformPlainGate(
+                self.input_size,
+                self.num_experts,
+                use_softmax=kwargs.get("gate_use_softmax", False),
+            )
         else:
             raise NotImplementedError
 
@@ -67,11 +73,13 @@ class BaseMoELayer(nn.Module):
             self.calculator = UniversalCalculator(
                 experts,
                 multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+                score_scale_factor=kwargs.get("score_scale_factor", 1.0),
             )
         elif self.calculator_type == "SwitchDropTokenCalculator":  # switch calculator
             self.calculator = SwitchDropTokenCalculator(
                 experts,
                 multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+                score_scale_factor=kwargs.get("score_scale_factor", 1.0),
                 drop_tokens=kwargs.get("drop_tokens", True),
                 dropped_padding=kwargs.get("dropped_padding", "zero"),
                 capacity_factor=kwargs.get("capacity_factor", 1.25),
@@ -94,90 +102,100 @@ class BaseMoELayer(nn.Module):
 
         return MoEMlpOutput(
             hidden_states=y,
-            balance_loss=gate_outputs.get("balance_loss"),
+            balance_loss=gate_outputs.get("balance_loss", None),
             num_dropped_tokens=calc_outs.num_dropped_tokens,
-            gate_load=gate_outputs.get("load"),
-            gate_importance=gate_outputs.get("importance"),
+            gate_load=gate_outputs.get("load", None),
+            gate_importance=gate_outputs.get("importance", None),
         )
 
+    # fmt: off
     def set_num_selects(self, num_selects):
-        if num_selects > self.gate.num_experts:
-            raise ValueError(
-                'The value of "num_selects" must satisfy "num_selects <= num_experts"!'
-            )
-        elif self.gate_type == "SwitchBalancedGate":
-            raise ValueError(
-                "SwitchBalancedGate doesn't support manually setting num_selects."
-            )
+        if "num_selects" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "num_selects".')
+        elif num_selects > self.gate.num_experts:
+            raise ValueError('The value of "num_selects" must satisfy "num_selects <= num_experts"!')
+        elif self.gate_type in ("SwitchBalancedGate",):
+            raise ValueError(f"{self.gate_type} doesn't support manually setting num_selects.")
         else:
             self.gate.num_selects = num_selects
 
     def set_gate_use_softmax(self, use_softmax):
-        self.gate.use_softmax = use_softmax
+        if "use_softmax" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "use_softmax".')
+        else:
+            self.gate.use_softmax = use_softmax
 
     def set_gate_use_balance(self, use_balance):
-        self.gate.use_balance = use_balance
+        if "use_balance" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "use_balance".')
+        else:
+            self.gate.use_balance = use_balance
 
     def set_gate_balance_loss_weight(self, balance_loss_weight):
-        self.gate.balance_loss_weight = balance_loss_weight
+        if "balance_loss_weight" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "balance_loss_weight".')
+        else:
+            self.gate.balance_loss_weight = balance_loss_weight
 
     def set_gate_add_noise(self, add_noise):
-        self.gate.add_noise = add_noise
+        if "add_noise" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "add_noise".')
+        else:
+            self.gate.add_noise = add_noise
 
     def set_gate_noise_epsilon(self, noise_epsilon):
-        if self.gate_type != "TopKBalancedNoisyGate":
-            raise TypeError(self.gate_type)
+        if "noise_epsilon" not in vars(self.gate).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "noise_epsilon".')
         else:
             self.gate.noise_epsilon = noise_epsilon
 
     def set_calculator_multiply_gate_scores(self, multiply_gate_scores):
-        self.calculator.multiply_gate_scores = multiply_gate_scores
+        if "multiply_gate_scores" not in vars(self.calculator).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "multiply_gate_scores".')
+        else:
+            self.calculator.multiply_gate_scores = multiply_gate_scores
+
+    def set_calculator_score_scale_factor(self, score_scale_factor):
+        if "score_scale_factor" not in vars(self.calculator).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "score_scale_factor".')
+        else:
+            self.calculator.score_scale_factor = score_scale_factor
 
     def set_calculator_drop_tokens(self, drop_tokens):
-        if self.calculator_type != "SwitchDropTokenCalculator":
-            raise TypeError(self.calculator_type)
-        elif (
-            drop_tokens
-            and self.calculator.dropped_padding != "zero"
-            and self.input_size != self.output_size
-        ):
-            warnings.warn(
-                'Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!'
-            )
+        if "drop_tokens" not in vars(self.calculator).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "drop_tokens".')
+        elif drop_tokens and self.calculator.dropped_padding != "zero" and self.input_size != self.output_size:
+            warnings.warn('Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!')
         else:
             self.calculator.drop_tokens = drop_tokens
 
     def set_calculator_dropped_padding(self, dropped_padding):
-        if self.calculator_type != "SwitchDropTokenCalculator":
-            raise TypeError(self.calculator_type)
+        if "dropped_padding" not in vars(self.calculator).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "dropped_padding".')
         elif dropped_padding not in self.calculator.available_dropped_padding_choices:
-            raise ValueError(
-                f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})"
-            )
-        elif (
-            self.calculator.drop_tokens
-            and dropped_padding != "zero"
-            and self.input_size != self.output_size
-        ):
-            warnings.warn(
-                f'Setting "dropped_padding={dropped_padding}" with "drop_tokens=True" when "input_size != output_size" will cause error!'
-            )
+            raise ValueError(f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})")
+        elif self.calculator.drop_tokens and dropped_padding != "zero" and self.input_size != self.output_size:
+            warnings.warn(f'Setting "dropped_padding={dropped_padding}" with "drop_tokens=True" when "input_size != output_size" will cause error!')
         else:
             self.calculator.dropped_padding = dropped_padding
 
     def set_calculator_capacity_factor(self, capacity_factor):
-        if self.calculator_type != "SwitchDropTokenCalculator":
-            raise TypeError(self.calculator_type)
+        if "capacity_factor" not in vars(self.calculator).keys():
+            raise KeyError(f'{self.gate_type} does not have a key named "capacity_factor".')
         else:
             self.calculator.capacity_factor = capacity_factor
 
     def reset_gate_network(self):
-        self.gate.reset_gate_network()
+        if "gate_network" not in vars(self.gate).keys():
+            raise KeyError(f"{self.gate_type} does not have a gate network.")
+        else:
+            self.gate.reset_gate_network()
+    # fmt: on
 
 
 class LinearMoELayer(BaseMoELayer):
     def __init__(
-        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
+            self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -202,16 +220,16 @@ class LinearMoELayer(BaseMoELayer):
 
 class LinearGLUMoELayer(BaseMoELayer):
     def __init__(
-        self,
-        input_size,
-        hidden_size,
-        output_size,
-        hidden_act,
-        num_experts,
-        num_selects,
-        size_experts=None,
-        bias=True,
-        **kwargs,
+            self,
+            input_size,
+            hidden_size,
+            output_size,
+            hidden_act,
+            num_experts,
+            num_selects,
+            size_experts=None,
+            bias=True,
+            **kwargs,
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()

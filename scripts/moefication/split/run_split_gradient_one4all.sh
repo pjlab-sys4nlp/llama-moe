@@ -1,10 +1,10 @@
 #!/usr/bin/bash
 
-#  llama_7B  llama_13B  llama_30B  llama_base
+#  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
+llama_size="llama_3B"
 
-intermediate_size=13824 #  11008  13824
+intermediate_size=8640 #  8640  11008  13824
 
 kernel=l1_norm
 accumulate_level=sample        #  sample  total
@@ -14,7 +14,6 @@ proj_type=up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
-score_file_path=${data_path}/moefication_results/split/Gradients/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
 save_path=${data_path}/moefication_results/split
 
 gpus=0
@@ -26,6 +25,8 @@ for expert_num in 16; do
     # 688 1376 2752 5504 11008
     # 864 1728 3456 6912 13824
     echo ${expert_num} ${expert_size} ${share_neurons}
+    score_file_path=${data_path}/moefication_results/split/Gradients${expert_num}/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
+
     OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
       python -m smoe.entrypoint.moefication.llama_split_gradient \
       --model_path ${model_path} \
