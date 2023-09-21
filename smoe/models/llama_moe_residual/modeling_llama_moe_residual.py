@@ -31,7 +31,7 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
             )
         else:
             assert config.intermediate_size_residual == sum(
-                config.size_experts_residual
+                config.size_experts_residual[layer_index]
             )
 
         gating_config = {
@@ -73,7 +73,7 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
             bias=False,
             # ---- different here ---- #
             num_experts_residual=config.num_experts_residual,
-            size_experts_residual=config.size_experts_residual,
+            size_experts_residual=config.size_experts_residual[layer_index],
             score_scale_factor_residual=config.score_scale_factor_residual,
             use_weighting=config.use_weighting,
             # ------------------------ #

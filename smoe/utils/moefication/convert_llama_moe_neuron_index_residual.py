@@ -220,6 +220,9 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
+    # print(size_experts, flush=True)
+    # print(size_experts_residual, flush=True)
+
     """build config"""
     print("Buiding llama-moe config...")
     config_llama_moe = LlamaMoEResidualConfig.from_pretrained(llama_model_path)
