@@ -195,7 +195,7 @@ class BaseMoELayer(nn.Module):
 
 class LinearMoELayer(BaseMoELayer):
     def __init__(
-            self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
+        self, input_size, output_size, num_experts, num_selects, bias=True, **kwargs
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
@@ -220,16 +220,16 @@ class LinearMoELayer(BaseMoELayer):
 
 class LinearGLUMoELayer(BaseMoELayer):
     def __init__(
-            self,
-            input_size,
-            hidden_size,
-            output_size,
-            hidden_act,
-            num_experts,
-            num_selects,
-            size_experts=None,
-            bias=True,
-            **kwargs,
+        self,
+        input_size,
+        hidden_size,
+        output_size,
+        hidden_act,
+        num_experts,
+        num_selects,
+        size_experts=None,
+        bias=True,
+        **kwargs,
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()

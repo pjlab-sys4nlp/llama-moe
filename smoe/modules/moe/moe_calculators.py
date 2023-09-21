@@ -28,7 +28,7 @@ class UniversalCalculator(nn.Module):
         self.num_experts = experts.num_experts
 
     def forward(
-            self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+        self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
     ) -> CalculatorOutput:
         # fmt: off
         """正向传播"""
@@ -79,13 +79,13 @@ class SwitchDropTokenCalculator(nn.Module):
     """
 
     def __init__(
-            self,
-            experts,
-            multiply_gate_scores=True,
-            score_scale_factor=1.0,
-            drop_tokens=True,
-            dropped_padding="zero",  # zero input
-            capacity_factor=1.25,
+        self,
+        experts,
+        multiply_gate_scores=True,
+        score_scale_factor=1.0,
+        drop_tokens=True,
+        dropped_padding="zero",  # zero input
+        capacity_factor=1.25,
     ):
         super(SwitchDropTokenCalculator, self).__init__()
         self.available_dropped_padding_choices = ("zero", "input")

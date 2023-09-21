@@ -3,7 +3,9 @@ import types
 import torch
 
 from smoe.modules.moe.moe_layers import LinearGLUMoELayer
-from smoe.utils.model_operation.change_llama_moe_forward import forward_topk_balanced_noisy_gate_with_random_expert_selection
+from smoe.utils.model_operation.change_llama_moe_forward import (
+    forward_topk_balanced_noisy_gate_with_random_expert_selection,
+)
 from smoe.utils.seed import set_seed
 
 input_size = 128
@@ -46,7 +48,9 @@ layer = LinearGLUMoELayer(
 
 batch_size = 64
 
-layer.gate.forward = types.MethodType(forward_topk_balanced_noisy_gate_with_random_expert_selection, layer.gate)
+layer.gate.forward = types.MethodType(
+    forward_topk_balanced_noisy_gate_with_random_expert_selection, layer.gate
+)
 set_seed(0)
 
 input = torch.rand((batch_size, input_size))

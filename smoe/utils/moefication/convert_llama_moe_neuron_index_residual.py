@@ -16,17 +16,17 @@ from smoe.utils.io import torch_load_template_file
 
 
 def convert_llama_model_neuron_index_residual(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_experts_residual,
-        num_selects,
-        score_scale_factor=None,
-        score_scale_factor_residual=None,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_experts_residual,
+    num_selects,
+    score_scale_factor=None,
+    score_scale_factor_residual=None,
+    use_default_gate=False,
 ):
     """
     LlamaMoEResidualModel
@@ -52,11 +52,25 @@ def convert_llama_model_neuron_index_residual(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert total_num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual, total_num_experts)])
-        residual_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual, total_num_experts)
+            ]
+        )
+        residual_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
-        this_layer_size_expert_residual = [residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
+        this_layer_size_expert_residual = [
+            residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)
+        ]
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
@@ -69,7 +83,10 @@ def convert_llama_model_neuron_index_residual(
     config_llama_moe = LlamaMoEResidualConfig.from_pretrained(llama_model_path)
     config_llama_moe.intermediate_size_moe = sum(size_experts[0])
     config_llama_moe.intermediate_size_residual = sum(size_experts_residual[0])
-    config_llama_moe.intermediate_size = config_llama_moe.intermediate_size_moe + config_llama_moe.intermediate_size_residual
+    config_llama_moe.intermediate_size = (
+        config_llama_moe.intermediate_size_moe
+        + config_llama_moe.intermediate_size_residual
+    )
 
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
@@ -77,11 +94,15 @@ def convert_llama_model_neuron_index_residual(
 
     config_llama_moe.num_experts_residual = num_experts_residual
     config_llama_moe.size_experts_residual = size_experts_residual
-    config_llama_moe.score_scale_factor_residual = 1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    config_llama_moe.score_scale_factor_residual = (
+        1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    )
     config_llama_moe.use_weighting = False
 
     config_llama_moe.gates = "mlp"
-    config_llama_moe.score_scale_factor = 1.0 if score_scale_factor is not None else score_scale_factor
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is not None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -137,17 +158,17 @@ def convert_llama_model_neuron_index_residual(
 
 
 def convert_llama_model_for_causal_lm_neuron_index_residual(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_experts_residual,
-        num_selects,
-        score_scale_factor=None,
-        score_scale_factor_residual=None,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_experts_residual,
+    num_selects,
+    score_scale_factor=None,
+    score_scale_factor_residual=None,
+    use_default_gate=False,
 ):
     """
     LlamaMoEResidualForCausalLM
@@ -173,11 +194,25 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert total_num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual, total_num_experts)])
-        residual_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual, total_num_experts)
+            ]
+        )
+        residual_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
-        this_layer_size_expert_residual = [residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
+        this_layer_size_expert_residual = [
+            residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)
+        ]
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
@@ -190,7 +225,10 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
     config_llama_moe = LlamaMoEResidualConfig.from_pretrained(llama_model_path)
     config_llama_moe.intermediate_size_moe = sum(size_experts[0])
     config_llama_moe.intermediate_size_residual = sum(size_experts_residual[0])
-    config_llama_moe.intermediate_size = config_llama_moe.intermediate_size_moe + config_llama_moe.intermediate_size_residual
+    config_llama_moe.intermediate_size = (
+        config_llama_moe.intermediate_size_moe
+        + config_llama_moe.intermediate_size_residual
+    )
 
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
@@ -198,11 +236,15 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
 
     config_llama_moe.num_experts_residual = num_experts_residual
     config_llama_moe.size_experts_residual = size_experts_residual
-    config_llama_moe.score_scale_factor_residual = 1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    config_llama_moe.score_scale_factor_residual = (
+        1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    )
     config_llama_moe.use_weighting = False
 
     config_llama_moe.gates = "mlp"
-    config_llama_moe.score_scale_factor = 1.0 if score_scale_factor is not None else score_scale_factor
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is not None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -257,17 +299,17 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
 
 
 def convert_llama_model_for_sequence_classification_neuron_index_residual(
-        llama_model_path,
-        split_index_path,
-        select_gate_path,
-        save_path,
-        template,
-        num_experts,
-        num_experts_residual,
-        num_selects,
-        score_scale_factor=None,
-        score_scale_factor_residual=None,
-        use_default_gate=False,
+    llama_model_path,
+    split_index_path,
+    select_gate_path,
+    save_path,
+    template,
+    num_experts,
+    num_experts_residual,
+    num_selects,
+    score_scale_factor=None,
+    score_scale_factor_residual=None,
+    use_default_gate=False,
 ):
     """
     LlamaMoEResidualForSequenceClassification
@@ -293,11 +335,25 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
     for i in tqdm(range(num_layers), desc="loading indices and gate weights"):
         this_layer_index = torch_load_template_file(split_index_path, template, i)
         assert total_num_experts == len(this_layer_index)
-        moe_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual, total_num_experts)])
-        residual_neuron_indices.append([torch.tensor(this_layer_index[j], dtype=torch.int) for j in range(num_experts_residual)])
+        moe_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual, total_num_experts)
+            ]
+        )
+        residual_neuron_indices.append(
+            [
+                torch.tensor(this_layer_index[j], dtype=torch.int)
+                for j in range(num_experts_residual)
+            ]
+        )
 
-        this_layer_size_expert = [moe_neuron_indices[i][j].size(0) for j in range(num_experts)]
-        this_layer_size_expert_residual = [residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)]
+        this_layer_size_expert = [
+            moe_neuron_indices[i][j].size(0) for j in range(num_experts)
+        ]
+        this_layer_size_expert_residual = [
+            residual_neuron_indices[i][j].size(0) for j in range(num_experts_residual)
+        ]
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
@@ -310,7 +366,10 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
     config_llama_moe = LlamaMoEResidualConfig.from_pretrained(llama_model_path)
     config_llama_moe.intermediate_size_moe = sum(size_experts[0])
     config_llama_moe.intermediate_size_residual = sum(size_experts_residual[0])
-    config_llama_moe.intermediate_size = config_llama_moe.intermediate_size_moe + config_llama_moe.intermediate_size_residual
+    config_llama_moe.intermediate_size = (
+        config_llama_moe.intermediate_size_moe
+        + config_llama_moe.intermediate_size_residual
+    )
 
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
@@ -318,11 +377,15 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
 
     config_llama_moe.num_experts_residual = num_experts_residual
     config_llama_moe.size_experts_residual = size_experts_residual
-    config_llama_moe.score_scale_factor_residual = 1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    config_llama_moe.score_scale_factor_residual = (
+        1.0 if score_scale_factor_residual is not None else score_scale_factor_residual
+    )
     config_llama_moe.use_weighting = False
 
     config_llama_moe.gates = "mlp"
-    config_llama_moe.score_scale_factor = 1.0 if score_scale_factor is not None else score_scale_factor
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is not None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -373,7 +436,9 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
     print("Saving converted model...")
     config_llama_moe.save_pretrained(save_path)
     model_llama_moe.save_pretrained(save_path)
-    print(f'Converted LlamaMoEResidualForSequenceClassification saved to "{save_path}".')
+    print(
+        f'Converted LlamaMoEResidualForSequenceClassification saved to "{save_path}".'
+    )
 
 
 if __name__ == "__main__":

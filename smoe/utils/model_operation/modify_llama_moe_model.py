@@ -56,6 +56,7 @@ def llama_moe_with_scaled_gate_score(model, output_scale_factor):
     return model
     # fmt: on
 
+
 def llama_moe_with_hidden_states_recording(model, device):
     """记录gate的load、importance、balance_loss"""
     # fmt: off

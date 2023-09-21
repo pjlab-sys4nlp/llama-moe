@@ -1,6 +1,7 @@
 import warnings
 
 import torch
+
 # from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
 from torch.distributions.normal import Normal
@@ -28,10 +29,10 @@ def get_gate_network(gate_type, input_size, num_experts):
 
 class UniformPlainGate(nn.Module):
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            use_softmax=True,
+        self,
+        input_size,
+        num_experts,
+        use_softmax=True,
     ):
         super(UniformPlainGate, self).__init__()
         self.input_size = input_size
@@ -43,7 +44,11 @@ class UniformPlainGate(nn.Module):
         scores = torch.ones((batch_size, self.num_experts), device=x.device)
         if self.use_softmax:
             scores /= self.num_experts
-        indices = torch.arange(0, self.num_experts, device=x.device).unsqueeze(0).expand(batch_size, self.num_experts)
+        indices = (
+            torch.arange(0, self.num_experts, device=x.device)
+            .unsqueeze(0)
+            .expand(batch_size, self.num_experts)
+        )
 
         return {
             "topK_indices": indices,
@@ -61,16 +66,16 @@ class TopKBalancedNoisyGate(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            num_selects,
-            gate_network="mlp",
-            use_softmax=True,
-            use_balance=True,
-            balance_loss_weight=1e-2,
-            add_noise=True,
-            noise_epsilon=1e-2,
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_softmax=True,
+        use_balance=True,
+        balance_loss_weight=1e-2,
+        add_noise=True,
+        noise_epsilon=1e-2,
     ):
         super(TopKBalancedNoisyGate, self).__init__()
         assert num_selects <= num_experts  # 选择数量大于专家数量，报错
@@ -260,15 +265,15 @@ class SwitchBalancedGate(nn.Module):
     """
 
     def __init__(
-            self,
-            input_size,
-            num_experts,
-            num_selects,
-            gate_network="mlp",
-            use_softmax=True,
-            use_balance=True,
-            balance_loss_weight=1e-1,
-            add_noise=True,
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_softmax=True,
+        use_balance=True,
+        balance_loss_weight=1e-1,
+        add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
         assert num_selects == 1

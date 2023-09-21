@@ -8,8 +8,14 @@ import numpy as np
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moe_residual.configuration_llama_moe_residual import LlamaMoEResidualConfig
-from smoe.models.llama_moe_residual.modeling_llama_moe_residual import LlamaMoEResidualModel, LlamaMoEResidualForSequenceClassification, LlamaMoEResidualForCausalLM
+from smoe.models.llama_moe_residual.configuration_llama_moe_residual import (
+    LlamaMoEResidualConfig,
+)
+from smoe.models.llama_moe_residual.modeling_llama_moe_residual import (
+    LlamaMoEResidualForCausalLM,
+    LlamaMoEResidualForSequenceClassification,
+    LlamaMoEResidualModel,
+)
 
 
 def main(args):
@@ -86,9 +92,13 @@ def main(args):
     if args.model_type == "LlamaMoEResidualModel":
         config_llama_moe_residual = LlamaMoEResidualModel(config_llama_moe_residual)
     elif args.model_type == "LlamaMoEResidualForCausalLM":
-        config_llama_moe_residual = LlamaMoEResidualForCausalLM(config_llama_moe_residual)
+        config_llama_moe_residual = LlamaMoEResidualForCausalLM(
+            config_llama_moe_residual
+        )
     elif args.model_type == "LlamaMoEForSequenceClassification":
-        config_llama_moe_residual = LlamaMoEResidualForSequenceClassification(config_llama_moe_residual)
+        config_llama_moe_residual = LlamaMoEResidualForSequenceClassification(
+            config_llama_moe_residual
+        )
     else:
         raise ValueError
 

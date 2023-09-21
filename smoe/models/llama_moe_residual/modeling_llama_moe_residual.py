@@ -22,11 +22,17 @@ _CONFIG_FOR_DOC = "LlamaMoEResidualConfig"
 class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
     def __init__(self, config: LlamaMoEResidualConfig, layer_index):
         super(LlamaMoEDecoderLayer, self).__init__(config)
-        assert config.intermediate_size == (config.intermediate_size_moe + config.intermediate_size_residual)
+        assert config.intermediate_size == (
+            config.intermediate_size_moe + config.intermediate_size_residual
+        )
         if config.size_experts_residual is None:  # all experts have the same size
-            assert (config.intermediate_size_moe // config.num_experts) == (config.intermediate_size_residual // config.num_experts_residual)
+            assert (config.intermediate_size_moe // config.num_experts) == (
+                config.intermediate_size_residual // config.num_experts_residual
+            )
         else:
-            assert config.intermediate_size_residual == sum(config.size_experts_residual)
+            assert config.intermediate_size_residual == sum(
+                config.size_experts_residual
+            )
 
         gating_config = {
             # all gates
