@@ -23,11 +23,11 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
     def __init__(self, config: LlamaMoEResidualConfig, layer_index):
         super(LlamaMoEDecoderLayer, self).__init__(config)
         assert config.intermediate_size == (
-            config.intermediate_size_moe + config.intermediate_size_residual
+                config.intermediate_size_moe + config.intermediate_size_residual
         )
         if config.size_experts_residual is None:  # all experts have the same size
             assert (config.intermediate_size_moe // config.num_experts) == (
-                config.intermediate_size_residual // config.num_experts_residual
+                    config.intermediate_size_residual // config.num_experts_residual
             )
         else:
             assert config.intermediate_size_residual == sum(
@@ -81,6 +81,9 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
             **calculator_config,
         )
 
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
+        self.mlp.set_residual_calculator_score_scale_factor(score_scale_factor)
+
 
 class LlamaMoEResidualPreTrainedModel(LlamaMoEPreTrainedModel):
     config_class = LlamaMoEResidualConfig
@@ -97,11 +100,18 @@ class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
             ]
         )
 
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_residual_calculator_score_scale_factor(score_scale_factor)
+
 
 class LlamaMoEResidualForCausalLM(LlamaMoEForCausalLM, LlamaMoEResidualPreTrainedModel):
     def __init__(self, config):
         super(LlamaMoEForCausalLM, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
+
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
+        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor)
 
 
 class LlamaMoEResidualForSequenceClassification(
@@ -110,3 +120,6 @@ class LlamaMoEResidualForSequenceClassification(
     def __init__(self, config):
         super(LlamaMoEForSequenceClassification, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
+
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
+        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor)

@@ -16,8 +16,8 @@ model_path=/mnt/petrelfs/share_data/quxiaoye/models/${model_type}/${split_type}-
 #model_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-Prune/Gradient-max-l1_norm-total-feature_grad/llama2_7B-0-0.20Percent-2201Neurons
 
 gpus=0
-cpus=16
-OMP_NUM_THREADS=8 srun --partition=MoE --job-name=test --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --job-name=example --kill-on-bad-exit=1 --quotatype=auto \
+cpus=8
+OMP_NUM_THREADS=2 srun --partition=MoE --job-name=test --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --job-name=example --kill-on-bad-exit=1 --quotatype=auto \
   python -m smoe.entrypoint.examples.load_llama_moe \
   --tokenizer_path ${tokenizer_path} \
   --model_path ${model_path} \
