@@ -110,7 +110,7 @@ class BaseMoELayer(nn.Module):
 
     # fmt: off
     def set_num_selects(self, num_selects):
-        if "num_selects" not in vars(self.gate).keys():
+        if "num_selects" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "num_selects".')
         elif num_selects > self.gate.num_experts:
             raise ValueError('The value of "num_selects" must satisfy "num_selects <= num_experts"!')
@@ -120,49 +120,49 @@ class BaseMoELayer(nn.Module):
             self.gate.num_selects = num_selects
 
     def set_gate_use_softmax(self, use_softmax):
-        if "use_softmax" not in vars(self.gate).keys():
+        if "use_softmax" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "use_softmax".')
         else:
             self.gate.use_softmax = use_softmax
 
     def set_gate_use_balance(self, use_balance):
-        if "use_balance" not in vars(self.gate).keys():
+        if "use_balance" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "use_balance".')
         else:
             self.gate.use_balance = use_balance
 
     def set_gate_balance_loss_weight(self, balance_loss_weight):
-        if "balance_loss_weight" not in vars(self.gate).keys():
+        if "balance_loss_weight" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "balance_loss_weight".')
         else:
             self.gate.balance_loss_weight = balance_loss_weight
 
     def set_gate_add_noise(self, add_noise):
-        if "add_noise" not in vars(self.gate).keys():
+        if "add_noise" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "add_noise".')
         else:
             self.gate.add_noise = add_noise
 
     def set_gate_noise_epsilon(self, noise_epsilon):
-        if "noise_epsilon" not in vars(self.gate).keys():
+        if "noise_epsilon" not in vars(self.gate):
             raise KeyError(f'{self.gate_type} does not have a key named "noise_epsilon".')
         else:
             self.gate.noise_epsilon = noise_epsilon
 
     def set_calculator_multiply_gate_scores(self, multiply_gate_scores):
-        if "multiply_gate_scores" not in vars(self.calculator).keys():
+        if "multiply_gate_scores" not in vars(self.calculator):
             raise KeyError(f'{self.gate_type} does not have a key named "multiply_gate_scores".')
         else:
             self.calculator.multiply_gate_scores = multiply_gate_scores
 
     def set_calculator_score_scale_factor(self, score_scale_factor):
-        if "score_scale_factor" not in vars(self.calculator).keys():
+        if "score_scale_factor" not in vars(self.calculator):
             raise KeyError(f'{self.gate_type} does not have a key named "score_scale_factor".')
         else:
             self.calculator.score_scale_factor = score_scale_factor
 
     def set_calculator_drop_tokens(self, drop_tokens):
-        if "drop_tokens" not in vars(self.calculator).keys():
+        if "drop_tokens" not in vars(self.calculator):
             raise KeyError(f'{self.gate_type} does not have a key named "drop_tokens".')
         elif drop_tokens and self.calculator.dropped_padding != "zero" and self.input_size != self.output_size:
             warnings.warn('Setting "drop_tokens=True" without zero dropped padding when "input_size != output_size" will cause error!')
@@ -170,7 +170,7 @@ class BaseMoELayer(nn.Module):
             self.calculator.drop_tokens = drop_tokens
 
     def set_calculator_dropped_padding(self, dropped_padding):
-        if "dropped_padding" not in vars(self.calculator).keys():
+        if "dropped_padding" not in vars(self.calculator):
             raise KeyError(f'{self.gate_type} does not have a key named "dropped_padding".')
         elif dropped_padding not in self.calculator.available_dropped_padding_choices:
             raise ValueError(f"'dropped_padding' type not available! (available choices: {self.calculator.available_dropped_padding_choices})")
@@ -180,13 +180,13 @@ class BaseMoELayer(nn.Module):
             self.calculator.dropped_padding = dropped_padding
 
     def set_calculator_capacity_factor(self, capacity_factor):
-        if "capacity_factor" not in vars(self.calculator).keys():
+        if "capacity_factor" not in vars(self.calculator):
             raise KeyError(f'{self.gate_type} does not have a key named "capacity_factor".')
         else:
             self.calculator.capacity_factor = capacity_factor
 
     def reset_gate_network(self):
-        if "gate_network" not in vars(self.gate).keys():
+        if "gate_network_type" not in vars(self.gate):
             raise KeyError(f"{self.gate_type} does not have a gate network.")
         else:
             self.gate.reset_gate_network()
