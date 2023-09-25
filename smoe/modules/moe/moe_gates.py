@@ -98,6 +98,7 @@ class TopKBalancedNoisyGate(nn.Module):
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
+            # logits_noise = gumbel_rsample(logits_gate.shape, device=logits_gate.device).to(logits_gate)
             logits = logits_gate + logits_noise  # 最终权重
         else:
             logits = logits_gate  # 最终权重，shape(batch_size, num_experts)

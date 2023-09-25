@@ -12,6 +12,7 @@ from typing import Iterator
 import torch
 from torch.utils.data import IterableDataset
 
+from smoe.data.aggregation import group_instances
 from smoe.utils.io import load_jsonlines_iter
 from smoe.utils.logging import get_logger
 from smoe.utils.random import get_random_string
@@ -193,10 +194,17 @@ class WeightedPackedDatasetBuilder:
 
 
 class PackedJsonlDataset(IterableDataset):
-    def __init__(self, data_dir: str, seed: int = 1227, buffer_size: int = 32) -> None:
+    def __init__(
+        self,
+        data_dir: str,
+        seed: int = 1227,
+        buffer_size: int = 200,
+        block_size: int = 2048,
+    ) -> None:
         super().__init__()
         self.rng = random.Random(seed)
         self.buffer_size = buffer_size
+        self.block_size = block_size
 
         data_dir_path = Path(data_dir)
         filepaths = sorted(data_dir_path.glob("**/*.jsonl"))
@@ -217,6 +225,7 @@ class PackedJsonlDataset(IterableDataset):
                 if len(self.buffer) >= self.buffer_size:
                     if len(self.buffer) > 0:
                         self.rng.shuffle(self.buffer)
+                        self.buffer_aggregation()
                         yield from self.buffer
                         self.buffer.clear()
 
@@ -225,8 +234,14 @@ class PackedJsonlDataset(IterableDataset):
         # for the last batch < buffer_size
         if len(self.buffer) > 0:
             self.rng.shuffle(self.buffer)
+            self.buffer_aggregation()
             yield from self.buffer
             self.buffer.clear()
+
+    def buffer_aggregation(self):
+        if self.block_size > 0 and len(self.buffer) > 0:
+            results = group_instances(self.buffer, self.block_size)
+            self.buffer = results
 
 
 class SubDirWeightedPackedJsonlDataset(IterableDataset):
@@ -258,9 +273,10 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
     def __init__(
         self,
         dataset_dir: str,
-        weights: dict[str, float] = None,
+        prob_map: dict[str, float] = None,
         seed: int = 1227,
-        buffer_size: int = 32,
+        buffer_size: int = 200,
+        block_size: int = 2048,
     ) -> None:
         self.rng = random.Random(seed)
         self.buffer_size = buffer_size
@@ -268,16 +284,16 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
 
         task_types = [p.stem for p in self.dataset_dir_path.glob("*") if p.is_dir()]
 
-        if weights is None:
-            weights = {str(task_type): 1.0 for task_type in task_types}
+        if prob_map is None:
+            prob_map = {str(task_type): 1.0 for task_type in task_types}
         for task_type in task_types:
-            assert task_type in weights
-        for task_type in weights:
+            assert task_type in prob_map
+        for task_type in prob_map:
             if task_type not in task_types:
                 logger.warning(
                     f"Task type {task_type} not found in dataset dir. Skip it."
                 )
-        self.weights = weights
+        self.prob_map = prob_map
 
         self.task_type_to_dataset = {}
         for task_type in task_types:
@@ -288,6 +304,7 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
                     str(self.dataset_dir_path.joinpath(task_type)),
                     seed=seed,
                     buffer_size=buffer_size,
+                    block_size=block_size,
                 )
             )
             self.task_type_to_dataset[task_type] = ds
@@ -295,11 +312,12 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
     def __iter__(self) -> Iterator:
         while len(self.task_type_to_dataset) > 0:
             candidate_task_types = list(self.task_type_to_dataset.keys())
-            weights = [self.weights[task_type] for task_type in candidate_task_types]
+            weights = [self.prob_map[task_type] for task_type in candidate_task_types]
             choice = self.rng.choices(candidate_task_types, weights=weights, k=1)[0]
             try:
                 yield next(self.task_type_to_dataset[choice])
             except StopIteration:
-                self.task_type_to_dataset.pop(choice)
-                logger.debug(f"Task type {choice} finished, drop it")
-                yield from self
+                # self.task_type_to_dataset.pop(choice)
+                # logger.debug(f"Task type {choice} finished, drop it")
+                # yield from self
+                return

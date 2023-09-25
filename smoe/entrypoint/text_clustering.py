@@ -1,18 +1,21 @@
 """
 srun -p MoE -n 1 -N 1 --mem 128G python -m smoe.entrypoint.text_clustering --do_train --do_eval -n 16 -m outputs/clustering -o resources/clustering_samples
+srun -p MoE -n 1 -N 1 --mem 128G python -u -m smoe.entrypoint.text_clustering --do_eval -n 4 -m outputs/clustering_4 -o resources/clustering_samples_4 1>logs/clustering_4.log 2>&1 &
 """
 
 import argparse
 import json
-import logging
 import os
 from collections import defaultdict
 from pathlib import Path
 
+from tqdm import tqdm
+
 from smoe.utils.io import load_jsonlines_iter
+from smoe.utils.logging import get_logger
 from smoe.utils.text_clustering import TextClustering
 
-logger = logging.getLogger(__name__)
+logger = get_logger("text_clustering", log_level="INFO")
 
 
 def main(args):
@@ -37,14 +40,43 @@ def main(args):
         model = TextClustering.from_pretrained(args.model_dir)
 
         logger.info("Loading contents")
-        instances = []
+        num_tot = 0
         for file in files:
+            for ins in load_jsonlines_iter(file):
+                num_tot += 1
+
+        instances = []
+        labels = []
+        bsz = 32
+        batch = []
+        bar = tqdm(total=num_tot)
+        for file_idx, file in enumerate(files):
+            logger.info(f"file: {file_idx} / {len(files)}")
             for i, ins in enumerate(load_jsonlines_iter(file)):
-                instances.append(
-                    {"content": ins["content"], "id": i, "file": file.name}
-                )
-        logger.info("Predicting")
-        labels = model.predict([ins["content"] for ins in instances])
+                if len(batch) == bsz:
+                    preds = model.predict([ins["content"] for ins in batch])
+                    instances.extend(batch)
+                    labels.extend(preds)
+                    bar.update(len(preds))
+                    batch.clear()
+                else:
+                    batch.append(
+                        {"content": ins["content"], "id": i, "file": file.name}
+                    )
+                # instances.append(
+                #     {"content": ins["content"], "id": i, "file": file.name}
+                # )
+                # label = model.predict([ins["content"]])[0]
+                # labels.append(label)
+        if len(batch) > 0:
+            preds = model.predict([ins["content"] for ins in batch])
+            instances.extend(batch)
+            labels.extend(preds)
+            bar.update(len(preds))
+            batch.clear()
+
+        logger.info("Predicting finished")
+        # labels = model.predict([ins["content"] for ins in instances])
 
         logger.info("Dumping results")
         out_dir = Path(args.output_dir)
@@ -65,6 +97,7 @@ def main(args):
 
 if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["LOGLEVEL"] = "INFO"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--do_train", action="store_true")

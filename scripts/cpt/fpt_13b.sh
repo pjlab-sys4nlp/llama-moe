@@ -8,7 +8,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70,SH-IDCA1404-10-140-54-47
 
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
@@ -27,6 +26,8 @@ source ~/anaconda3/bin/activate smoe
     # export TORCH_DISTRIBUTED_DEBUG=DETAIL
     # export TORCH_SHOW_CPP_STACKTRACES=1
     # export CUDA_LAUNCH_BLOCKING=1
+
+    comment="13B, expert 1/16, noisy gate"
 
     # model_type="llama"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
@@ -71,6 +72,8 @@ source ~/anaconda3/bin/activate smoe
     echo "output_dir: $output_dir"
     scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     git diff > $output_dir/diff.patch
+    env > $output_dir/.env
+    echo $comment > $output_dir/comment.txt
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -128,10 +131,9 @@ source ~/anaconda3/bin/activate smoe
             --log_level info \
             --log_level_replica warning \
             --log_on_each_node False \
+            --gate_type "TopKBalancedNoisyGate" \
+            --calculator_type "UniversalCalculator" \
+            --num_selects 1 \
             --report_to none
 
 }
-
-            # --gate_type "TopKBalancedNoisyGate" \
-            # --calculator_type "UniversalCalculator" \
-            # --num_selects 1 \

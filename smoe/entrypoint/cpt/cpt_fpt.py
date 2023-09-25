@@ -18,6 +18,7 @@ from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
+from smoe.data.streaming import SubDirWeightedPackedJsonlDataset
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
 from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
@@ -195,22 +196,34 @@ def main():
         # }
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
-        lm_datasets = load_streaming_datasets(
+        lm_datasets = SubDirWeightedPackedJsonlDataset(
             data_args.dataset_dir,
             prob_map=data_args.prob_map,
-            num_proc=data_args.preprocessing_num_workers,
-            debug_mode=training_args.debug_mode,
+            seed=training_args.seed,
             block_size=data_args.block_size,
         )
+        # lm_datasets = load_streaming_datasets(
+        #     data_args.dataset_dir,
+        #     prob_map=data_args.prob_map,
+        #     num_proc=data_args.preprocessing_num_workers,
+        #     debug_mode=training_args.debug_mode,
+        #     block_size=data_args.block_size,
+        # )
 
     if training_args.do_train:
         train_dataset = lm_datasets
         if data_args.max_train_samples is None:
             raise ValueError("max_train_samples cannot be None")
         logger.info("training example:")
-        logger.info(
-            tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
-        )
+        res = None
+        if hasattr(train_dataset, "take"):
+            res = tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
+        else:
+            for x in train_dataset:
+                res = x["input_ids"]
+                break
+            res = tokenizer.decode([x["input_ids"] for x in train_dataset][0])
+        logger.info(res)
 
     eval_dataset = None
     if training_args.do_eval:

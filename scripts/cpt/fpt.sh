@@ -10,23 +10,26 @@
 #SBATCH --mem=0
 #SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-70
 
-#SBATCH --nodes=8
+#SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 
 source ~/anaconda3/bin/activate smoe
 
-num_nodes=8         # should match with --nodes
-num_gpu_per_node=8  # should match with --gres
-
-# #cpu/#num_gpu_per_node
-export OMP_NUM_THREADS=16
-export LOGLEVEL=INFO
-# export NCCL_DEBUG=INFO
-# export TORCH_DISTRIBUTED_DEBUG=DETAIL
-# export TORCH_SHOW_CPP_STACKTRACES=1
-# export CUDA_LAUNCH_BLOCKING=1
 
 {
+    num_nodes=1         # should match with --nodes
+    num_gpu_per_node=8  # should match with --gres
+
+    # #cpu/#num_gpu_per_node
+    export OMP_NUM_THREADS=16
+    export LOGLEVEL=INFO
+    # export NCCL_DEBUG=INFO
+    # export TORCH_DISTRIBUTED_DEBUG=DETAIL
+    # export TORCH_SHOW_CPP_STACKTRACES=1
+    # export CUDA_LAUNCH_BLOCKING=1
+
+    comment="exp purpose"
+
     # model_type="llama"
     # pretrained_model="outputs/llama1_7B_random"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
@@ -66,6 +69,8 @@ export LOGLEVEL=INFO
     echo "output_dir: $output_dir"
     scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     git diff > $output_dir/diff.patch
+    env > $output_dir/.env
+    echo $comment > $output_dir/comment.txt
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
