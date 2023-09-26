@@ -75,6 +75,31 @@ def test_subdir_weighted_pack_with_type():
     """
 
 
+def test_weighted_streaming():
+    prob_map = {
+        "en_cc": 0.67,
+        "en_c4": 0.15,
+        "github": 0.045,
+        "en_wikipedia": 0.045,
+        "en_book": 0.045,
+        "en_arxiv": 0.025,
+        "en_stack": 0.02,
+    }
+    lm_datasets = SubDirWeightedPackedJsonlDataset(
+        "/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed",
+        prob_map=prob_map,
+        seed=1227,
+        block_size=2048,
+    )
+    for ds in lm_datasets:
+        print(ds["input_ids"])
+        break
+    for ds in lm_datasets:
+        print(ds["input_ids"])
+        break
+
+
 if __name__ == "__main__":
     # test_jsonl_dataset()
-    test_subdir_weighted_pack_with_type()
+    # test_subdir_weighted_pack_with_type()
+    test_weighted_streaming()

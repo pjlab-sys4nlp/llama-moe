@@ -12,6 +12,7 @@
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=auto
+#SBATCH --time=5:00:00
 
 source ~/anaconda3/bin/activate smoe
 
@@ -27,13 +28,14 @@ source ~/anaconda3/bin/activate smoe
     # export TORCH_SHOW_CPP_STACKTRACES=1
     # export CUDA_LAUNCH_BLOCKING=1
 
-    comment="13B, expert 1/16, noisy gate"
+    comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4"
+    # comment="random initialized llama1-7B"
 
     # model_type="llama"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     model_type="llama_moe"
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
     # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     # pretrained_model=$1
@@ -43,11 +45,12 @@ source ~/anaconda3/bin/activate smoe
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_13B-16Select4-up_proj
 
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax-copy/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-    lr=2e-4
+    lr=4e-4
     final_lr_portion=0.1
     per_device_train_batch_size=8
     per_device_eval_batch_size=1
@@ -133,7 +136,7 @@ source ~/anaconda3/bin/activate smoe
             --log_on_each_node False \
             --gate_type "TopKBalancedNoisyGate" \
             --calculator_type "UniversalCalculator" \
-            --num_selects 1 \
+            --num_selects 4 \
             --report_to none
 
 }

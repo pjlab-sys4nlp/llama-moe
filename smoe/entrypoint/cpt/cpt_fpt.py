@@ -1,6 +1,7 @@
 import os
 
 import torch
+from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -220,9 +221,9 @@ def main():
             res = tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
         else:
             for x in train_dataset:
-                res = x["input_ids"]
+                input_ids = x["input_ids"]
                 break
-            res = tokenizer.decode([x["input_ids"] for x in train_dataset][0])
+            res = tokenizer.decode(input_ids)
         logger.info(res)
 
     eval_dataset = None
@@ -236,6 +237,10 @@ def main():
             else getattr(torch, model_args.torch_dtype)
         )
         ModelClass = MODEL_MAP[model_args.model_type]
+
+        # model = LlamaForCausalLM(config)
+        # model.to(torch_dtype)
+
         model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -246,6 +251,7 @@ def main():
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
         )
+
         # train an MoE model from scratch 👇
         # config.num_hidden_layers = 20
         # model: LlamaMoEForCausalLM = LlamaMoEForCausalLM(config)

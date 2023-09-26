@@ -36,8 +36,11 @@ def group_instances(examples: list[dict], block_size: int = 2048) -> list[dict]:
             examples: a list of dict instances that have multiple keys
         """
         concatenated_examples = {}
-        for k in examples[0].keys():
+        keys = examples[0].keys()
+        for k in keys:
             concatenated_examples[k] = list(chain(*[e[k] for e in examples]))
+        if "labels" not in keys and "input_ids" in keys:
+            concatenated_examples["labels"] = concatenated_examples["input_ids"]
         return concatenated_examples
 
     def _chunk(examples: dict, block_size: int) -> list[dict]:

@@ -707,20 +707,24 @@ class LlamaLrSchedulingTrainer(Trainer):
                         args, self.state, self.control
                     )
 
+                    keys = [
+                        "balance_loss",
+                        "num_dropped_tokens",
+                        "gate_load",
+                        "gate_importance",
+                    ]
+                    _result_dict = {key: None for key in keys}
+                    for key in keys:
+                        if hasattr(model_training_outputs, key):
+                            _result_dict[key] = getattr(model_training_outputs, key)
+
                     self._maybe_log_save_evaluate(
                         tr_loss,
                         model,
                         trial,
                         epoch,
                         ignore_keys_for_eval,
-                        balance_loss=getattr(model_training_outputs, "balance_loss"),
-                        num_dropped_tokens=getattr(
-                            model_training_outputs, "num_dropped_tokens"
-                        ),
-                        gate_load=getattr(model_training_outputs, "gate_load"),
-                        gate_importance=getattr(
-                            model_training_outputs, "gate_importance"
-                        ),
+                        **_result_dict,
                     )
                 else:
                     self.control = self.callback_handler.on_substep_end(
