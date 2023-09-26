@@ -5,11 +5,10 @@
 #SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --mem=0
-#SBATCH --quotatype=auto
 
 num_nodes=1        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
@@ -39,18 +38,23 @@ save_path=${data_path}/moefication_results/split
 pretrained_model=${data_path}/models/${llama_size}
 tokenizer_path=${data_path}/models/${llama_size}
 
-dataset_dir=${data_path}/data/8clusters
-total_clusters=8
-dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl")
+#dataset_dir=${data_path}/data/clustering_tokenized/4clusters
+#total_clusters=4
+#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl")
+
+#dataset_dir=${data_path}/data/clustering_tokenized/8clusters
+#total_clusters=8
+#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl")
 
 #total_clusters=16
-#dataset_dir=${data_path}/data/16clusters
+#dataset_dir=${data_path}/data/clustering_tokenized/16clusters
 #dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
 
-#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl")
-#dataset_name=("8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
-#dataset_name=("16.jsonl" "17.jsonl" "18.jsonl" "19.jsonl" "20.jsonl" "21.jsonl" "22.jsonl" "23.jsonl")
-#dataset_name=("24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
+total_clusters=32
+dataset_dir=${data_path}/data/clustering_tokenized/32clusters
+#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl" "16.jsonl" "17.jsonl" "18.jsonl" "19.jsonl" "20.jsonl" "21.jsonl" "22.jsonl" "23.jsonl" "24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
+
+#dataset_name=("7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
 
 #dataset_name=("0.jsonl")
 #dataset_name=("1.jsonl")
@@ -68,6 +72,22 @@ dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jso
 #dataset_name=("13.jsonl")
 #dataset_name=("14.jsonl")
 #dataset_name=("15.jsonl")
+#dataset_name=("16.jsonl")
+#dataset_name=("17.jsonl")
+#dataset_name=("18.jsonl")
+#dataset_name=("19.jsonl")
+#dataset_name=("20.jsonl")
+#dataset_name=("21.jsonl")
+#dataset_name=("22.jsonl")
+#dataset_name=("23.jsonl")
+#dataset_name=("24.jsonl")
+#dataset_name=("25.jsonl")
+#dataset_name=("26.jsonl")
+#dataset_name=("27.jsonl")
+#dataset_name=("28.jsonl")
+#dataset_name=("29.jsonl")
+#dataset_name=("30.jsonl")
+#dataset_name=("31.jsonl")
 
 #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
 ###################################################################

@@ -47,7 +47,9 @@ def main(args):
         model_llama_moe.set_moe_calculator_capacity_factor(1.25)
 
     # ---- different here ---- #
-    model_llama_moe.set_moe_residual_calculator_score_scale_factor(12.0)  # 修改residual的权重放缩系数
+    model_llama_moe.set_moe_residual_calculator_score_scale_factor(
+        12.0
+    )  # 修改residual的权重放缩系数
 
     """prepare data"""
     sentence_list = [

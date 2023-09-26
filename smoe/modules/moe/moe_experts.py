@@ -85,11 +85,13 @@ class LinearGLUExperts(nn.Module):
         self.num_experts = num_experts
         self.size_experts = size_experts
 
-        if size_experts is None:  # all experts share the same number of hidden neurons
+        if size_experts is None:
+            # all experts share the same number of hidden neurons
             assert hidden_features % num_experts == 0
             size_per_expert = hidden_features // num_experts
             size_experts = [size_per_expert for _ in range(num_experts)]
-        else:  # use specified expert sizes
+        else:
+            # use specified expert sizes
             assert (
                 len(size_experts) == num_experts
                 and sum(size_experts) == hidden_features
