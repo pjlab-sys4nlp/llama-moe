@@ -192,10 +192,12 @@ class LlamaLrSchedulingTrainer(Trainer):
                 4,
             )
             logs["learning_rate"] = self._get_learning_rate()
-            logs["num_dropped_tokens"] = num_dropped_tokens
-            logs["gate_load"] = gate_load
-            logs["gate_importance"] = gate_importance
-            logs["balance_loss"] = balance_loss
+            logs["num_dropped_tokens"] = [x.item() for x in num_dropped_tokens]
+            logs["gate_load"] = [x.detach().cpu().tolist() for x in gate_load]
+            logs["gate_importance"] = [
+                x.detach().cpu().tolist() for x in gate_importance
+            ]
+            logs["balance_loss"] = balance_loss.item()
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -376,6 +378,8 @@ class LlamaLrSchedulingTrainer(Trainer):
             self._created_lr_scheduler = False
 
         if self.is_deepspeed_enabled:
+            # # zhutong: move model to cuda device for fused optim init
+            # self.model.to(self.accelerator.device)
             self.optimizer, self.lr_scheduler = deepspeed_init(
                 self, num_training_steps=max_steps
             )

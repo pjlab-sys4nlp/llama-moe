@@ -2,9 +2,14 @@
 
 set -vx
 
-tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-data_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data
-out_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+# tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+# data_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data
+# out_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+
+tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_3B
+data_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples
+out_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+
 logs_dir=logs
 
 mkdir -p $logs_dir

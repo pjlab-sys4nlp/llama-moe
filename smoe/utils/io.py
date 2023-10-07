@@ -45,7 +45,10 @@ class load_jsonlines_iter:
 
     def __iter__(self):
         for line in self.fin:
-            yield json.loads(line)
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                pass
         self.fin.close()
 
 

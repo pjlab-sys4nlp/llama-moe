@@ -49,7 +49,7 @@ CONFIG_MAPPING.update(
 )
 
 
-# @wechat_sender()
+@wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -132,7 +132,7 @@ def main():
 
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
-        config.num_hidden_layers = 2
+        config.num_hidden_layers = 1
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
@@ -177,6 +177,13 @@ def main():
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
     if data_args.prob_map is None:
+        # slimpajama samples openllama-3B tokenized
+        # data_args.prob_map = {
+        #     "cc": 0.67,
+        #     "wikipedia": 0.33,
+        # }
+
+        # redpajama
         data_args.prob_map = {
             "en_cc": 0.67,
             "en_c4": 0.15,
@@ -239,6 +246,7 @@ def main():
         ModelClass = MODEL_MAP[model_args.model_type]
 
         # model = LlamaForCausalLM(config)
+        # model.half()
         # model.to(torch_dtype)
 
         model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(

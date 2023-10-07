@@ -3,6 +3,8 @@
 #SBATCH --job-name=cpt-13b-test
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
+##SBATCH --output=logs/%x.log
+##SBATCH --error=logs/%x.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -12,7 +14,7 @@
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=auto
-#SBATCH --time=5:00:00
+##SBATCH --time=5:00:00
 
 source ~/anaconda3/bin/activate smoe
 
@@ -28,29 +30,40 @@ source ~/anaconda3/bin/activate smoe
     # export TORCH_SHOW_CPP_STACKTRACES=1
     # export CUDA_LAUNCH_BLOCKING=1
 
+    # comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4, expert weight re-scale"
     comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4"
     # comment="random initialized llama1-7B"
+    # comment="random initialized llama1-13B"
+    # comment="7B, expert 4/16, noisy gate, gradient shared neurons, w/o residual, w/o weight re-scale, lr2e-4"
+    # comment="3B MoE, debug"
 
     # model_type="llama"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/llama_13B"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     model_type="llama_moe"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_3B-8Select2-4320Neurons-Share"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-16Select4-688Neurons-Share"
     pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    # pretrained_model=$1
-    echo "==================> $pretrained_model <=================="
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Graph-l2_norm/llama_13B-16Select4-up_proj
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_13B-16Select4-up_proj
+    # pretrained_model=$1
+    echo "==================> $pretrained_model <=================="
 
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax-copy/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # tokenizer_path="/mnt/petrelfs/share_data/quxiaoye/models/llama_3B"
 
-    lr=4e-4
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # dataset_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+
+    lr=2e-4
     final_lr_portion=0.1
     per_device_train_batch_size=8
     per_device_eval_batch_size=1
@@ -71,6 +84,7 @@ source ~/anaconda3/bin/activate smoe
 
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    # output_dir=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-13b-16gpus-lr2e-4
     mkdir -p $output_dir
     echo "output_dir: $output_dir"
     scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
@@ -85,6 +99,7 @@ source ~/anaconda3/bin/activate smoe
     echo "Node: $head_node"
     echo "Node IP: $head_node_ip"
 
+            # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-13b-16gpus-lr2e-4/checkpoint-2000 \
     srun torchrun \
         --nnodes ${num_nodes} \
         --nproc_per_node ${num_gpu_per_node} \
@@ -117,7 +132,7 @@ source ~/anaconda3/bin/activate smoe
             --max_steps ${max_steps} \
             --max_train_samples ${max_train_samples} \
             --save_strategy steps \
-            --save_total_limit 2 \
+            --save_total_limit 1 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
