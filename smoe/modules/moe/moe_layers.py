@@ -104,8 +104,8 @@ class BaseMoELayer(nn.Module):
             hidden_states=y,
             balance_loss=gate_outputs.get("balance_loss", None),
             num_dropped_tokens=calc_outs.num_dropped_tokens,
-            gate_load=gate_outputs.get("load", None),
-            gate_importance=gate_outputs.get("importance", None),
+            gate_load=gate_outputs.get("load", torch.tensor(-1)),
+            gate_importance=gate_outputs.get("importance", torch.tensor(-1)),
         )
 
     # fmt: off

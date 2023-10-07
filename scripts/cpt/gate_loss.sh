@@ -75,7 +75,7 @@ export GATE_LOSS_RESULTS_DIR="results/RandomSplit-l2_norm-llama_7B-16Select4-up_
         --rdzv_id $RANDOM \
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
-        smoe/entrypoint/cpt_fpt.py \
+        smoe/entrypoint/cpt/cpt_fpt.py \
             --ignore_data_skip \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \

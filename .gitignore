@@ -167,7 +167,7 @@ outputs/
 /visualization/
 results/analysis/cluster_*.png
 results/expert_load_vis
-results/analysis_clustering7
+results/analysis_clustering*
 results/gate_loss_100b
 results/RandomSplit-l2_norm-llama_7B-16Select4-up_proj
 results/gate_loss_original_clustering_model

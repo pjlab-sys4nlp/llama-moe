@@ -33,7 +33,7 @@ class UniversalCalculator(nn.Module):
         # fmt: off
         """正向传播"""
         """临时变量"""
-        batch_size = topK_indices.size(0)
+        batch_size = topK_indices.size(0)  # topK_indices: (bsz*seq_len, num_selects)
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
@@ -59,6 +59,7 @@ class UniversalCalculator(nn.Module):
         expert_outputs = [self.experts(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
 
         """重组各个专家的输出，并进行加权"""
+        # (bsz*seq_len*num_selects, hidden_size)
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
@@ -66,7 +67,7 @@ class UniversalCalculator(nn.Module):
         zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
 
-        return CalculatorOutput(hidden_states=y)
+        return CalculatorOutput(hidden_states=y, num_dropped_tokens=torch.tensor(-1.0))
         # fmt: on
 
 
@@ -147,4 +148,6 @@ class SwitchDropTokenCalculator(nn.Module):
             # 乘权重
             y = torch.mul(y, topK_scores.reshape(-1, 1) * self.score_scale_factor)
 
-        return CalculatorOutput(hidden_states=y, num_dropped_tokens=num_dropped_tokens)
+        return CalculatorOutput(
+            hidden_states=y, num_dropped_tokens=torch.tensor(num_dropped_tokens)
+        )

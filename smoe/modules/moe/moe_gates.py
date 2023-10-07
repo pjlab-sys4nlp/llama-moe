@@ -1,8 +1,7 @@
 import warnings
 
 import torch
-
-# from deepspeed.moe.sharded_moe import gumbel_rsample
+from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
 from torch.distributions.normal import Normal
 
@@ -22,7 +21,7 @@ def get_gate_network(gate_type, input_size, num_experts):
             torch.nn.Linear(num_experts, num_experts, bias=False),
         )
     else:
-        raise ValueError(f'Expected "gate_type" in {valid_gate_type}, got {gate_type}')
+        raise ValueError(f'Expected "gate_type" in {valid_gate_type}, got {gate_type}.')
 
     return gate_network
 
@@ -133,6 +132,7 @@ class TopKBalancedNoisyGate(nn.Module):
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
+            # logits_noise = noise_control * gumbel_rsample(logits_gate.shape, device=logits_gate.device).to(logits_gate)
             logits = logits_gate + logits_noise  # 最终权重
         else:
             logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
@@ -183,8 +183,8 @@ class TopKBalancedNoisyGate(nn.Module):
             "topK_indices": top_k_indices,
             "topK_scores": top_k_scores,
             "balance_loss": balance_loss,
-            "load": load.tolist(),
-            "importance": importance.tolist(),
+            "load": load,
+            "importance": importance,
         }
 
     def forward_return_scores(self, x):
@@ -245,8 +245,8 @@ class TopKBalancedNoisyGate(nn.Module):
         return {
             "scores": scores,
             "balance_loss": balance_loss,
-            "load": load.tolist(),
-            "importance": importance.tolist(),
+            "load": load,
+            "importance": importance,
         }
 
     # fmt: on
@@ -272,7 +272,7 @@ class SwitchBalancedGate(nn.Module):
         gate_network="mlp",
         use_softmax=True,
         use_balance=True,
-        balance_loss_weight=1e-1,
+        balance_loss_weight=1e-2,
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
@@ -324,8 +324,8 @@ class SwitchBalancedGate(nn.Module):
             "topK_scores": top1_scores,
             "expert_batch_size": load.tolist(),
             "balance_loss": balance_loss,
-            "load": load_mean.tolist(),
-            "importance": importance_mean.tolist(),
+            "load": load_mean,
+            "importance": importance_mean,
         }
 
     def reset_gate_network(self):
