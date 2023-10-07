@@ -76,7 +76,6 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
     num_warmup_steps: int,
     num_training_steps: int,
     num_cycles: float,
-    learning_rate: float,
     final_lr_portion: float,
 ):
     if current_step < num_warmup_steps:
@@ -85,7 +84,7 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
         max(1, num_training_steps - num_warmup_steps)
     )
     return max(
-        learning_rate * final_lr_portion,
+        final_lr_portion,
         0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)),
     )
 
@@ -110,7 +109,6 @@ class LlamaLrSchedulingTrainer(Trainer):
             num_warmup_steps=num_warmup_steps,
             num_training_steps=num_training_steps,
             num_cycles=0.5,
-            learning_rate=self.args.learning_rate,
             final_lr_portion=self.args.final_lr_portion,
         )
         last_epoch = -1
@@ -147,6 +145,7 @@ class LlamaLrSchedulingTrainer(Trainer):
             return loss_mb.reduce_mean().detach().to(self.args.device)
 
         with self.compute_loss_context_manager():
+            # zhutong: return outputs
             loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
 
         if self.args.n_gpu > 1:
@@ -160,42 +159,8 @@ class LlamaLrSchedulingTrainer(Trainer):
         else:
             self.accelerator.backward(loss)
 
+        # zhutong: return outputs
         return loss.detach() / self.args.gradient_accumulation_steps, outputs
-
-    def compute_loss(self, model, inputs, return_outputs=False):
-        """
-        How the loss is computed by Trainer. By default, all models return the loss in the first element.
-
-        Subclass and override for custom behavior.
-        """
-        if self.label_smoother is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        else:
-            labels = None
-        outputs = model(**inputs)
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        if labels is not None:
-            if (
-                unwrap_model(model)._get_name()
-                in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values()
-            ):
-                loss = self.label_smoother(outputs, labels, shift_labels=True)
-            else:
-                loss = self.label_smoother(outputs, labels)
-        else:
-            if isinstance(outputs, dict) and "loss" not in outputs:
-                raise ValueError(
-                    "The model did not return a loss from the inputs, only the following keys: "
-                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
-                )
-            # We don't use .loss here since the model may return tuples instead of ModelOutput.
-            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-
-        return (loss, outputs) if return_outputs else loss
 
     def _maybe_log_save_evaluate(
         self,
@@ -227,10 +192,12 @@ class LlamaLrSchedulingTrainer(Trainer):
                 4,
             )
             logs["learning_rate"] = self._get_learning_rate()
-            logs["num_dropped_tokens"] = num_dropped_tokens
-            logs["gate_load"] = gate_load
-            logs["gate_importance"] = gate_importance
-            logs["balance_loss"] = balance_loss
+            logs["num_dropped_tokens"] = [x.item() for x in num_dropped_tokens]
+            logs["gate_load"] = [x.detach().cpu().tolist() for x in gate_load]
+            logs["gate_importance"] = [
+                x.detach().cpu().tolist() for x in gate_importance
+            ]
+            logs["balance_loss"] = balance_loss.item()
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -411,6 +378,8 @@ class LlamaLrSchedulingTrainer(Trainer):
             self._created_lr_scheduler = False
 
         if self.is_deepspeed_enabled:
+            # # zhutong: move model to cuda device for fused optim init
+            # self.model.to(self.accelerator.device)
             self.optimizer, self.lr_scheduler = deepspeed_init(
                 self, num_training_steps=max_steps
             )
@@ -742,20 +711,24 @@ class LlamaLrSchedulingTrainer(Trainer):
                         args, self.state, self.control
                     )
 
+                    keys = [
+                        "balance_loss",
+                        "num_dropped_tokens",
+                        "gate_load",
+                        "gate_importance",
+                    ]
+                    _result_dict = {key: None for key in keys}
+                    for key in keys:
+                        if hasattr(model_training_outputs, key):
+                            _result_dict[key] = getattr(model_training_outputs, key)
+
                     self._maybe_log_save_evaluate(
                         tr_loss,
                         model,
                         trial,
                         epoch,
                         ignore_keys_for_eval,
-                        balance_loss=getattr(model_training_outputs, "balance_loss"),
-                        num_dropped_tokens=getattr(
-                            model_training_outputs, "num_dropped_tokens"
-                        ),
-                        gate_load=getattr(model_training_outputs, "gate_load"),
-                        gate_importance=getattr(
-                            model_training_outputs, "gate_importance"
-                        ),
+                        **_result_dict,
                     )
                 else:
                     self.control = self.callback_handler.on_substep_end(

@@ -1,59 +1,80 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-moe-fpt-13b-64gpus-bs8_4-task_test
+#SBATCH --job-name=cpt-13b-test
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
+##SBATCH --output=logs/%x.log
+##SBATCH --error=logs/%x.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116
-#SBATCH --time=8:00:00
 
-#SBATCH --nodes=8
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
+#SBATCH --quotatype=auto
+##SBATCH --time=5:00:00
 
 source ~/anaconda3/bin/activate smoe
 
 {
-    num_nodes=8         # should match with --nodes
+    num_nodes=2         # should match with --nodes
     num_gpu_per_node=8  # should match with --gres
 
     # #cpu/#num_gpu_per_node
-    export OMP_NUM_THREADS=4
+    export OMP_NUM_THREADS=16
     export LOGLEVEL=INFO
     # export NCCL_DEBUG=INFO
     # export TORCH_DISTRIBUTED_DEBUG=DETAIL
     # export TORCH_SHOW_CPP_STACKTRACES=1
     # export CUDA_LAUNCH_BLOCKING=1
 
-    lr=3e-4
+    # comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4, expert weight re-scale"
+    comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4"
+    # comment="random initialized llama1-7B"
+    # comment="random initialized llama1-13B"
+    # comment="7B, expert 4/16, noisy gate, gradient shared neurons, w/o residual, w/o weight re-scale, lr2e-4"
+    # comment="3B MoE, debug"
 
     # model_type="llama"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # model_type="llama_moe"
-    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/llama_13B"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     model_type="llama_moe"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_3B-8Select2-4320Neurons-Share"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-16Select4-688Neurons-Share"
+    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
-    # pretrained_model=$1
-    echo "==================> $pretrained_model <=================="
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Clustering-l2/llama_13B-16Select4-up_proj
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Graph-l2_norm/llama_13B-16Select4-up_proj
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_13B-16Select4-up_proj
+    # pretrained_model=$1
+    echo "==================> $pretrained_model <=================="
 
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax-copy/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # tokenizer_path="/mnt/petrelfs/share_data/quxiaoye/models/llama_3B"
 
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # dataset_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+
+    lr=2e-4
+    final_lr_portion=0.1
     per_device_train_batch_size=8
     per_device_eval_batch_size=1
     gradient_accumulation_steps=4
+    num_tokens="3*10^11"
+    seed=1227
     block_size=2048
-    max_steps=$(echo "10^11 / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "10^11 / $block_size" | bc)
+    deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
+
+    max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
+    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
@@ -63,8 +84,13 @@ source ~/anaconda3/bin/activate smoe
 
     data_cache=resources/cache
     output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+    # output_dir=/mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-13b-16gpus-lr2e-4
+    mkdir -p $output_dir
     echo "output_dir: $output_dir"
-    deepspeed_config_file=conf/deepspeed/bf16_zero2_default.json
+    scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
+    git diff > $output_dir/diff.patch
+    env > $output_dir/.env
+    echo $comment > $output_dir/comment.txt
 
     nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIS ) )
     nodes_array=($nodes)
@@ -73,6 +99,7 @@ source ~/anaconda3/bin/activate smoe
     echo "Node: $head_node"
     echo "Node IP: $head_node_ip"
 
+            # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/models/tzhu_model_bak/cpt-13b-16gpus-lr2e-4/checkpoint-2000 \
     srun torchrun \
         --nnodes ${num_nodes} \
         --nproc_per_node ${num_gpu_per_node} \
@@ -80,7 +107,7 @@ source ~/anaconda3/bin/activate smoe
         --rdzv_id $RANDOM \
         --rdzv_backend c10d \
         --rdzv_endpoint $head_node:29518 \
-        smoe/entrypoint/cpt_fpt.py \
+        smoe/entrypoint/cpt/cpt_fpt.py \
             --deepspeed ${deepspeed_config_file} \
             --model_name_or_path ${pretrained_model} \
             --model_type ${model_type} \
@@ -91,10 +118,10 @@ source ~/anaconda3/bin/activate smoe
             --per_device_train_batch_size ${per_device_train_batch_size} \
             --per_device_eval_batch_size ${per_device_eval_batch_size} \
             --do_train \
-            --seed $RANDOM \
+            --seed ${seed} \
             --bf16 \
             --num_train_epochs 1 \
-            --final_lr_portion 0.1 \
+            --final_lr_portion ${final_lr_portion} \
             --optim adamw_torch \
             --adam_beta1 0.9 \
             --adam_beta2 0.95 \
@@ -103,9 +130,7 @@ source ~/anaconda3/bin/activate smoe
             --max_grad_norm 1.0 \
             --warmup_steps 2000 \
             --max_steps ${max_steps} \
-            --max_train_samples 48828125 \
-            --logging_strategy steps \
-            --logging_steps 10 \
+            --max_train_samples ${max_train_samples} \
             --save_strategy steps \
             --save_total_limit 1 \
             --save_steps 1000 \
@@ -115,10 +140,18 @@ source ~/anaconda3/bin/activate smoe
             --output_dir ${output_dir} \
             --overwrite_output_dir \
             --ddp_timeout 30000 \
-            --logging_first_step True \
-            --torch_dtype bfloat16 \
             --ddp_find_unused_parameters False \
+            --torch_dtype bfloat16 \
             --gradient_checkpointing \
-            --report_to none \
-            --log_level info
+            --logging_first_step True \
+            --logging_strategy steps \
+            --logging_steps 10 \
+            --log_level info \
+            --log_level_replica warning \
+            --log_on_each_node False \
+            --gate_type "TopKBalancedNoisyGate" \
+            --calculator_type "UniversalCalculator" \
+            --num_selects 4 \
+            --report_to none
+
 }

@@ -87,6 +87,15 @@ class ModelArguments:
             )
         },
     )
+    use_legacy_tokenizer: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Whether to use the legacy tokenization or not. Only has an effect when"
+                " using a sentencepiece-based tokenizer. Ref: https://github.com/huggingface/transformers/pull/24565"
+            )
+        },
+    )
     model_revision: str = field(
         default="main",
         metadata={

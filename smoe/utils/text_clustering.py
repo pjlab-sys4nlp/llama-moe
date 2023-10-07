@@ -20,7 +20,7 @@ class TextClustering:
         return self.kmeans.n_clusters
 
     def encode_emb(self, sentences: list[str]) -> np.ndarray:
-        arr: np.ndarray = self.emb.encode(sentences=sentences)
+        arr: np.ndarray = self.emb.encode(sentences=sentences, show_progress_bar=False)
         return arr
 
     def fit_emb(self, emb: np.ndarray):

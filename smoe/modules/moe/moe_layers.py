@@ -47,8 +47,8 @@ class BaseMoELayer(nn.Module):
             hidden_states=y,
             balance_loss=gate_outputs.get("balance_loss"),
             num_dropped_tokens=calc_outs.num_dropped_tokens,
-            gate_load=gate_outputs.get("load"),
-            gate_importance=gate_outputs.get("importance"),
+            gate_load=gate_outputs.get("load", torch.tensor(-1)),
+            gate_importance=gate_outputs.get("importance", torch.tensor(-1)),
         )
 
     def set_num_selects(self, num_selects):

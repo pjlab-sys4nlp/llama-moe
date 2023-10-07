@@ -191,6 +191,9 @@ def visualize_swiglu_output(
 
 
 def find_factors_with_minimal_sum(number):
+    if number == 1:
+        return (1, 1)
+
     # Initialize variables to keep track of the factors with the minimal sum
     min_sum = float("inf")
     min_factors = None
@@ -286,8 +289,8 @@ def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
     axes = axes.reshape(*img_grid)
     for i in range(data.shape[0]):
         ax = axes[i // img_grid[1], i % img_grid[1]]
-        im = ax.imshow(
-            data[i].cpu().reshape(*shape).float().numpy(),
+        ax.imshow(
+            data[i].cpu().reshape(*shape).float().detach().numpy(),
             cmap=cmap,
             interpolation="nearest",
             # vmin=0.0,

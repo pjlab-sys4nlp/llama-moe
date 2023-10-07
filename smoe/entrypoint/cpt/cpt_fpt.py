@@ -1,6 +1,7 @@
 import os
 
 import torch
+from torch.distributed.elastic.multiprocessing.errors import record
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -18,6 +19,7 @@ from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
+from smoe.data.streaming import SubDirWeightedPackedJsonlDataset
 from smoe.metrics.accuracy import compute_metrics
 from smoe.metrics.preprocess import logits_argmax
 from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
@@ -66,9 +68,12 @@ def main():
     logger.info(f"Training args: {training_args.to_json_string()}")
 
     if training_args.debug_mode:
+        import torch.distributed as dist
+
         from smoe.utils.debugging import remote_breakpoint
 
-        remote_breakpoint()
+        if dist.get_rank() == 0:
+            remote_breakpoint()
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -127,13 +132,14 @@ def main():
 
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
-        config.num_hidden_layers = 2
+        config.num_hidden_layers = 1
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
         "use_fast": model_args.use_fast_tokenizer,
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
+        "legacy": True if model_args.use_legacy_tokenizer else False,
     }
     if model_args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
@@ -171,6 +177,13 @@ def main():
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
     if data_args.prob_map is None:
+        # slimpajama samples openllama-3B tokenized
+        # data_args.prob_map = {
+        #     "cc": 0.67,
+        #     "wikipedia": 0.33,
+        # }
+
+        # redpajama
         data_args.prob_map = {
             "en_cc": 0.67,
             "en_c4": 0.15,
@@ -191,22 +204,34 @@ def main():
         # }
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
-        lm_datasets = load_streaming_datasets(
+        lm_datasets = SubDirWeightedPackedJsonlDataset(
             data_args.dataset_dir,
             prob_map=data_args.prob_map,
-            num_proc=data_args.preprocessing_num_workers,
-            debug_mode=training_args.debug_mode,
+            seed=training_args.seed,
             block_size=data_args.block_size,
         )
+        # lm_datasets = load_streaming_datasets(
+        #     data_args.dataset_dir,
+        #     prob_map=data_args.prob_map,
+        #     num_proc=data_args.preprocessing_num_workers,
+        #     debug_mode=training_args.debug_mode,
+        #     block_size=data_args.block_size,
+        # )
 
     if training_args.do_train:
         train_dataset = lm_datasets
         if data_args.max_train_samples is None:
             raise ValueError("max_train_samples cannot be None")
         logger.info("training example:")
-        logger.info(
-            tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
-        )
+        res = None
+        if hasattr(train_dataset, "take"):
+            res = tokenizer.decode([x["input_ids"] for x in train_dataset.take(1)][0])
+        else:
+            for x in train_dataset:
+                input_ids = x["input_ids"]
+                break
+            res = tokenizer.decode(input_ids)
+        logger.info(res)
 
     eval_dataset = None
     if training_args.do_eval:
@@ -219,6 +244,11 @@ def main():
             else getattr(torch, model_args.torch_dtype)
         )
         ModelClass = MODEL_MAP[model_args.model_type]
+
+        # model = LlamaForCausalLM(config)
+        # model.half()
+        # model.to(torch_dtype)
+
         model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -229,6 +259,7 @@ def main():
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=True,
         )
+
         # train an MoE model from scratch 👇
         # config.num_hidden_layers = 20
         # model: LlamaMoEForCausalLM = LlamaMoEForCausalLM(config)

@@ -98,6 +98,7 @@ class TopKBalancedNoisyGate(nn.Module):
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
+            # logits_noise = noise_control * gumbel_rsample(logits_gate.shape, device=logits_gate.device).to(logits_gate)
             logits = logits_gate + logits_noise  # 最终权重
         else:
             logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
@@ -110,6 +111,9 @@ class TopKBalancedNoisyGate(nn.Module):
 
         """专家平衡选择"""
         # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下gate loss输出值设备不匹配的错误
+        load = torch.tensor(-1.0)
+        importance = torch.tensor(-1.0)
+
         if self.training and self.use_balance:
             """计算importance"""
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
@@ -142,8 +146,8 @@ class TopKBalancedNoisyGate(nn.Module):
             "topK_indices": top_k_indices,
             "topK_scores": top_k_scores,
             "balance_loss": balance_loss,
-            "load": load.tolist(),
-            "importance": importance.tolist(),
+            "load": load,
+            "importance": importance,
         }
 
     def forward_return_scores(self, x):
@@ -224,7 +228,7 @@ class SwitchBalancedGate(nn.Module):
         gate_network="mlp",
         use_softmax=True,
         use_balance=True,
-        balance_loss_weight=1e-1,
+        balance_loss_weight=1e-2,
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
@@ -276,8 +280,8 @@ class SwitchBalancedGate(nn.Module):
             "topK_scores": top1_scores,
             "expert_batch_size": load.tolist(),
             "balance_loss": balance_loss,
-            "load": load_mean.tolist(),
-            "importance": importance_mean.tolist(),
+            "load": load_mean,
+            "importance": importance_mean,
         }
 
     def reset_gate_network(self):

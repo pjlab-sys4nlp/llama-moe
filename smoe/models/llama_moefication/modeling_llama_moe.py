@@ -29,13 +29,14 @@ _CONFIG_FOR_DOC = "LlamaMoEConfig"
 
 @dataclass
 class MoEDecoderLayerOutput(ModelOutput):
+    # zhutong: do not change the order of these fields!!
     hidden_states: Optional[torch.FloatTensor] = None
+    balance_loss: Optional[float] = None
+    num_dropped_tokens: Optional[torch.Tensor] = None
+    gate_load: Optional[list[torch.Tensor]] = None
+    gate_importance: Optional[list[torch.Tensor]] = None
     self_attn_weights: Optional[torch.FloatTensor] = None
     present_key_value: Optional[torch.FloatTensor] = None
-    balance_loss: Optional[float] = None
-    num_dropped_tokens: Optional[int] = None
-    gate_load: Optional[list] = None
-    gate_importance: Optional[list] = None
 
 
 @dataclass
@@ -50,7 +51,7 @@ class BaseMoEModelOutputWithPast(ModelOutput):
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     balance_loss: Optional[float] = None
-    num_dropped_tokens: Optional[Tuple[int]] = None
+    num_dropped_tokens: Optional[Tuple[torch.Tensor]] = None
     gate_load: Optional[Tuple[list]] = None
     gate_importance: Optional[Tuple[list]] = None
 
@@ -134,15 +135,23 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         mlp_outs: MoEMlpOutput = self.mlp(hidden_states)
         hidden_states = residual + mlp_outs.hidden_states
 
-        outputs = MoEDecoderLayerOutput(
-            hidden_states=hidden_states,
-            balance_loss=mlp_outs.balance_loss,
-            self_attn_weights=self_attn_weights if output_attentions else None,
-            present_key_value=present_key_value if use_cache else None,
-            num_dropped_tokens=mlp_outs.num_dropped_tokens,
-            gate_load=mlp_outs.gate_load,
-            gate_importance=mlp_outs.gate_importance,
+        outputs = (
+            hidden_states,
+            mlp_outs.balance_loss,
+            mlp_outs.num_dropped_tokens,
+            mlp_outs.gate_load,
+            mlp_outs.gate_importance,
         )
+        if output_attentions:
+            outputs += (self_attn_weights,)
+        if use_cache:
+            outputs += (present_key_value,)
+
+        for i, _o in enumerate(outputs):
+            if not isinstance(_o, torch.Tensor):
+                raise RuntimeError(
+                    f"outputs[{i}]({type(_o)}) should be torch.Tensor to support grad ckpt"
+                )
 
         return outputs
 
@@ -313,17 +322,15 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
 
                     return custom_forward
 
-                layer_outputs: MoEDecoderLayerOutput = (
-                    torch.utils.checkpoint.checkpoint(
-                        create_custom_forward(decoder_layer),
-                        hidden_states,
-                        attention_mask,
-                        position_ids,
-                        None,
-                    )
+                layer_outputs: tuple = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(decoder_layer),
+                    hidden_states,
+                    attention_mask,
+                    position_ids,
+                    None,
                 )
             else:
-                layer_outputs: MoEDecoderLayerOutput = decoder_layer(
+                layer_outputs: tuple = decoder_layer(
                     hidden_states,
                     attention_mask=attention_mask,
                     position_ids=position_ids,
@@ -331,6 +338,7 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                 )
+            layer_outputs = MoEDecoderLayerOutput(*layer_outputs)
 
             hidden_states = layer_outputs.hidden_states
             if layer_outputs.balance_loss is not None:
@@ -432,7 +440,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
-        **kwargs
+        **kwargs,
     ):
         output_attentions = (
             output_attentions
@@ -490,7 +498,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             num_dropped_tokens=outputs.num_dropped_tokens,
-            balance_loss=outputs.balance_loss.item(),
+            balance_loss=outputs.balance_loss,
             gate_load=outputs.gate_load,
             gate_importance=outputs.gate_importance,
         )
