@@ -1,8 +1,5 @@
-import math
-
 import torch
 from deepspeed.moe.sharded_moe import gumbel_rsample
-from einops import einsum, rearrange
 from torch import nn
 from torch.distributions.normal import Normal
 
@@ -287,60 +284,3 @@ class SwitchBalancedGate(nn.Module):
         for name, param in self.gate_network.named_parameters():
             if "weight" in name:
                 torch.nn.init.kaiming_normal_(param)
-
-
-class SoftMoEGate(nn.Module):
-    """
-    https://arxiv.org/pdf/2308.00951.pdf
-    https://github.com/fkodom/soft-mixture-of-experts
-    """
-
-    def __init__(
-        self,
-        in_features: int,
-        num_experts: int,
-        slots_per_expert: int,
-        device=None,
-        dtype=None,
-    ):
-        super().__init__()
-        self.in_features = in_features
-        self.num_experts = num_experts
-        self.slots_per_expert = slots_per_expert
-
-        self.phi = nn.Parameter(
-            torch.empty(
-                (in_features, num_experts, slots_per_expert),
-                device=device,
-                dtype=dtype,
-            )
-        )
-
-    def reset_gate_network(self) -> None:
-        nn.init.kaiming_uniform_(self.phi, a=math.sqrt(5))
-
-    def forward(self, x):
-        if x.size(-1) != self.in_features:
-            raise ValueError(
-                f"Expected x.size(-1)={x.size(-1)} to match embed_dim={self.in_features}, "
-                f"but got {x.size(-1)}."
-            )
-        elif x.ndim != 3:
-            raise ValueError(f"Expected input to have 3 dimensions, but got {x.ndim}.")
-
-        logits = einsum(x, self.phi, "b m d, d n p -> b m n p")
-        dispatch_weights = logits.softmax(dim=0)  # denoted 'D' in the paper
-        # NOTE: The 'torch.softmax' function does not support multiple values for the
-        # 'dim' argument (unlike jax), so we are forced to flatten the last two dimensions.
-        # Then, we rearrange the Tensor into its original shape.
-        combine_weights = rearrange(
-            logits.flatten(start_dim=2).softmax(dim=-1),
-            "b m (n p) -> b m n p",
-            n=self.num_experts,
-        )
-
-        return {
-            "dispatch_weights": dispatch_weights,
-            "combine_weights": combine_weights,
-            "balance_loss": torch.tensor(0),
-        }

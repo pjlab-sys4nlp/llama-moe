@@ -7,12 +7,11 @@ from transformers.utils import ModelOutput
 
 from .moe_calculators import (
     CalculatorOutput,
-    SoftMoECalculator,
     SwitchDropTokenCalculator,
     UniversalCalculator,
 )
-from .moe_experts import LinearExperts, LinearGLUExperts, SoftGLUExperts
-from .moe_gates import SoftMoEGate, SwitchBalancedGate, TopKBalancedNoisyGate
+from .moe_experts import LinearExperts, LinearGLUExperts
+from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate
 
 
 @dataclass
@@ -28,15 +27,13 @@ class BaseMoELayer(nn.Module):
     def __init__(self):
         super(BaseMoELayer, self).__init__()
 
-        self.gate: Union[SwitchBalancedGate, TopKBalancedNoisyGate, SoftMoEGate]
-        self.calculator: Union[
-            SwitchDropTokenCalculator, UniversalCalculator, SoftMoECalculator
-        ]
+        self.gate: Union[SwitchBalancedGate, TopKBalancedNoisyGate]
+        self.calculator: Union[SwitchDropTokenCalculator, UniversalCalculator]
 
     def forward(self, x) -> MoEMlpOutput:
-        # original_shape = x.shape[:-1]
-        # # shape(batch_size*seq_len, input_size)
-        # x = x.reshape(-1, self.input_size)
+        original_shape = x.shape[:-1]
+        # shape(batch_size*seq_len, input_size)
+        x = x.reshape(-1, self.input_size)
 
         # 计算被选出的专家及其分数，以及gate的loss
         gate_outputs: dict = self.gate(x)
@@ -44,7 +41,7 @@ class BaseMoELayer(nn.Module):
         calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
         y = calc_outs.hidden_states
         # shape(batch_size, seq_len, output_size)
-        # y = y.reshape(original_shape + (self.output_size,))
+        y = y.reshape(original_shape + (self.output_size,))
 
         return MoEMlpOutput(
             hidden_states=y,
@@ -173,12 +170,6 @@ class LinearMoELayer(BaseMoELayer):
                 use_balance=kwargs.get("gate_use_balance", True),
                 balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
             )
-        elif self.gate_type == "SoftMoEGate":
-            self.gate = SoftMoEGate(
-                input_size,
-                num_experts,
-                slots_per_expert = kwargs.get("slots_per_expert", 1),
-            )
         else:
             raise NotImplementedError
 
@@ -194,10 +185,6 @@ class LinearMoELayer(BaseMoELayer):
                 drop_tokens=kwargs.get("drop_tokens", True),
                 dropped_padding=kwargs.get("dropped_padding", "zero"),
                 capacity_factor=kwargs.get("capacity_factor", 1.25),
-            )
-        elif self.calculator_type == "SoftMoECalculator":
-            self.calculator = SoftMoECalculator(
-                experts,
             )
         else:
             raise NotImplementedError
@@ -262,20 +249,6 @@ class LinearGLUMoELayer(BaseMoELayer):
                 use_balance=kwargs.get("gate_use_balance", True),
                 balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
             )
-        elif self.gate_type == "SoftMoEGate":
-            self.gate = SoftMoEGate(
-                input_size,
-                num_experts,
-                slots_per_expert = kwargs.get("slots_per_expert", 1),
-            )
-            experts = SoftGLUExperts(
-                input_size,
-                hidden_size,
-                output_size,
-                hidden_act,
-                num_experts,
-                bias=bias
-            )
         else:
             raise NotImplementedError
 
@@ -291,10 +264,6 @@ class LinearGLUMoELayer(BaseMoELayer):
                 drop_tokens=kwargs.get("drop_tokens", True),
                 dropped_padding=kwargs.get("dropped_padding", "zero"),
                 capacity_factor=kwargs.get("capacity_factor", 1.25),
-            )
-        elif self.calculator_type == "SoftMoECalculator":
-            self.calculator = SoftMoECalculator(
-                experts,
             )
         else:
             raise NotImplementedError

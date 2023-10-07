@@ -8,7 +8,7 @@ model_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEFo
 
 tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/${base_model}/
 
-gpus=1
+gpus=0
 cpus=16
 OMP_NUM_THREADS=8 srun --partition=MoE --job-name=test --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --job-name=example --kill-on-bad-exit=1 \
   python -m smoe.entrypoint.examples.create_switch_llama_moe \
