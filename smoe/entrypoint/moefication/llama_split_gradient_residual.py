@@ -4,7 +4,7 @@ import os
 from tqdm import tqdm
 from transformers import LlamaConfig
 
-from smoe.utils.io import torch_load_template_score_file, delete_file_or_path
+from smoe.utils.io import delete_file_or_path, torch_load_template_score_file
 from smoe.utils.moefication.expert_split_residual import GradientSplitResidual
 from smoe.utils.string_operation import str2bool
 

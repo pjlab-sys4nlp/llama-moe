@@ -1,13 +1,17 @@
 import os
 import types
 
-from transformers.models.llama.modeling_llama import LlamaMLP, LlamaModel, LlamaDecoderLayer
+from transformers.models.llama.modeling_llama import (
+    LlamaDecoderLayer,
+    LlamaMLP,
+    LlamaModel,
+)
 
 from smoe.utils.model_operation.change_llama_forward import (
+    forward_llama_decoder_with_hidden_states_scale_recording,
     forward_llama_decoder_with_padding_mask,
     forward_llama_mlp_with_feature_dumping,
     forward_llama_model_with_padding_mask,
-    forward_llama_decoder_with_hidden_states_scale_recording,
 )
 
 

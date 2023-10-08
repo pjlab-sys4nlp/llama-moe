@@ -54,13 +54,13 @@ def forward_llama_mlp_with_feature_dumping(self, x, padding_mask):
 
 
 def forward_llama_decoder_with_hidden_states_scale_recording(
-        self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Tuple[torch.Tensor]] = None,
-        output_attentions: Optional[bool] = False,
-        use_cache: Optional[bool] = False,
+    self,
+    hidden_states: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_value: Optional[Tuple[torch.Tensor]] = None,
+    output_attentions: Optional[bool] = False,
+    use_cache: Optional[bool] = False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -82,8 +82,12 @@ def forward_llama_decoder_with_hidden_states_scale_recording(
     hidden_states = self.mlp(hidden_states)
 
     ###########################################################
-    self.mlp_outputs.append(torch.abs(hidden_states.detach().clone().float()).sum(2).flatten())
-    self.mlp_residuals.append(torch.abs(residual.detach().clone().float()).sum(2).flatten())
+    self.mlp_outputs.append(
+        torch.abs(hidden_states.detach().clone().float()).sum(2).flatten()
+    )
+    self.mlp_residuals.append(
+        torch.abs(residual.detach().clone().float()).sum(2).flatten()
+    )
     ###########################################################
 
     ###########################################################
@@ -105,14 +109,14 @@ def forward_llama_decoder_with_hidden_states_scale_recording(
 
 
 def forward_llama_decoder_with_padding_mask(
-        self,
-        hidden_states,
-        padding_mask,  # ----- add padding_mask -----
-        attention_mask=None,
-        position_ids=None,
-        past_key_value=None,
-        output_attentions=False,
-        use_cache=False,
+    self,
+    hidden_states,
+    padding_mask,  # ----- add padding_mask -----
+    attention_mask=None,
+    position_ids=None,
+    past_key_value=None,
+    output_attentions=False,
+    use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -148,16 +152,16 @@ def forward_llama_decoder_with_padding_mask(
 
 
 def forward_llama_model_with_padding_mask(
-        self,
-        input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+    self,
+    input_ids: torch.LongTensor = None,
+    attention_mask: Optional[torch.Tensor] = None,
+    position_ids: Optional[torch.LongTensor] = None,
+    past_key_values: Optional[List[torch.FloatTensor]] = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    use_cache: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
     output_attentions = (
         output_attentions

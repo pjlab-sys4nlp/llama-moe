@@ -90,4 +90,4 @@ def compress_png_image(image_path, print_info=False):
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     cv2.imwrite(image_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
     if print_info:
-        print(f"Done for \"{image_path}\".")
+        print(f'Done for "{image_path}".')

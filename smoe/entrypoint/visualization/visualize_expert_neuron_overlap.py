@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
-from smoe.utils.io import torch_load_template_score_file, delete_file_or_path
+from smoe.utils.io import delete_file_or_path, torch_load_template_score_file
 from smoe.utils.visualization.visualize import visualize_expert_neuron_overlap
 
 # fmt: off

@@ -143,14 +143,14 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
 
 def visualize_swiglu_output(
-        hidden_outputs_path,
-        save_path,
-        neuron_type,
-        layer_idx,
-        criterion="plain",
-        num_bins=1000,
-        edge=(-1.0, 1.0),
-        device="cpu",
+    hidden_outputs_path,
+    save_path,
+    neuron_type,
+    layer_idx,
+    criterion="plain",
+    num_bins=1000,
+    edge=(-1.0, 1.0),
+    device="cpu",
 ):
     # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
@@ -242,9 +242,9 @@ def plot_to_image(figure):
 
 def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
     if (
-            len(tensors) == 0
-            or not all(isinstance(t, torch.Tensor) for t in tensors)
-            or not all(t.shape == tensors[0].shape for t in tensors)
+        len(tensors) == 0
+        or not all(isinstance(t, torch.Tensor) for t in tensors)
+        or not all(t.shape == tensors[0].shape for t in tensors)
     ):
         return None
     data = torch.stack(tensors, dim=0)
@@ -289,12 +289,12 @@ def get_heatmap_img_grid_for_tb(tensors: tuple[torch.FloatTensor]):
 
 
 def visualize_expert_load_heatmap(
-        load_sum: np.ndarray,
-        layer_idx: int,
-        dataset_name: str,
-        shape: tuple = (4, 4),
-        save_dir: str = "results/expert_load_vis",
-        save_fig: bool = True,
+    load_sum: np.ndarray,
+    layer_idx: int,
+    dataset_name: str,
+    shape: tuple = (4, 4),
+    save_dir: str = "results/expert_load_vis",
+    save_fig: bool = True,
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -324,13 +324,13 @@ def visualize_expert_load_heatmap(
 
 
 def visualize_expert_neuron_overlap(
-        selected_masks: torch.Tensor,
-        num_experts: int,
-        intermediate_size: int,
-        expert_size: int,
-        layer_idx: int,
-        save_dir: str = "./",
-        save_fig: bool = True,
+    selected_masks: torch.Tensor,
+    num_experts: int,
+    intermediate_size: int,
+    expert_size: int,
+    layer_idx: int,
+    save_dir: str = "./",
+    save_fig: bool = True,
 ):
     # fmt: off
     torch.set_printoptions(
@@ -428,12 +428,12 @@ def visualize_expert_neuron_overlap(
 
 
 def visualize_expert_load_barv(
-        load_sum: np.ndarray,
-        layer_idx: int,
-        dataset_name: str,
-        y_max: float = None,
-        x_label: str = None,
-        save_dir: str = "results/expert_load_vis",
+    load_sum: np.ndarray,
+    layer_idx: int,
+    dataset_name: str,
+    y_max: float = None,
+    x_label: str = None,
+    save_dir: str = "results/expert_load_vis",
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():

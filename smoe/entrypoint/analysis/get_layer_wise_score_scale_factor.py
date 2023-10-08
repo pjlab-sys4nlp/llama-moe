@@ -9,7 +9,9 @@ from transformers import LlamaTokenizer
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import LineByLineJsonlTextDataset
 from smoe.models.llama_moe import LlamaMoEForCausalLM
-from smoe.utils.model_operation.modify_llama_moe_model import llama_moe_with_hidden_states_scale_recording_early_stop
+from smoe.utils.model_operation.modify_llama_moe_model import (
+    llama_moe_with_hidden_states_scale_recording_early_stop,
+)
 from smoe.utils.string_operation import str2bool
 
 # fmt: off
