@@ -28,20 +28,25 @@ class Model(nn.Module):
         return a2
 
 
-batch_size = 4
-input_dim = 128
-hidden_dim = 1024
-output_dim = 64
+def test_hook():
+    batch_size = 4
+    input_dim = 128
+    hidden_dim = 1024
+    output_dim = 64
 
-model = Model(input_dim, hidden_dim, output_dim)
-loss_func = nn.MSELoss()
+    model = Model(input_dim, hidden_dim, output_dim)
+    loss_func = nn.MSELoss()
 
-x = torch.rand((batch_size, input_dim))
-target = torch.rand((batch_size, output_dim))
+    x = torch.rand((batch_size, input_dim))
+    target = torch.rand((batch_size, output_dim))
 
-y = model(x)
-loss = loss_func(y, target)
-loss.backward()
+    y = model(x)
+    loss = loss_func(y, target)
+    loss.backward()
 
-print(model.layer1.weight.grad, model.layer1.weight.grad.shape)
-print(model.layer2.weight.grad, model.layer2.weight.grad.shape)
+    print(model.layer1.weight.grad, model.layer1.weight.grad.shape)
+    print(model.layer2.weight.grad, model.layer2.weight.grad.shape)
+
+
+if __name__ == "__main__":
+    test_hook()

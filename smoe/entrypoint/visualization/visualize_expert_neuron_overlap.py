@@ -8,7 +8,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
-from smoe.utils.io import delete_file_or_path, torch_load_template_score_file
+from smoe.utils.io import delete_file_or_dir, torch_load_template_score_file
 from smoe.utils.visualization.visualize import visualize_expert_neuron_overlap
 
 # fmt: off
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print("Loading llama config...")
     config = LlamaConfig.from_pretrained(args.model_path)
 
-    delete_file_or_path(os.path.join(args.save_path, "total_neurons.txt"))
+    delete_file_or_dir(os.path.join(args.save_path, "total_neurons.txt"))
 
     for layer_id in tqdm(range(config.num_hidden_layers)):
         """read scores from files"""

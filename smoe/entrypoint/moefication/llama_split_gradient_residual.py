@@ -4,7 +4,7 @@ import os
 from tqdm import tqdm
 from transformers import LlamaConfig
 
-from smoe.utils.io import delete_file_or_path, torch_load_template_score_file
+from smoe.utils.io import delete_file_or_dir, torch_load_template_score_file
 from smoe.utils.moefication.expert_split_residual import GradientSplitResidual
 from smoe.utils.string_operation import str2bool
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     if args.visualization_path is not None:
-        delete_file_or_path(os.path.join(args.save_path, "total_neurons.txt"))
+        delete_file_or_dir(os.path.join(args.save_path, "total_neurons.txt"))
 
     for i in tqdm(range(config.num_hidden_layers)):
         score_list = torch_load_template_score_file(args.score_file_path, args.template + file_postfix, i)

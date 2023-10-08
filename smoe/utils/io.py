@@ -9,11 +9,11 @@ import cv2
 import torch
 
 
-def delete_file_or_path(path):
-    if os.path.isfile(path):
-        os.remove(path)
-    elif os.path.exists(path):
-        shutil.rmtree(path)
+def delete_file_or_dir(dir):
+    if os.path.isfile(dir):
+        os.remove(dir)
+    elif os.path.exists(dir):
+        shutil.rmtree(dir)
     else:
         pass
 
