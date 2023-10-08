@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from smoe.data.datasets_moefication import ShardDataset
+from smoe.utils.io import compress_png_image
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.visualization.plotter import plotter
 
@@ -142,14 +143,14 @@ def visualize_expert_select_mlp(result_path, save_path, proj_type):
 
 
 def visualize_swiglu_output(
-    hidden_outputs_path,
-    save_path,
-    neuron_type,
-    layer_idx,
-    criterion="plain",
-    num_bins=1000,
-    edge=(-1.0, 1.0),
-    device="cpu",
+        hidden_outputs_path,
+        save_path,
+        neuron_type,
+        layer_idx,
+        criterion="plain",
+        num_bins=1000,
+        edge=(-1.0, 1.0),
+        device="cpu",
 ):
     # fmt: off
     # neuron_type 与 layer_idx 仅为生成图像名称使用
@@ -186,6 +187,7 @@ def visualize_swiglu_output(
         os.makedirs(save_path)
     fig.savefig(os.path.join(save_path, fig_name + ".png"), dpi=640, bbox_inches="tight")
     plt.close(fig)
+    compress_png_image(os.path.join(save_path, fig_name + ".png"), print_info=False)
     print(f'Results saved to "{save_path}"!')
     # fmt: on
 
@@ -240,9 +242,9 @@ def plot_to_image(figure):
 
 def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
     if (
-        len(tensors) == 0
-        or not all(isinstance(t, torch.Tensor) for t in tensors)
-        or not all(t.shape == tensors[0].shape for t in tensors)
+            len(tensors) == 0
+            or not all(isinstance(t, torch.Tensor) for t in tensors)
+            or not all(t.shape == tensors[0].shape for t in tensors)
     ):
         return None
     data = torch.stack(tensors, dim=0)
@@ -287,12 +289,12 @@ def get_heatmap_img_grid_for_tb(tensors: tuple[torch.FloatTensor]):
 
 
 def visualize_expert_load_heatmap(
-    load_sum: np.ndarray,
-    layer_idx: int,
-    dataset_name: str,
-    shape: tuple = (4, 4),
-    save_dir: str = "results/expert_load_vis",
-    save_fig: bool = True,
+        load_sum: np.ndarray,
+        layer_idx: int,
+        dataset_name: str,
+        shape: tuple = (4, 4),
+        save_dir: str = "results/expert_load_vis",
+        save_fig: bool = True,
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -317,17 +319,18 @@ def visualize_expert_load_heatmap(
     fig.tight_layout()
     if save_fig:
         fig.savefig(path, dpi=320, bbox_inches="tight")
+        compress_png_image(path, print_info=False)
     return fig
 
 
 def visualize_expert_neuron_overlap(
-    selected_masks: torch.Tensor,
-    num_experts: int,
-    intermediate_size: int,
-    expert_size: int,
-    layer_idx: int,
-    save_dir: str = "./",
-    save_fig: bool = True,
+        selected_masks: torch.Tensor,
+        num_experts: int,
+        intermediate_size: int,
+        expert_size: int,
+        layer_idx: int,
+        save_dir: str = "./",
+        save_fig: bool = True,
 ):
     # fmt: off
     torch.set_printoptions(
@@ -381,6 +384,9 @@ def visualize_expert_neuron_overlap(
         raise ValueError(f"{save_dir} is a file, not a directory")
     path_overlap_count.mkdir(exist_ok=True, parents=True)
 
+    with open(os.path.join(save_dir, "total_neurons.txt"), "a") as file:
+        file.write(f"{total_neurons}\n")
+
     """overlap_rate"""
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -397,6 +403,7 @@ def visualize_expert_neuron_overlap(
 
     if save_fig:
         fig.savefig(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
+        compress_png_image(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"), print_info=False)
     plt.close(fig)
 
     """overlap_count"""
@@ -415,17 +422,18 @@ def visualize_expert_neuron_overlap(
 
     if save_fig:
         fig.savefig(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
+        compress_png_image(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"), print_info=False)
     plt.close(fig)
     # fmt: on
 
 
 def visualize_expert_load_barv(
-    load_sum: np.ndarray,
-    layer_idx: int,
-    dataset_name: str,
-    y_max: float = None,
-    x_label: str = None,
-    save_dir: str = "results/expert_load_vis",
+        load_sum: np.ndarray,
+        layer_idx: int,
+        dataset_name: str,
+        y_max: float = None,
+        x_label: str = None,
+        save_dir: str = "results/expert_load_vis",
 ):
     save_dir_path = Path(os.path.join(save_dir, f"layer{layer_idx}"))
     if save_dir_path.is_file():
@@ -447,3 +455,4 @@ def visualize_expert_load_barv(
     ax.set_axisbelow(True)
     fig.tight_layout()
     fig.savefig(path, dpi=320, bbox_inches="tight")
+    compress_png_image(path, print_info=False)

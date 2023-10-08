@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from smoe.utils.io import compress_png_image
+
 
 def line_plot(
     xs,
@@ -27,6 +29,7 @@ def line_plot(
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=320)
+        compress_png_image(save_path, print_info=False)
     plt.close()
 
 
@@ -72,4 +75,5 @@ def line_plot_with_highlight(
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=320)
+        compress_png_image(save_path, print_info=False)
     plt.close()

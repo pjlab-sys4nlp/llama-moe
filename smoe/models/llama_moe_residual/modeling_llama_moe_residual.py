@@ -23,7 +23,7 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
     def __init__(self, config: LlamaMoEResidualConfig, layer_index):
         super(LlamaMoEDecoderLayer, self).__init__(config)
         assert config.intermediate_size == (
-            config.intermediate_size_moe + config.intermediate_size_residual
+                config.intermediate_size_moe + config.intermediate_size_residual
         )
 
         gating_config = {
@@ -41,7 +41,7 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
             # all calculators
             "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
-            "score_scale_factor": config.score_scale_factor,
+            "score_scale_factor": config.score_scale_factor[layer_index] if isinstance(config.score_scale_factor, list) else config.score_scale_factor,
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -66,7 +66,7 @@ class LlamaMoEResidualDecoderLayer(LlamaMoEDecoderLayer):
             # ---- different here ---- #
             num_experts_residual=config.num_experts_residual,
             size_experts_residual=config.size_experts_residual[layer_index],
-            score_scale_factor_residual=config.score_scale_factor_residual,
+            score_scale_factor_residual=config.score_scale_factor_residual[layer_index] if isinstance(config.score_scale_factor_residual, list) else config.score_scale_factor_residual,
             use_weighting=config.use_weighting,
             # ------------------------ #
             **gating_config,
@@ -92,9 +92,14 @@ class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
             ]
         )
 
-    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
-        for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.set_moe_residual_calculator_score_scale_factor(
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        if layer_index is None:
+            for idx, decoder_layer in enumerate(self.layers):
+                decoder_layer.set_moe_residual_calculator_score_scale_factor(
+                    score_scale_factor
+                )
+        else:
+            self.layers[layer_index].set_moe_residual_calculator_score_scale_factor(
                 score_scale_factor
             )
 
@@ -104,8 +109,8 @@ class LlamaMoEResidualForCausalLM(LlamaMoEForCausalLM, LlamaMoEResidualPreTraine
         super(LlamaMoEForCausalLM, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
 
-    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
-        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor)
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor, layer_index=layer_index)
 
 
 class LlamaMoEResidualForSequenceClassification(
@@ -115,5 +120,5 @@ class LlamaMoEResidualForSequenceClassification(
         super(LlamaMoEForSequenceClassification, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
 
-    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor):
-        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor)
+    def set_moe_residual_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        self.model.set_moe_residual_calculator_score_scale_factor(score_scale_factor, layer_index=layer_index)

@@ -35,7 +35,7 @@ def main(args):
 
     # Residual模块配置 🔍
     num_experts_residual = 2
-    size_experts_residual = None  # 688
+    size_experts_residual = None  # 为None则各个共享专家大小相同
     score_scale_factor_residual = 8.0
     use_weighting = False
 

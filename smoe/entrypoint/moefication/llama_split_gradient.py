@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
-from smoe.utils.io import torch_load_template_score_file
+from smoe.utils.io import torch_load_template_score_file, delete_file_or_path
 from smoe.utils.moefication.expert_split import GradientSplit
 from smoe.utils.string_operation import str2bool
 
@@ -15,6 +15,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str)
     parser.add_argument('--score_file_path', type=str)
     parser.add_argument('--save_path', type=str)
+    parser.add_argument('--visualization_path', type=str, default=None)
     parser.add_argument('--expert_num', type=int, default=None)
     parser.add_argument('--expert_size', type=int)
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
@@ -42,6 +43,9 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
+    if args.visualization_path is not None:
+        delete_file_or_path(os.path.join(args.save_path, "total_neurons.txt"))
+
     for i in tqdm(range(config.num_hidden_layers)):
         score_list = torch_load_template_score_file(args.score_file_path, args.template + file_postfix, i)
 
@@ -61,5 +65,8 @@ if __name__ == "__main__":
         if not args.share_neurons:
             split.cnt()
         split.save()
+
+        if args.visualization_path is not None:
+            split.visualize(args.visualization_path, share_neurons=args.share_neurons)
     print("Done.")
     # fmt: on

@@ -83,7 +83,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             # all calculators
             "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
-            "score_scale_factor": config.score_scale_factor,
+            "score_scale_factor": config.score_scale_factor[layer_index] if isinstance(config.score_scale_factor, list) else config.score_scale_factor,
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -410,9 +410,12 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
-    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
-        for idx, decoder_layer in enumerate(self.layers):
-            decoder_layer.set_moe_calculator_score_scale_factor(score_scale_factor)
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        if layer_index is None:
+            for idx, decoder_layer in enumerate(self.layers):
+                decoder_layer.set_moe_calculator_score_scale_factor(score_scale_factor)
+        else:
+            self.layers[layer_index].set_moe_calculator_score_scale_factor(score_scale_factor)
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         for idx, decoder_layer in enumerate(self.layers):
@@ -532,8 +535,8 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
-    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
-        self.model.set_moe_calculator_score_scale_factor(score_scale_factor)
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        self.model.set_moe_calculator_score_scale_factor(score_scale_factor, layer_index=layer_index)
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
@@ -674,8 +677,8 @@ class LlamaMoEForSequenceClassification(
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
-    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
-        self.model.set_moe_calculator_score_scale_factor(score_scale_factor)
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor, layer_index=None):
+        self.model.set_moe_calculator_score_scale_factor(score_scale_factor, layer_index=layer_index)
 
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)

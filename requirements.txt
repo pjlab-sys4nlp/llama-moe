@@ -35,3 +35,4 @@ python-dotenv==1.0.0
 sentence-transformers==2.2.2
 Pillow==9.4.0
 numpy==1.25.0
+opencv-python=4.8.1

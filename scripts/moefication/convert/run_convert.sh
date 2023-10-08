@@ -5,11 +5,14 @@
 llama_size="llama_7B"
 
 num_experts=16                   #  8  16
-num_selects=4                    #  2  4
-score_scale_factor=1.0           #  1.0  16.0
+num_selects=16                   #  2  4
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
-split_type=Graph-l2_norm         #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+split_type=Random                #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
 proj_type=up_proj                #  gate_proj  up_proj
+
+score_scale_factor=16.0 #  1.0  2.0  4.0  8.0  16.0
+score_scale_factor_file_path=""
+#score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_dense
 
 use_default_gate=True #  True  False
 select_type=l2_norm   #  plain  positive  l1_norm  l2_norm
@@ -38,6 +41,7 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --num_experts ${num_experts} \
   --num_selects ${num_selects} \
   --score_scale_factor ${score_scale_factor} \
+  --score_scale_factor_file_path "${score_scale_factor_file_path}" \
   --convert_type ${convert_type} \
   --use_default_gate ${use_default_gate}
 

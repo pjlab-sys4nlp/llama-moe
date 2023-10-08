@@ -67,6 +67,7 @@ if __name__ == "__main__":
     """evaluation"""
     print("Start evaluation...")
     model.to(device)
+    model.half()
     model.eval()
     iter_train = iter(data_loader)
     for step in tqdm(range(len(data_loader)), desc="forward step", position=0, leave=True):

@@ -65,7 +65,7 @@ def convert_llama_model(
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = "mlp"
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
 
     """initialize moe model"""

@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=split-grad
+#SBATCH --job-name=get-grad
 #SBATCH --partition=MoE
 #SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
@@ -9,6 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --mem=0
+#SBATCH --quotatype=spot
 
 num_nodes=1        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
@@ -24,7 +25,7 @@ export LOGLEVEL=INFO
 ###################################################################
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_3B"
+llama_size="llama2_13B"
 
 accumulate_level=sample        #  sample  total
 kernel=l1_norm                 #  plain  l1_norm  l2_norm
@@ -38,23 +39,18 @@ save_path=${data_path}/moefication_results/split
 pretrained_model=${data_path}/models/${llama_size}
 tokenizer_path=${data_path}/models/${llama_size}
 
-#dataset_dir=${data_path}/data/clustering_tokenized/4clusters
-#total_clusters=4
-#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl")
+per_device_train_batch_size=1
+block_size=4096
 
-#dataset_dir=${data_path}/data/clustering_tokenized/8clusters
-#total_clusters=8
-#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl")
+total_clusters=16 #  4  8  16  32
+dataset_dir=${data_path}/data/clustering_tokenized/${total_clusters}clusters
+#dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
+dataset_name=()
+for ((i = 0; i < ${total_clusters}; i++)); do
+  dataset_name+=("${i}.jsonl")
+done
 
-#total_clusters=16
-#dataset_dir=${data_path}/data/clustering_tokenized/16clusters
-#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
-
-total_clusters=32
-dataset_dir=${data_path}/data/clustering_tokenized/32clusters
-#dataset_name=("0.jsonl" "1.jsonl" "2.jsonl" "3.jsonl" "4.jsonl" "5.jsonl" "6.jsonl" "7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl" "16.jsonl" "17.jsonl" "18.jsonl" "19.jsonl" "20.jsonl" "21.jsonl" "22.jsonl" "23.jsonl" "24.jsonl" "25.jsonl" "26.jsonl" "27.jsonl" "28.jsonl" "29.jsonl" "30.jsonl" "31.jsonl")
-
-#dataset_name=("7.jsonl" "8.jsonl" "9.jsonl" "10.jsonl" "11.jsonl" "12.jsonl" "13.jsonl" "14.jsonl" "15.jsonl")
+#dataset_name=("6.jsonl" "7.jsonl")
 
 #dataset_name=("0.jsonl")
 #dataset_name=("1.jsonl")
@@ -89,11 +85,7 @@ dataset_dir=${data_path}/data/clustering_tokenized/32clusters
 #dataset_name=("30.jsonl")
 #dataset_name=("31.jsonl")
 
-#dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
 ###################################################################
-
-per_device_train_batch_size=4
-block_size=2048
 
 output_dir=/mnt/petrelfs/dongdaize.d/workspace/train-moe/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
 echo "output_dir: $output_dir"
@@ -104,18 +96,19 @@ nodes=($(scontrol show hostnames $SLURM_JOB_NODELIS))
 nodes_array=($nodes)
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
-port=$((6000 + $RANDOM))
+#port=$((6000 + $RANDOM))
 echo "Node: $head_node"
 echo "Node IP: $head_node_ip"
 
 for name in "${dataset_name[@]}"; do
+  echo "@@@@@@@@@@@@@@@@@@@@@@" ${llama_size} ${name} "@@@@@@@@@@@@@@@@@@@@@@"
   srun torchrun \
     --nnodes ${num_nodes} \
     --nproc_per_node ${num_gpu_per_node} \
     --node_rank $SLURM_NODEID \
     --rdzv_id $RANDOM \
     --rdzv_backend c10d \
-    --rdzv_endpoint $head_node:$port \
+    --rdzv_endpoint $head_node:0 \
     smoe/entrypoint/moefication/llama_split_gradient_get_grads.py \
     --deepspeed ${deepspeed_config_file} \
     --model_name_or_path ${pretrained_model} \

@@ -24,8 +24,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_experts', type=int, default=14, help='number of moe experts')
     parser.add_argument('--num_experts_residual', type=int, default=2, help='number of residual experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of selected moe experts')
-    parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for moe experts')
-    parser.add_argument('--score_scale_factor_residual', type=float, default=1.0, help='scale factor for residual experts')
+    parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for moe experts in all layers')
+    parser.add_argument('--score_scale_factor_residual', type=float, default=1.0, help='scale factor for residual experts in all layers')
+    # parser.add_argument('--score_scale_factor_file_path', type=str, default=None, help='file storing the layer-wise scale factors, this will override the arguments "score_scale_factor" and "score_scale_factor_residual"')
 
     parser.add_argument('--convert_type', type=str, default="LlamaMoEResidualForCausalLM", choices=("LlamaMoEResidualModel", "LlamaMoEResidualForCausalLM", "LlamaMoEResidualForSequenceClassification"))
     parser.add_argument('--use_default_gate', type=str, default="False")

@@ -2,13 +2,15 @@ import torch
 from transformers.utils import logging
 
 from smoe.models.llama_moe import BaseMoEModelOutputWithPast
+from smoe.models.llama_moe.modeling_llama_moe import MoEDecoderLayerOutput
 from smoe.modules.moe.moe_calculators import CalculatorOutput
+from smoe.modules.moe.moe_layers import MoEMlpOutput
 
 logger = logging.get_logger(__name__)
 
 
 def forward_universal_calculator_with_scaled_gate_score(
-    self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
+        self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
 ) -> CalculatorOutput:
     # fmt: off
     """正向传播"""
@@ -94,7 +96,7 @@ def forward_topk_balanced_noisy_gate_with_fixed_expert_selection(self, x):
 
 
 def forward_topk_balanced_noisy_gate_with_hidden_states_recording(
-    self, x, padding_mask, **kwargs
+        self, x, padding_mask, **kwargs
 ):
     # fmt: off
     self.samples_cnt += torch.sum(padding_mask).item()  ####################################
@@ -137,9 +139,9 @@ def forward_topk_balanced_noisy_gate_with_hidden_states_recording(
 
 
 def forward_linear_glu_moe_layer_with_padding_mask(
-    self,
-    x,
-    padding_mask,
+        self,
+        x,
+        padding_mask,
 ):
     # fmt: off
     original_shape = x.shape[:-1]
@@ -154,15 +156,68 @@ def forward_linear_glu_moe_layer_with_padding_mask(
     # fmt: on
 
 
+def forward_llama_moe_decoder_with_hidden_states_scale_recording(
+        self,
+        hidden_states,
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
+):
+    residual = hidden_states
+    hidden_states = self.input_layernorm(hidden_states)
+
+    # Self Attention
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states=hidden_states,
+        attention_mask=attention_mask,
+        position_ids=position_ids,
+        past_key_value=past_key_value,
+        output_attentions=output_attentions,
+        use_cache=use_cache,
+    )
+    hidden_states = residual + hidden_states
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
+    mlp_outs: MoEMlpOutput = self.mlp(hidden_states)
+
+    ###########################################################
+    self.mlp_outputs.append(torch.abs(mlp_outs.hidden_states.detach().clone().float()).sum(2).flatten())
+    self.mlp_residuals.append(torch.abs(residual.detach().clone().float()).sum(2).flatten())
+    ###########################################################
+
+    ###########################################################
+    # self.mlp_outputs.append((mlp_outs.hidden_states * mlp_outs.hidden_states).detach().clone().float().sum(2).flatten())
+    # self.mlp_residuals.append((residual * residual).detach().clone().float().sum(2).flatten())
+    ###########################################################
+
+    hidden_states = residual + mlp_outs.hidden_states
+
+    outputs = MoEDecoderLayerOutput(
+        hidden_states=hidden_states,
+        balance_loss=mlp_outs.balance_loss,
+        self_attn_weights=self_attn_weights if output_attentions else None,
+        present_key_value=present_key_value if use_cache else None,
+        num_dropped_tokens=mlp_outs.num_dropped_tokens,
+        gate_load=mlp_outs.gate_load,
+        gate_importance=mlp_outs.gate_importance,
+    )
+
+    return outputs
+
+
 def forward_llama_moe_decoder_with_padding_mask(
-    self,
-    hidden_states,
-    padding_mask,  # ----- add padding_mask -----
-    attention_mask=None,
-    position_ids=None,
-    past_key_value=None,
-    output_attentions=False,
-    use_cache=False,
+        self,
+        hidden_states,
+        padding_mask,  # ----- add padding_mask -----
+        attention_mask=None,
+        position_ids=None,
+        past_key_value=None,
+        output_attentions=False,
+        use_cache=False,
 ):
     residual = hidden_states
     hidden_states = self.input_layernorm(hidden_states)
@@ -201,17 +256,200 @@ def forward_llama_moe_decoder_with_padding_mask(
     return outputs
 
 
+
+
+def forward_llama_moe_model_with_early_stop(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
+
+        # retrieve input_ids and inputs_embeds
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError(
+                "You cannot specify both decoder_input_ids and decoder_inputs_embeds at"
+                " the same time"
+            )
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError(
+                "You have to specify either decoder_input_ids or decoder_inputs_embeds"
+            )
+
+        seq_length_with_past = seq_length
+        past_key_values_length = 0
+
+        if past_key_values is not None:
+            past_key_values_length = past_key_values[0][0].shape[2]
+            seq_length_with_past = seq_length_with_past + past_key_values_length
+
+        if position_ids is None:
+            device = input_ids.device if input_ids is not None else inputs_embeds.device
+            position_ids = torch.arange(
+                past_key_values_length,
+                seq_length + past_key_values_length,
+                dtype=torch.long,
+                device=device,
+            )
+            position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
+        else:
+            position_ids = position_ids.view(-1, seq_length).long()
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+        # embed positions
+        if attention_mask is None:
+            attention_mask = torch.ones(
+                (batch_size, seq_length_with_past),
+                dtype=torch.bool,
+                device=inputs_embeds.device,
+            )
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            inputs_embeds,
+            past_key_values_length,
+        )
+
+        hidden_states = inputs_embeds
+        balance_loss = 0.0
+
+        if self.gradient_checkpointing and self.training:
+            if use_cache:
+                logger.warning_once(
+                    "`use_cache=True` is incompatible with gradient checkpointing."
+                    " Setting `use_cache=False`..."
+                )
+                use_cache = False
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        next_decoder_cache = () if use_cache else None
+
+        num_dropped_tokens = ()
+        gate_load = ()
+        gate_importance = ()
+        for idx, decoder_layer in enumerate(self.layers):
+            ################################################
+            if self.early_stop_layer is not None:
+                if idx > self.early_stop_layer:
+                    break
+            ################################################
+
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+
+            past_key_value = (
+                past_key_values[idx] if past_key_values is not None else None
+            )
+
+            if self.gradient_checkpointing and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        # None for past_key_value
+                        return module(*inputs, output_attentions, None)
+
+                    return custom_forward
+
+                layer_outputs: MoEDecoderLayerOutput = (
+                    torch.utils.checkpoint.checkpoint(
+                        create_custom_forward(decoder_layer),
+                        hidden_states,
+                        attention_mask,
+                        position_ids,
+                        None,
+                    )
+                )
+            else:
+                layer_outputs: MoEDecoderLayerOutput = decoder_layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                )
+
+            hidden_states = layer_outputs.hidden_states
+            if layer_outputs.balance_loss is not None:
+                balance_loss += layer_outputs.balance_loss
+
+            if use_cache:
+                next_decoder_cache += (layer_outputs.present_key_value,)
+
+            if output_attentions:
+                all_self_attns += (layer_outputs.self_attn_weights,)
+
+            num_dropped_tokens += (layer_outputs.num_dropped_tokens,)
+            gate_load += (layer_outputs.gate_load,)
+            gate_importance += (layer_outputs.gate_importance,)
+
+        hidden_states = self.norm(hidden_states)
+
+        # add hidden states from the last decoder layer
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        next_cache = next_decoder_cache if use_cache else None
+        if not return_dict:
+            return tuple(
+                v
+                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+                if v is not None
+            )
+        return BaseMoEModelOutputWithPast(
+            last_hidden_state=hidden_states,
+            balance_loss=balance_loss,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            num_dropped_tokens=num_dropped_tokens,
+            gate_load=gate_load,
+            gate_importance=gate_importance,
+        )
+
+
+
+
+
 def forward_llama_moe_model_with_padding_mask(
-    self,
-    input_ids=None,
-    attention_mask=None,
-    position_ids=None,
-    past_key_values=None,
-    inputs_embeds=None,
-    use_cache=None,
-    output_attentions=None,
-    output_hidden_states=None,
-    return_dict=None,
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
 ):
     output_attentions = (
         output_attentions

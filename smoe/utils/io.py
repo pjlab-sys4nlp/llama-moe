@@ -3,8 +3,19 @@ import json
 import lzma
 import os
 import pickle
+import shutil
 
+import cv2
 import torch
+
+
+def delete_file_or_path(path):
+    if os.path.isfile(path):
+        os.remove(path)
+    elif os.path.exists(path):
+        shutil.rmtree(path)
+    else:
+        pass
 
 
 def torch_load_template_file(path, template, layer):
@@ -73,3 +84,10 @@ def dump_jsonlines(obj, filepath, **kwargs):
     with open(filepath, "w", encoding="utf8") as fout:
         for ins in obj:
             fout.write(f"{json.dumps(ins, ensure_ascii=False, **kwargs)}\n")
+
+
+def compress_png_image(image_path, print_info=False):
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    cv2.imwrite(image_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    if print_info:
+        print(f"Done for \"{image_path}\".")

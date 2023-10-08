@@ -1,13 +1,31 @@
 import os
 import types
 
-from transformers.models.llama.modeling_llama import LlamaMLP, LlamaModel
+from transformers.models.llama.modeling_llama import LlamaMLP, LlamaModel, LlamaDecoderLayer
 
 from smoe.utils.model_operation.change_llama_forward import (
     forward_llama_decoder_with_padding_mask,
     forward_llama_mlp_with_feature_dumping,
     forward_llama_model_with_padding_mask,
+    forward_llama_decoder_with_hidden_states_scale_recording,
 )
+
+
+def llama_with_hidden_states_scale_recording(model):
+    """记录所有decoder layer中MLP的输出值大小规模，与相应的残差大小规模"""
+    # fmt: off
+    assert isinstance(model, LlamaModel)
+
+    for layer_idx, layer in enumerate(model.layers):  # locate block by the name template
+        assert isinstance(layer, LlamaDecoderLayer)
+
+        layer.forward = types.MethodType(forward_llama_decoder_with_hidden_states_scale_recording, layer)  # change forward function for LlamaDecoderLayer
+
+        layer.mlp_outputs = []
+        layer.mlp_residuals = []
+
+    return model
+    # fmt: on
 
 
 def llama_with_feature_dumping(model, device_id, save_path, template, save_interval=1):

@@ -24,7 +24,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
-    parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for experts')
+    parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for experts in all layers')
+    parser.add_argument('--score_scale_factor_file_path', type=str, default=None, help='file storing the layer-wise scale factors, this will override the argument "score_scale_factor"')
 
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
     parser.add_argument('--use_default_gate', type=str, default="False")
@@ -32,6 +33,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     args.use_default_gate = str2bool(args.use_default_gate)
     print(args, "\n")
+
+    if args.score_scale_factor_file_path is not None and args.score_scale_factor_file_path != "":
+        with open(os.path.join(args.score_scale_factor_file_path, "score_scale_factors.txt"), "r") as file:
+            layer_wise_score_scale_factor_str = file.readlines()[0]
+            layer_wise_score_scale_factor = eval(layer_wise_score_scale_factor_str)
+            args.score_scale_factor = layer_wise_score_scale_factor
+
+    print(args.score_scale_factor, flush=True)
 
     if args.convert_type == "LlamaMoEModel":
         convert_llama_model_neuron_index(
@@ -42,6 +51,7 @@ if __name__ == "__main__":
             args.template,
             args.num_experts,
             args.num_selects,
+            score_scale_factor=args.score_scale_factor,
             use_default_gate=args.use_default_gate
         )
     elif args.convert_type == "LlamaMoEForCausalLM":
@@ -53,6 +63,7 @@ if __name__ == "__main__":
             args.template,
             args.num_experts,
             args.num_selects,
+            score_scale_factor=args.score_scale_factor,
             use_default_gate=args.use_default_gate
         )
     elif args.convert_type == "LlamaMoEForSequenceClassification":
@@ -64,6 +75,7 @@ if __name__ == "__main__":
             args.template,
             args.num_experts,
             args.num_selects,
+            score_scale_factor=args.score_scale_factor,
             use_default_gate=args.use_default_gate
         )
     else:

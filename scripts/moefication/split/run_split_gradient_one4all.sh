@@ -21,17 +21,20 @@ cpus=8
 
 share_neurons=True
 for expert_num in 16; do
-  for expert_size in 864; do
+  for expert_size in 540 1080 2160 4320 8640; do
+    # 540 1080 2160 4320 8640
     # 688 1376 2752 5504 11008
     # 864 1728 3456 6912 13824
     echo ${expert_num} ${expert_size} ${share_neurons}
     score_file_path=${data_path}/moefication_results/split/Gradients${expert_num}/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
+    visualization_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/expert-neuron-overlap/cluster${expert_num}/${llama_size}-${expert_size}-${accumulate_level}-${importance_type}-${kernel}-${criterion}-${proj_type}
 
-    OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
+    OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
       python -m smoe.entrypoint.moefication.llama_split_gradient \
       --model_path ${model_path} \
       --score_file_path ${score_file_path} \
       --save_path ${save_path} \
+      --visualization_path ${visualization_path} \
       --expert_num ${expert_num} \
       --expert_size ${expert_size} \
       --template layers.{}.mlp.${proj_type}.weight \
@@ -50,7 +53,7 @@ share_neurons=False
 expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
 echo ${expert_num} ${expert_size} ${share_neurons}
 
-OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
+OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
   python -m smoe.entrypoint.moefication.llama_split_gradient \
   --model_path ${model_path} \
   --score_file_path ${score_file_path} \

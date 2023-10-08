@@ -176,3 +176,6 @@ results/random_16select4_moe
 results/gate_loss.png
 /visualization_change_13B/
 /visualization_change_7B/
+/logs/
+/logs-cpt/
+/tensorboard/

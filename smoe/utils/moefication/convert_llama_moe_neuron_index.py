@@ -72,7 +72,7 @@ def convert_llama_model_neuron_index(
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
 
     """initialize moe model"""
@@ -177,7 +177,7 @@ def convert_llama_model_for_causal_lm_neuron_index(
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
 
     """initialize moe model"""
@@ -283,7 +283,7 @@ def convert_llama_model_for_sequence_classification_neuron_index(
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
 
     """initialize moe model"""

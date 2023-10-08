@@ -14,6 +14,7 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 from smoe.data.datasets_moefication import ShardDataset
 from smoe.utils.kernel_function import pass_kernel_function
 from smoe.utils.moefication.k_means_constrained_cos import KMeansConstrainedCos
+from smoe.utils.visualization.visualize import visualize_expert_neuron_overlap
 
 
 def load_ffn_weight(model, template, layer):
@@ -391,7 +392,13 @@ class GradientSplit(LayerSplit):
         expert_start_index = [0] * expert_num
 
         while sum(expert_neuron_count) < self.neuron_num:
-            now_selected_score = float('inf')
+            if criterion == "min":
+                now_selected_score = float('inf')
+            elif criterion == "max":
+                now_selected_score = float('-inf')
+            else:
+                raise NotImplementedError
+
             now_selected_neuron = -1
             now_selected_expert = -1
 
@@ -441,4 +448,21 @@ class GradientSplit(LayerSplit):
             self.split_without_neuron_sharing(expert_num, expert_size, criterion)
         else:
             self.split_with_neuron_sharing(expert_num, expert_size, criterion)
+
+    def visualize(self, save_path, share_neurons=False):
+        if share_neurons:  # 必须在share_neuron的情况下才可以可视化
+            num_experts = len(self.labels)
+            expert_size = len(self.labels[0])
+
+            selected_mask_list = []
+            for i, indices in enumerate(self.labels):
+                indices_tensor = torch.tensor(indices)
+                selected_mask = torch.zeros((self.neuron_num,), dtype=torch.int)
+                selected_mask[indices_tensor] += 1
+                selected_mask_list.append(selected_mask)
+            selected_masks = torch.stack(selected_mask_list, dim=0)  # shape(num_experts, intermediate_size)
+
+            visualize_expert_neuron_overlap(selected_masks, num_experts, self.neuron_num, expert_size, self.layer, save_dir=save_path)
+        else:
+            print("Skip visualization as share_neurons==False.")
     # fmt: on
