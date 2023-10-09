@@ -8,8 +8,8 @@ import numpy as np
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import (
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.modeling_llama_moe import (
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,
@@ -35,10 +35,12 @@ def main(args):
     gate_use_softmax = True
     gate_use_balance = True
     gate_balance_loss_weight = 1e-2
+    gate_add_noise = True
 
     # MoE计算方法配置
     calculator_type = "SwitchDropTokenCalculator"
     multiply_gate_scores = True
+    score_scale_factor = 1.0
     drop_tokens = True
     dropped_padding = "input"
     capacity_factor = 1.25
@@ -66,8 +68,10 @@ def main(args):
         gate_use_softmax=gate_use_softmax,
         gate_use_balance=gate_use_balance,
         gate_balance_loss_weight=gate_balance_loss_weight,
+        gate_add_noise=gate_add_noise,
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
+        score_scale_factor=score_scale_factor,
         drop_tokens=drop_tokens,
         dropped_padding=dropped_padding,
         capacity_factor=capacity_factor,

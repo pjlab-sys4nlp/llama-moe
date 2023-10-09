@@ -7,7 +7,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaForSequenceClassification, LlamaModel
 
-from smoe.models.llama_moefication import (
+from smoe.models.llama_moe import (
     LlamaMoEConfig,
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
@@ -24,6 +24,7 @@ def convert_llama_model(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -63,6 +64,9 @@ def convert_llama_model(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -117,6 +121,7 @@ def convert_llama_model_for_causal_lm(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -156,6 +161,9 @@ def convert_llama_model_for_causal_lm(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is not None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -184,7 +192,6 @@ def convert_llama_model_for_causal_lm(
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
-        # print(model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)])
     # fmt: on
 
     print("Converting...")
@@ -211,6 +218,7 @@ def convert_llama_model_for_sequence_classification(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -250,6 +258,9 @@ def convert_llama_model_for_sequence_classification(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is not None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -304,6 +315,7 @@ if __name__ == "__main__":
     template = "layers.{}.mlp.gate_proj.weight"
     num_experts = 8
     num_selects = 2
+    score_scale_factor = 8.0
     use_default_gate = False
 
     convert_llama_model(
@@ -314,6 +326,7 @@ if __name__ == "__main__":
         template,
         num_experts,
         num_selects,
+        score_scale_factor=score_scale_factor,
         use_default_gate=use_default_gate,
     )
 

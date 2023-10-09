@@ -10,12 +10,14 @@ from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer, set_seed
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.single_file import load_cached_dataset
 from smoe.trainer.moefication.expert_split_gradient import ExpertSplitGradientTrainer
-from smoe.utils.change_llama_forward import forward_llama_mlp_with_backward_hook_bug_fix
 from smoe.utils.config import (
     DataArguments,
     EnhancedTrainingArguments,
     ModelArguments,
     parse_args,
+)
+from smoe.utils.model_operation.change_llama_forward import (
+    forward_llama_mlp_with_backward_hook_bug_fix,
 )
 from smoe.utils.moefication.expert_split import GradientSplitGetGrads
 from smoe.utils.param import get_trainable_parameters
@@ -24,14 +26,13 @@ from smoe.utils.param import get_trainable_parameters
 @dataclass
 class SplitArguments:
     save_path: str = field(default=None)
-    expert_size: int = field(default=None)
+    total_clusters: int = field(default=None)
     kernel: Optional[str] = field(default="l1_norm")  # plain l1_norm l2_norm
     accumulate_level: Optional[str] = field(default="sample")  # sample total
     data_use_range_begin: Optional[float] = field(default=0.0)
     data_use_range_end: Optional[float] = field(default=1.0)
-    importance_type: Optional[str] = field(
-        default="feature_grad"
-    )  # feature_grad feature_change
+    # feature_grad feature_change
+    importance_type: Optional[str] = field(default="feature_change")
 
 
 @record
@@ -43,11 +44,14 @@ def main():
     )
     training_args.dataloader_pin_memory = False
 
+    print(data_args)
+    print(split_args)
+
     model_name = os.path.split(model_args.model_name_or_path)[1]
     dataset_name = os.path.split(data_args.dataset_dir)[1].split(".")[0]
     split_args.save_path = os.path.join(
         split_args.save_path,
-        "Gradients",
+        f"Gradients{split_args.total_clusters}",
         f"{model_name}-Gradients-{split_args.kernel}-{split_args.accumulate_level}-{split_args.importance_type}",
         dataset_name,
     )
@@ -122,7 +126,7 @@ def main():
         kernel=split_args.kernel,
         importance_type=split_args.importance_type,
         device=f"cuda:{training_args.local_rank}",
-        global_rank=os.environ["RANK"],
+        global_rank=int(os.environ["RANK"]),
     )
     split.get_score()
     print(f"Device {training_args.local_rank} Done.")

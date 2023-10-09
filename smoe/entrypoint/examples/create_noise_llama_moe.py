@@ -8,8 +8,8 @@ import numpy as np
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import (
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.modeling_llama_moe import (
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
     LlamaMoEModel,
@@ -41,6 +41,7 @@ def main(args):
     # MoE计算方法配置
     calculator_type = "UniversalCalculator"
     multiply_gate_scores = True
+    score_scale_factor = 1.0
 
     # 随机生成各个专家的大小，添加到size_experts
     for i in range(num_hidden_layers):
@@ -69,6 +70,7 @@ def main(args):
         gate_noise_epsilon=gate_noise_epsilon,
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
+        score_scale_factor=score_scale_factor,
     )
 
     if args.model_type == "LlamaMoEModel":

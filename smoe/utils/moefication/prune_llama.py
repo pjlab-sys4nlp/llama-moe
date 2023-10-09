@@ -4,6 +4,8 @@ import pickle
 import numpy as np
 import torch
 
+from smoe.utils.seed import set_seed
+
 
 class LayerPrune:
     def __init__(self, config, template, layer):
@@ -27,7 +29,6 @@ class GradientPrune(LayerPrune):
         self.score = score
         self.num_experts = 1
         self.neuron_num = score.size(0)
-        self.labels = np.zeros((self.neuron_num,))
 
     def sort_by_criterion(self, criterion):
         if criterion == "min":
@@ -43,3 +44,19 @@ class GradientPrune(LayerPrune):
         self.labels = [sorted_index[:expert_size]]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
         # print(self.labels)
         # fmt: on
+
+
+class RandomPrune(LayerPrune):
+    # fmt: off
+    def __init__(self, config, template, layer, neuron_num):
+        super().__init__(config, template, layer)
+        self.num_experts = 1
+        self.neuron_num = neuron_num
+
+    def prune(self, expert_size, seed=None):
+        if seed is not None:
+            set_seed(seed)
+        index = torch.randperm(self.neuron_num).tolist()
+        self.labels = [index[:expert_size]]  # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
+        # print(self.labels)
+    # fmt: on

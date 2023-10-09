@@ -18,7 +18,7 @@ save_path=${data_path}/moefication_results/features
 
 gpus=8
 cpus=$((gpus * 16))
-OMP_NUM_THREADS=2 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+OMP_NUM_THREADS=2 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
   torchrun --nproc_per_node=${gpus} -m smoe.entrypoint.moefication.llama_get_hidden_features \
   --model_path ${model_path} \
   --train_data_path ${train_data_path} \
@@ -31,4 +31,4 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=get_features --mpi=pmi2 --gres
   --block_size ${block_size}
 
 wait
-chmod -R 777 ${save_path}/${llama_size} >/dev/null 2>&1
+chmod -R 755 ${save_path}/${llama_size} >/dev/null 2>&1

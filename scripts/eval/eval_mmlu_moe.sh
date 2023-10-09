@@ -35,4 +35,4 @@ for i in '0' '1' '2' '3'; do
 done
 
 wait
-chmod -R 777 ${save_path}
+chmod -R 755 ${save_path}

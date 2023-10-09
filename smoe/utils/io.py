@@ -3,13 +3,33 @@ import json
 import lzma
 import os
 import pickle
+import shutil
 
+import cv2
 import torch
+
+
+def delete_file_or_dir(dir):
+    if os.path.isfile(dir):
+        os.remove(dir)
+    elif os.path.exists(dir):
+        shutil.rmtree(dir)
+    else:
+        pass
 
 
 def torch_load_template_file(path, template, layer):
     target = os.path.join(path, template.format(layer))
     return torch.load(target)
+
+
+def torch_load_template_score_file(path, template, layer):
+    score_list = []
+    for expert_folder_name in os.listdir(path):
+        score_file = os.path.join(path, expert_folder_name, template.format(layer))
+        score = torch.load(score_file, map_location="cpu")
+        score_list.append(score)
+    return score_list
 
 
 def save_compressed_file_7z(tensor, path):  # 7z
@@ -64,3 +84,10 @@ def dump_jsonlines(obj, filepath, **kwargs):
     with open(filepath, "w", encoding="utf8") as fout:
         for ins in obj:
             fout.write(f"{json.dumps(ins, ensure_ascii=False, **kwargs)}\n")
+
+
+def compress_png_image(image_path, print_info=False):
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    cv2.imwrite(image_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+    if print_info:
+        print(f'Done for "{image_path}".')

@@ -153,6 +153,7 @@ class MLPGate(BaseGate):
         self.mlp_model = TopKBalancedNoisyGate(self.hidden_dim, self.config.num_experts, self.config.num_selects, gate_network="mlp",
                                                use_balance=use_balance, add_noise=add_noise, use_softmax=use_softmax)
         self.mlp_model.gate_network.apply(self.mlp_gate_weights_init)
+        self.mlp_model.balance_loss_weight = balance_loss_lambda
         self.mlp_model = self.mlp_model.to(device)
 
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
@@ -218,7 +219,9 @@ class MLPGate(BaseGate):
                     hidden_inputs = hidden_inputs_examples[batch_id]
                     hidden_outputs = hidden_outputs_examples[batch_id]
 
-                    pred, gate_loss = self.mlp_model.forward_return_scores(hidden_inputs, gate_loss_lambda=balance_loss_lambda)  # MoE gate选择的各个专家的scores，shape(batch_size, expert_num)
+                    output = self.mlp_model.forward_return_scores(hidden_inputs)  # MoE gate选择的各个专家的scores，shape(batch_size, expert_num)
+                    pred = output["scores"]
+                    gate_loss = output["balance_loss"]
                     pred_topk, pred_labels = torch.topk(pred, k=int(self.config.num_selects), dim=-1)
 
                     scores = self.calculate_scores(hidden_outputs, expert_masks, use_softmax=use_softmax)  # 根据当前层激活后的输出所计算出的各个专家的分数
@@ -275,7 +278,8 @@ class MLPGate(BaseGate):
                         hidden_inputs = hidden_inputs_examples[batch_id]
                         hidden_outputs = hidden_outputs_examples[batch_id]
 
-                        pred, gate_loss = self.mlp_model.forward_return_scores(hidden_inputs, gate_loss_lambda=balance_loss_lambda)  # MoE gate选择的各个专家的scores，shape(batch, expert_num)
+                        output = self.mlp_model.forward_return_scores(hidden_inputs)  # MoE gate选择的各个专家的scores，shape(batch, expert_num)
+                        pred = output["scores"]
                         pred_topk, pred_labels = torch.topk(pred, k=int(self.config.num_selects), dim=-1)
 
                         scores = self.calculate_scores(hidden_outputs, expert_masks, use_softmax=use_softmax)  # 根据当前层激活后的输出所计算出的各个专家的分数

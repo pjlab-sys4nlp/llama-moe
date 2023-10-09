@@ -13,7 +13,7 @@ gpus=0
 cpus=8
 for num_experts in 4 8 16 32; do
   for proj_type in "gate_proj" "up_proj"; do
-    OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+    OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
       python -m smoe.entrypoint.moefication.llama_split_random \
       --model_path ${model_path} \
       --save_path ${save_path} \
@@ -24,4 +24,4 @@ for num_experts in 4 8 16 32; do
 done
 
 wait
-chmod -R 777 ${save_path} >/dev/null 2>&1
+chmod -R 755 ${save_path} >/dev/null 2>&1

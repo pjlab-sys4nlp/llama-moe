@@ -6,7 +6,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaForSequenceClassification, LlamaModel
 
-from smoe.models.llama_moefication import (
+from smoe.models.llama_moe import (
     LlamaMoEConfig,
     LlamaMoEForCausalLM,
     LlamaMoEForSequenceClassification,
@@ -23,6 +23,7 @@ def convert_llama_model_neuron_index(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -70,6 +71,9 @@ def convert_llama_model_neuron_index(
     config_llama_moe.size_experts = size_experts
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -124,6 +128,7 @@ def convert_llama_model_for_causal_lm_neuron_index(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -171,6 +176,9 @@ def convert_llama_model_for_causal_lm_neuron_index(
     config_llama_moe.size_experts = size_experts
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -226,6 +234,7 @@ def convert_llama_model_for_sequence_classification_neuron_index(
     template,
     num_experts,
     num_selects,
+    score_scale_factor=None,
     use_default_gate=False,
 ):
     """
@@ -273,6 +282,9 @@ def convert_llama_model_for_sequence_classification_neuron_index(
     config_llama_moe.size_experts = size_experts
     config_llama_moe.intermediate_size = sum(size_experts[0])
     config_llama_moe.gates = "mlp"
+    config_llama_moe.score_scale_factor = (
+        1.0 if score_scale_factor is None else score_scale_factor
+    )
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -327,6 +339,7 @@ if __name__ == "__main__":
     template = "layers.{}.mlp.gate_proj.weight"
     num_experts = 8
     num_selects = 2
+    score_scale_factor = 8.0
     use_default_gate = True
 
     convert_llama_model_neuron_index(
@@ -337,6 +350,7 @@ if __name__ == "__main__":
         template,
         num_experts,
         num_selects,
+        score_scale_factor=score_scale_factor,
         use_default_gate=use_default_gate,
     )
 
