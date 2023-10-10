@@ -17,7 +17,7 @@ from smoe.models.llama_moe.modeling_llama_moe import (
 
 
 def main(args):
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     """set up configs"""
     # 模型大小参数
@@ -71,6 +71,7 @@ def main(args):
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
         score_scale_factor=score_scale_factor,
+        use_cache=False,
     )
 
     if args.model_type == "LlamaMoEModel":
@@ -101,7 +102,7 @@ def main(args):
     model_llama_moe.to(device)
     tokens.to(device)
     result = model_llama_moe(**tokens)  # noqa: F841
-    # print(result)
+    print("Done!")
 
 
 if __name__ == "__main__":

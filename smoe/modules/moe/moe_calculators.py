@@ -12,7 +12,15 @@ class CalculatorOutput(ModelOutput):
     num_dropped_tokens: Optional[int] = None
 
 
-class UniversalCalculator(nn.Module):
+class BaseCalculator(nn.Module):
+    def __init__(self):
+        super(BaseCalculator, self).__init__()
+
+    def reset_experts(self):
+        self.experts.reset_parameters()
+
+
+class UniversalCalculator(BaseCalculator):
     # traditional calculation mode, forward $num_experts$ times with re-batch optimization
     """
     https://github.com/YeonwooSung/Pytorch_mixture-of-experts
@@ -71,7 +79,7 @@ class UniversalCalculator(nn.Module):
         # fmt: on
 
 
-class SwitchDropTokenCalculator(nn.Module):
+class SwitchDropTokenCalculator(BaseCalculator):
     """
     https://arxiv.org/pdf/2101.03961.pdf
     https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/switch/__init__.py

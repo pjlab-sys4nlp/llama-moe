@@ -58,5 +58,6 @@ def test_noise_moe():
     input = torch.rand((batch_size, input_size))
     output = layer(input)
 
+
 if __name__ == "__main__":
     test_noise_moe()

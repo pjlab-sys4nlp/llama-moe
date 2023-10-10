@@ -2,6 +2,7 @@ import torch
 
 from smoe.modules.moe_residual.moe_residual_layers import LinearGLUMoEResidualLayer
 
+
 def test_noise_moe_residual():
     input_size = 4096
     hidden_size = 688 * 14
@@ -54,6 +55,7 @@ def test_noise_moe_residual():
 
     input = torch.rand((batch_size, input_size))
     output = layer(input)
+
 
 if __name__ == "__main__":
     test_noise_moe_residual()

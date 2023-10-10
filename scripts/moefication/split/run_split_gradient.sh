@@ -2,16 +2,16 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama2_7B"
+llama_size="llama_3B"
 
-share_neurons=False #  True  False
-expert_num=16
+share_neurons=True #  True  False
+expert_num=4
 
 #intermediate_size=8640 #  8640  11008  13824
 #scale_factor=4
 #expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${expert_num})
 
-expert_size=864
+expert_size=8640
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824

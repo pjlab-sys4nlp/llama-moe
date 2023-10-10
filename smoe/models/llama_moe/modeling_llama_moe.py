@@ -83,9 +83,11 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             # all calculators
             "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
-            "score_scale_factor": config.score_scale_factor[layer_index]
-            if isinstance(config.score_scale_factor, list)
-            else config.score_scale_factor,
+            "score_scale_factor": (
+                config.score_scale_factor[layer_index]
+                if isinstance(config.score_scale_factor, list)
+                else config.score_scale_factor
+            ),
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -193,6 +195,9 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 
     def reset_gate_network(self):
         self.mlp.reset_gate_network()
+
+    def reset_experts(self):
+        self.mlp.reset_experts()
 
 
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
@@ -439,6 +444,10 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.reset_gate_network()
 
+    def reset_experts(self):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.reset_experts()
+
 
 class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def __init__(self, config):
@@ -559,6 +568,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
+
+    def reset_experts(self):
+        self.model.reset_experts()
 
 
 class LlamaMoEForSequenceClassification(
@@ -705,3 +717,6 @@ class LlamaMoEForSequenceClassification(
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
+
+    def reset_experts(self):
+        self.model.reset_experts()

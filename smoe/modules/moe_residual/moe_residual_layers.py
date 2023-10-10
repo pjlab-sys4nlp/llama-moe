@@ -70,8 +70,21 @@ class BaseMoEResidualLayer(nn.Module):
     def reset_gate_network(self):
         self.moe_layer.reset_gate_network()
 
+    def reset_experts(self):
+        self.moe_layer.reset_experts()
+
+    # functions for the residual block
+    def set_residual_gate_use_softmax(self, use_softmax):
+        self.residual_block.set_gate_use_softmax(use_softmax)
+
+    def set_residual_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.residual_block.set_calculator_multiply_gate_scores(multiply_gate_scores)
+
     def set_residual_calculator_score_scale_factor(self, score_scale_factor):
         self.residual_block.set_calculator_score_scale_factor(score_scale_factor)
+
+    def reset_residual_experts(self):
+        self.residual_block.reset_experts()
 
 
 class LinearMoEResidualLayer(BaseMoEResidualLayer):
@@ -83,7 +96,6 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
         num_selects,
         bias=True,
         num_experts_residual=1,
-        score_scale_factor_residual=1.0,
         use_weighting=True,
         moe_layer=None,
         **kwargs,
@@ -113,10 +125,12 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
             bias=bias,
             **{
                 "gate_type": "UniformPlainGate",
-                "gate_use_softmax": True,
+                "gate_use_softmax": kwargs.get("gate_use_softmax_residual", True),
                 "calculator_type": "UniversalCalculator",
-                "multiply_gate_scores": True,
-                "score_scale_factor": score_scale_factor_residual,
+                "multiply_gate_scores": kwargs.get(
+                    "multiply_gate_scores_residual", True
+                ),
+                "score_scale_factor": kwargs.get("score_scale_factor_residual", 1.0),
             },
         )
 
@@ -130,8 +144,8 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
     def from_moe_layer(
         moe_layer,
         num_experts_residual=1,
-        score_scale_factor_residual=1.0,
         use_weighting=None,
+        **kwargs,
     ):
         # create the moe residual layer using an existing moe layer
         # the "moe_layer" will be initialized from the given moe layer
@@ -144,9 +158,9 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
             moe_layer.num_selects,
             bias=moe_layer.bias,
             num_experts_residual=num_experts_residual,
-            score_scale_factor_residual=score_scale_factor_residual,
             use_weighting=use_weighting,
             moe_layer=moe_layer,
+            **kwargs,
         )
 
 
@@ -163,7 +177,6 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
         bias=True,
         num_experts_residual=1,
         size_experts_residual=None,
-        score_scale_factor_residual=1.0,
         use_weighting=False,
         moe_layer=None,
         **kwargs,
@@ -217,10 +230,12 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
             bias=bias,
             **{
                 "gate_type": "UniformPlainGate",
-                "gate_use_softmax": True,
+                "gate_use_softmax": kwargs.get("gate_use_softmax_residual", True),
                 "calculator_type": "UniversalCalculator",
-                "multiply_gate_scores": True,
-                "score_scale_factor": score_scale_factor_residual,
+                "multiply_gate_scores": kwargs.get(
+                    "multiply_gate_scores_residual", True
+                ),
+                "score_scale_factor": kwargs.get("score_scale_factor_residual", 1.0),
             },
         )
 
@@ -235,8 +250,8 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
         moe_layer,
         num_experts_residual=None,
         size_experts_residual=None,
-        score_scale_factor_residual=1.0,
         use_weighting=None,
+        **kwargs,
     ):
         # create the moe residual layer using an existing moe layer
         # the "moe_layer" will be initialized from the given moe layer
@@ -253,7 +268,7 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
             bias=moe_layer.bias,
             num_experts_residual=num_experts_residual,
             size_experts_residual=size_experts_residual,
-            score_scale_factor_residual=score_scale_factor_residual,
             use_weighting=use_weighting,
             moe_layer=moe_layer,
+            **kwargs,
         )

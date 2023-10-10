@@ -350,7 +350,7 @@ def visualize_expert_neuron_overlap(
 
     # print(intersection_num)
     # print(union_num)
-    print("overlap_rate", overlap_rate, sep="\n")
+    print("overlap_rate", overlap_rate, sep="\n", flush=True)
 
     """overlap count for each expert"""
     # rows: overlap count,  columns: different experts
@@ -367,7 +367,7 @@ def visualize_expert_neuron_overlap(
         # print(overlap_count[overlap_times, :])
 
     # print(overlap_count.sum(0))
-    print("overlap_count", overlap_count, sep="\n")
+    print("overlap_count", overlap_count, sep="\n", flush=True)
 
     """save graphs"""
     total_neurons = (sum_count > 0).sum().item()
@@ -403,7 +403,7 @@ def visualize_expert_neuron_overlap(
 
     if save_fig:
         fig.savefig(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
-        compress_png_image(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png"), print_info=False)
+        compress_png_image(str(path_overlap_rate / Path(f"overlap_rate_layer{layer_idx}.png")), print_info=False)
     plt.close(fig)
 
     """overlap_count"""
@@ -422,7 +422,7 @@ def visualize_expert_neuron_overlap(
 
     if save_fig:
         fig.savefig(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"), dpi=480, bbox_inches="tight", )
-        compress_png_image(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png"), print_info=False)
+        compress_png_image(str(path_overlap_count / Path(f"overlap_count_layer{layer_idx}.png")), print_info=False)
     plt.close(fig)
     # fmt: on
 
