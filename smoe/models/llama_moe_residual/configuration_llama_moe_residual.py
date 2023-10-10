@@ -17,10 +17,10 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         vocab_size=32000,
         hidden_size=4096,
         intermediate_size=11008,  # 688*16
-        # ---- different here ---- #
+        # ↓↓↓↓ different here ↓↓↓↓ #
         intermediate_size_moe=9632,  # 688*14
         intermediate_size_residual=1376,  # 688*2
-        # ------------------------ #
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
         num_hidden_layers=32,
         num_attention_heads=32,
         num_key_value_heads=None,
@@ -40,12 +40,14 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         num_selects=2,
         size_experts=None,
         #### -------- moe residual block configs -------- ####
-        # ---- different here ---- #
+        # ↓↓↓↓ different here ↓↓↓↓ #
         num_experts_residual=2,
         size_experts_residual=None,
+        gate_use_softmax_residual=True,
+        multiply_gate_scores_residual=True,
         score_scale_factor_residual=1.0,
         use_weighting=False,
-        # ------------------------ #
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
         #### -------- moe gate configs -------- ####
         gate_type="TopKBalancedNoisyGate",
         gate_network="mlp",
@@ -69,10 +71,10 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
-        # ---- different here ---- #
+        # ↓↓↓↓ different here ↓↓↓↓ #
         self.intermediate_size_moe = intermediate_size_moe
         self.intermediate_size_residual = intermediate_size_residual
-        # ------------------------ #
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
         self.hidden_act = hidden_act
@@ -87,12 +89,14 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         self.num_selects = num_selects
         self.size_experts = size_experts
 
-        # ---- different here ---- #
+        # ↓↓↓↓ different here ↓↓↓↓ #
         self.num_experts_residual = num_experts_residual
         self.size_experts_residual = size_experts_residual
+        self.gate_use_softmax_residual = gate_use_softmax_residual
+        self.multiply_gate_scores_residual = multiply_gate_scores_residual
         self.score_scale_factor_residual = score_scale_factor_residual
         self.use_weighting = use_weighting
-        # ------------------------ #
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
 
         self.gate_type = gate_type
         self.gate_network = gate_network

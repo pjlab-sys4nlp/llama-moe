@@ -2,11 +2,11 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
+llama_size="llama_3B"
 
-num_experts=16 #  2  4  8  16  32
-num_selects=4  #  1  2  4
-expert_size=864
+num_experts=4 #  2  4  8  16  32
+num_selects=1 #  1  2  4
+expert_size=8640
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824
@@ -14,9 +14,9 @@ share_neurons=True               #  True  False
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
 
 score_scale_factor=1.0 #  1.0  2.0  4.0  8.0  16.0
-#score_scale_factor_file_path=""
+score_scale_factor_file_path=""
 #score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_dense
-score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_moe_trained
+#score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_moe_trained
 
 kernel=l1_norm
 criterion=max                  #  min  max
@@ -28,8 +28,6 @@ data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 split_file_path=${data_path}/moefication_results/split/${llama_size}-Split-Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${num_experts}Experts-${expert_size}Neurons
 save_path=${data_path}/models/${convert_type}/Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${llama_size}-${num_experts}Select${num_selects}-${expert_size}Neurons
-
-save_path=${save_path}-layer-wise-moe ##########################################
 
 gpus=0
 cpus=8

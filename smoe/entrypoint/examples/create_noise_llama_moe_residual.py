@@ -19,7 +19,7 @@ from smoe.models.llama_moe_residual.modeling_llama_moe_residual import (
 
 
 def main(args):
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     """set up configs"""
     # 模型大小参数
@@ -36,6 +36,8 @@ def main(args):
     # Residual模块配置 🔍
     num_experts_residual = 2
     size_experts_residual = None  # 为None则各个共享专家大小相同
+    gate_use_softmax_residual = False
+    multiply_gate_scores_residual = False
     score_scale_factor_residual = 8.0
     use_weighting = False
 
@@ -75,6 +77,8 @@ def main(args):
         size_experts=size_experts,
         num_experts_residual=num_experts_residual,
         size_experts_residual=size_experts_residual,
+        gate_use_softmax_residual=gate_use_softmax_residual,
+        multiply_gate_scores_residual=multiply_gate_scores_residual,
         score_scale_factor_residual=score_scale_factor_residual,
         use_weighting=use_weighting,
         gate_type=gate_type,
@@ -87,6 +91,7 @@ def main(args):
         calculator_type=calculator_type,
         multiply_gate_scores=multiply_gate_scores,
         score_scale_factor=score_scale_factor,
+        use_cache=False,
     )
 
     if args.model_type == "LlamaMoEResidualModel":
@@ -121,7 +126,7 @@ def main(args):
     config_llama_moe_residual.to(device)
     tokens.to(device)
     result = config_llama_moe_residual(**tokens)  # noqa: F841
-    # print(result)
+    print("Done!")
 
 
 if __name__ == "__main__":

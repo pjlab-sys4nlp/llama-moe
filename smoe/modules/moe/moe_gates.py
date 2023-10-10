@@ -52,9 +52,9 @@ class UniformPlainGate(nn.Module):
         return {
             "topK_indices": indices,
             "topK_scores": scores,
-            "balance_loss": None,
-            "load": None,
-            "importance": None,
+            "balance_loss": torch.tensor(0, device=x.device),
+            "load": torch.tensor(-1, device=x.device),
+            "importance": torch.tensor(-1, device=x.device),
         }
 
 
@@ -132,7 +132,7 @@ class TopKBalancedNoisyGate(nn.Module):
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
-            # logits_noise = noise_control * gumbel_rsample(logits_gate.shape, device=logits_gate.device).to(logits_gate)
+            # logits_noise = noise_control * gumbel_rsample(logits_gate.shape, device=logits_gate.device)
             logits = logits_gate + logits_noise  # 最终权重
         else:
             logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
@@ -151,7 +151,7 @@ class TopKBalancedNoisyGate(nn.Module):
         """计算load"""
         # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
         if self.training:
-            if self.add_noise:
+            if self.add_noise and self.num_selects != self.num_experts:
                 batch_size = top_logits.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
@@ -177,7 +177,7 @@ class TopKBalancedNoisyGate(nn.Module):
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
         else:
-            balance_loss = None
+            balance_loss = torch.tensor(0, device=x.device)
 
         return {
             "topK_indices": top_k_indices,
@@ -214,7 +214,7 @@ class TopKBalancedNoisyGate(nn.Module):
         """计算load"""
         # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
         if self.training:
-            if self.add_noise:
+            if self.add_noise and self.num_selects != self.num_experts:
                 batch_size = top_logits.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()

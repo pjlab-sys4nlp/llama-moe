@@ -2,6 +2,7 @@ import torch
 
 from smoe.modules.moe.moe_layers import LinearGLUMoELayer
 
+
 def test_switch_moe():
     input_size = 128
     hidden_size = 4096
@@ -46,6 +47,7 @@ def test_switch_moe():
 
     input = torch.rand((batch_size, input_size))
     output = layer(input)
+
 
 if __name__ == "__main__":
     test_switch_moe()

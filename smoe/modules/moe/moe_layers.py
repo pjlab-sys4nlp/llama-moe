@@ -117,6 +117,7 @@ class BaseMoELayer(nn.Module):
         elif self.gate_type in ("SwitchBalancedGate",):
             raise ValueError(f"{self.gate_type} doesn't support manually setting num_selects.")
         else:
+            self.num_selects = num_selects
             self.gate.num_selects = num_selects
 
     def set_gate_use_softmax(self, use_softmax):
@@ -190,6 +191,9 @@ class BaseMoELayer(nn.Module):
             raise KeyError(f"{self.gate_type} does not have a gate network.")
         else:
             self.gate.reset_gate_network()
+
+    def reset_experts(self):
+        self.calculator.reset_experts()
     # fmt: on
 
 

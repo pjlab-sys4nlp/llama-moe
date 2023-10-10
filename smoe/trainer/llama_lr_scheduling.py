@@ -113,6 +113,7 @@ class LlamaLrSchedulingTrainer(Trainer):
         )
         last_epoch = -1
         self.lr_scheduler = LambdaLR(optimizer, lr_lambda, last_epoch)
+        self._created_lr_scheduler = True
         return self.lr_scheduler
 
     def training_step(
