@@ -2,16 +2,16 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_3B"
+llama_size="llama_7B"
 
-num_experts=28                           #  7  14  28
-num_experts_residual=4                   #  1  2  3  4
-num_selects=4                            #  1  2  3  4
-score_scale_factor_residual=4.0          #  4.0  8.0  12.0  16.0
+num_experts=13                           #  7  14  28
+num_experts_residual=3                   #  1  2  3  4
+num_selects=1                            #  1  2  3  4
+score_scale_factor_residual=12.0         #  4.0  8.0  12.0  16.0
 score_scale_factor=4.0                   #  4.0  8.0  12.0  16.0
 convert_type=LlamaMoEResidualForCausalLM #  LlamaMoEResidualModel  LlamaMoEResidualForCausalLM  LlamaMoEResidualForSequenceClassification
 
-expert_size=1080
+expert_size=688
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824

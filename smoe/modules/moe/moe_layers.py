@@ -12,7 +12,12 @@ from .moe_calculators import (
     UniversalCalculator,
 )
 from .moe_experts import LinearExperts, LinearGLUExperts
-from .moe_gates import SwitchBalancedGate, TopKBalancedNoisyGate, UniformPlainGate
+from .moe_gates import (
+    RandomLearnableGate,
+    SwitchBalancedGate,
+    TopKBalancedNoisyGate,
+    UniformPlainGate,
+)
 
 
 @dataclass
@@ -62,6 +67,16 @@ class BaseMoELayer(nn.Module):
                 self.input_size,
                 self.num_experts,
                 use_softmax=kwargs.get("gate_use_softmax", False),
+            )
+        elif self.gate_type == "RandomLearnableGate":  # random gate with network
+            self.gate = RandomLearnableGate(
+                self.input_size,
+                self.num_experts,
+                self.num_selects,
+                gate_network=kwargs.get("gate_network", "mlp"),
+                use_softmax=kwargs.get("gate_use_softmax", False),
+                add_noise=kwargs.get("gate_add_noise", True),
+                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
             )
         else:
             raise NotImplementedError
@@ -187,10 +202,7 @@ class BaseMoELayer(nn.Module):
             self.calculator.capacity_factor = capacity_factor
 
     def reset_gate_network(self):
-        if "gate_network_type" not in vars(self.gate):
-            raise KeyError(f"{self.gate_type} does not have a gate network.")
-        else:
-            self.gate.reset_gate_network()
+        self.gate.reset_gate_network()
 
     def reset_experts(self):
         self.calculator.reset_experts()

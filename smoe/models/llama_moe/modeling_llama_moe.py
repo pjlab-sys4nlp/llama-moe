@@ -389,6 +389,72 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
             gate_importance=gate_importance,
         )
 
+    def update_config(self):
+        self.config.vocab_size = self.config.vocab_size
+        self.config.max_position_embeddings = self.config.max_position_embeddings
+        # ↓↓↓↓↓↓↓↓↓↓↓↓ changed here ↓↓↓↓↓↓↓↓↓↓↓↓ #
+        self.config.hidden_size = self.layers[0].mlp.input_size
+        self.config.intermediate_size = self.layers[0].mlp.hidden_size
+        self.config.num_hidden_layers = len(self.layers)
+        self.config.num_attention_heads = self.layers[0].self_attn.num_heads
+        self.config.hidden_act = self.layers[0].mlp.hidden_act
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
+        self.config.initializer_range = self.config.initializer_range
+        self.config.rms_norm_eps = self.config.rms_norm_eps
+        self.config.pretraining_tp = self.config.pretraining_tp
+        self.config.use_cache = self.config.use_cache
+        self.config.rope_scaling = self.config.rope_scaling
+        self.config._rope_scaling_validation()
+
+        self.config.num_experts = self.layers[0].mlp.num_experts
+        self.config.num_selects = self.layers[0].mlp.num_selects
+        self.config.size_experts = [
+            self.layers[i].mlp.calculator.experts.size_experts
+            for i in range(self.config.num_hidden_layers)
+        ]
+
+        self.config.gate_type = vars(self.layers[0].mlp).get(
+            "gate_type", "TopKBalancedNoisyGate"
+        )
+        self.config.gate_network = vars(self.layers[0].mlp.gate).get(
+            "gate_network_type", "mlp"
+        )
+        self.config.gate_use_softmax = vars(self.layers[0].mlp.gate).get(
+            "use_softmax", True
+        )
+        self.config.gate_use_balance = vars(self.layers[0].mlp.gate).get(
+            "use_balance", True
+        )
+        self.config.gate_balance_loss_weight = vars(self.layers[0].mlp.gate).get(
+            "balance_loss_weight", 1e-2
+        )
+        self.config.gate_add_noise = vars(self.layers[0].mlp.gate).get(
+            "add_noise", True
+        )
+        self.config.gate_noise_epsilon = vars(self.layers[0].mlp.gate).get(
+            "noise_epsilon", 1e-2
+        )
+
+        self.config.calculator_type = vars(self.layers[0].mlp).get(
+            "calculator_type", "UniversalCalculator"
+        )
+        self.config.multiply_gate_scores = vars(self.layers[0].mlp.calculator).get(
+            "multiply_gate_scores", True
+        )
+        self.config.score_scale_factor = [
+            vars(self.layers[i].mlp.calculator).get("score_scale_factor", 1.0)
+            for i in range(self.config.num_hidden_layers)
+        ]
+        self.config.drop_tokens = vars(self.layers[0].mlp.calculator).get(
+            "drop_tokens", True
+        )
+        self.config.dropped_padding = vars(self.layers[0].mlp.calculator).get(
+            "dropped_padding", "zero"
+        )
+        self.config.capacity_factor = vars(self.layers[0].mlp.calculator).get(
+            "capacity_factor", 1.25
+        )
+
     def set_moe_num_selects(self, num_selects):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_num_selects(num_selects)
@@ -528,6 +594,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             gate_load=outputs.gate_load,
             gate_importance=outputs.gate_importance,
         )
+
+    def update_config(self):
+        self.model.update_config()
 
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)
@@ -677,6 +746,9 @@ class LlamaMoEForSequenceClassification(
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
+
+    def update_config(self):
+        self.model.update_config()
 
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)

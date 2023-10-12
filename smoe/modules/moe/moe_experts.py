@@ -83,7 +83,6 @@ class LinearGLUExperts(nn.Module):
         self.out_features = out_features
         self.hidden_act = hidden_act
         self.num_experts = num_experts
-        self.size_experts = size_experts
 
         if size_experts is None:
             # all experts share the same number of hidden neurons
@@ -96,6 +95,7 @@ class LinearGLUExperts(nn.Module):
                 len(size_experts) == num_experts
                 and sum(size_experts) == hidden_features
             )
+        self.size_experts = size_experts
 
         self.act_fn = ACT2FN[hidden_act]
 

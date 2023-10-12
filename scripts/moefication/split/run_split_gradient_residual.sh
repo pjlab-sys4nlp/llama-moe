@@ -2,16 +2,17 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
+llama_size="llama_7B"
 
-expert_num_moe=13
-expert_num_residual=3
+expert_num_moe=15
+expert_num_residual=1
 total_expert_num=$((${expert_num_moe} + ${expert_num_residual}))
 
 #intermediate_size=8640 #  8640  11008  13824
 #scale_factor=1
 #expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${total_expert_num})
-expert_size=864
+
+expert_size=688
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824

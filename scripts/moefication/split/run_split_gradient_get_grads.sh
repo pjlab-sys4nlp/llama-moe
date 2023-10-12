@@ -6,12 +6,14 @@
 #SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --nodes=2
+#SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --mem=0
-#SBATCH --quotatype=spot
+#SBATCH --quotatype=reserved
 
-num_nodes=2        # should match with --nodes
+# reserved spot
+
+num_nodes=1        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
 
 # #cpu/#num_gpu_per_node
