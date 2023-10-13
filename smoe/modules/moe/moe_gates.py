@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
@@ -19,13 +21,113 @@ def get_gate_network(gate_type, input_size, num_experts):
             torch.nn.Linear(num_experts, num_experts, bias=False),
         )
     else:
-        raise ValueError('Expected "gate_type" in', valid_gate_type, "got", gate_type)
+        raise ValueError(f'Expected "gate_type" in {valid_gate_type}, got {gate_type}.')
 
     return gate_network
 
 
-class TopKBalancedNoisyGate(nn.Module):
+class BaseGate(nn.Module):
+    def __init__(self):
+        super(BaseGate, self).__init__()
+
+    def reset_gate_network(self):
+        if "gate_network_type" not in vars(self):
+            raise KeyError(f"{type(self)} does not have a gate network.")
+        else:
+            self.gate_network = get_gate_network(
+                self.gate_network_type, self.input_size, self.num_experts
+            )
+
+
+class UniformPlainGate(BaseGate):
     """
+    Select all experts with the same score.
+    If use_softmax=True, then score=1/num_experts.
+    If use_softmax=False, then score=1.
+    """
+
+    def __init__(
+        self,
+        input_size,
+        num_experts,
+        use_softmax=True,
+    ):
+        super(UniformPlainGate, self).__init__()
+        self.input_size = input_size
+        self.num_experts = num_experts
+        self.use_softmax = use_softmax
+
+    def forward(self, x):
+        batch_size = x.shape[0]  # gate计算出的权重
+        scores = torch.ones((batch_size, self.num_experts), device=x.device)
+        if self.use_softmax:
+            scores /= self.num_experts
+        indices = (
+            torch.arange(0, self.num_experts, device=x.device)
+            .unsqueeze(0)
+            .expand(batch_size, self.num_experts)
+        )
+
+        return {
+            "topK_indices": indices,
+            "topK_scores": scores,
+            "balance_loss": torch.tensor(0, device=x.device),
+            "load": torch.tensor(-1, device=x.device),
+            "importance": torch.tensor(-1, device=x.device),
+        }
+
+
+class RandomLearnableGate(BaseGate):
+    """
+    Randomly select k experts each time, with a learnable gate_network controlling expert scores.
+    """
+
+    def __init__(
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        gate_network="mlp",
+        use_softmax=True,
+        add_noise=True,
+        noise_epsilon=1e-2,
+    ):
+        super(RandomLearnableGate, self).__init__()
+        self.input_size = input_size
+        self.num_experts = num_experts
+        self.num_selects = num_selects
+
+        self.gate_network_type = gate_network
+        self.gate_network = get_gate_network(gate_network, input_size, num_experts)
+
+        self.use_softmax = use_softmax
+        self.softmax = nn.Softmax(1)
+
+        self.add_noise = add_noise
+        self.noise_epsilon = noise_epsilon
+
+    def forward(self, x):
+        logits = self.gate_network(x)  # gate计算出的权重
+        gumbel_rsample(logits.shape, device=logits.device).to(
+            logits
+        ) * self.noise_epsilon
+
+        _, top_k_indices = torch.rand_like(logits).topk(self.num_selects, dim=1)
+        top_k_logits = torch.gather(logits, dim=1, index=top_k_indices)
+        top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
+
+        return {
+            "topK_indices": top_k_indices,
+            "topK_scores": top_k_scores,
+            "balance_loss": torch.tensor(0, device=x.device),
+            "load": torch.tensor(-1, device=x.device),
+            "importance": torch.tensor(-1, device=x.device),
+        }
+
+
+class TopKBalancedNoisyGate(BaseGate):
+    """
+    Select the top-k experts each time, with a learnable gate_network controlling expert scores.
     https://arxiv.org/abs/1701.06538.
     https://github.com/YeonwooSung/Pytorch_mixture-of-experts
     """
@@ -68,8 +170,6 @@ class TopKBalancedNoisyGate(nn.Module):
             dtype=self.weight_noise.weight.data.dtype,
         )
         # print(self.weight_noise.weight.data)
-        # self.mean = torch.tensor([0.0], requires_grad=False)
-        # self.std = torch.tensor([1.0], requires_grad=False)
         self.mean = 0.0
         self.std = 1.0
         self.normal = Normal(self.mean, self.std)
@@ -98,7 +198,6 @@ class TopKBalancedNoisyGate(nn.Module):
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
-            # logits_noise = noise_control * gumbel_rsample(logits_gate.shape, device=logits_gate.device).to(logits_gate)
             logits = logits_gate + logits_noise  # 最终权重
         else:
             logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
@@ -109,40 +208,47 @@ class TopKBalancedNoisyGate(nn.Module):
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
 
-        """专家平衡选择"""
-        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下gate loss输出值设备不匹配的错误
-        load = torch.tensor(-1.0)
-        importance = torch.tensor(-1.0)
+        """计算importance"""
+        zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+        scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+        importance = scores_filtered.sum(0)  # shape(num_experts)
 
-        if self.training and self.use_balance:
-            """计算importance"""
-            zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
-            scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
-            importance = scores_filtered.sum(0)  # shape(num_experts)
-            # importance = scores_filtered.float().sum(0)  # shape(num_experts)
+        """计算load"""
+        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        if self.training:
+            if self.add_noise and self.num_selects != self.num_experts:
+                batch_size = top_logits.size(0)
+                m = top_logits.size(1)
+                top_values_flat = top_logits.flatten()
+                threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
+                threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
+                is_in = torch.gt(logits_noise, threshold_if_in)
+                threshold_positions_if_out = threshold_positions_if_in - 1
+                threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
+                # is each value currently in the top k.
+                prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
+                prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
+                prob = torch.where(is_in, prob_if_in, prob_if_out)
+                load = prob.sum(0)
+            else:
+                load = (scores_filtered > 0).sum(0)
+                warnings.warn('Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
+                              'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.')
+        else:
+            load = (scores_filtered > 0).sum(0)
 
-            """计算load"""
-            batch_size = logits_gate.size(0)
-            m = top_logits.size(1)
-            top_values_flat = top_logits.flatten()
-            threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
-            threshold_if_in = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_in), 1)
-            is_in = torch.gt(logits_noise, threshold_if_in)
-            threshold_positions_if_out = threshold_positions_if_in - 1
-            threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-            # is each value currently in the top k.
-            prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
-            prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
-            prob = torch.where(is_in, prob_if_in, prob_if_out)
-            # load = prob.float().sum(0)
-            load = prob.sum(0)
-
-            """计算balance loss"""
+        """计算balance loss"""
+        if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
-            # balance_loss = balance_loss.to(logits)  # fallback to fp16
         else:
-            balance_loss = torch.tensor(-100.0)
+            balance_loss = torch.tensor(-100.0, device=x.device)
+
+        # print("weight", self.gate_network.weight, sep="\n")
+        # print("logits_gate", logits_gate, sep="\n")
+        # print("importance", importance, sep="\n")
+        # print("load", load, sep="\n")
+        # print("balance_loss", balance_loss, sep="\n")
 
         return {
             "topK_indices": top_k_indices,
@@ -171,16 +277,16 @@ class TopKBalancedNoisyGate(nn.Module):
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
 
-        """专家平衡选择"""
-        if self.use_balance:
-            """计算importance"""
-            zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
-            scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
-            importance = scores_filtered.sum(0)  # shape(num_experts)
+        """计算importance"""
+        zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+        scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
+        importance = scores_filtered.sum(0)  # shape(num_experts)
 
-            """计算load"""
-            if self.training:  # 计算各分数在处于topK范围内的概率，可传递梯度
-                batch_size = logits_gate.size(0)
+        """计算load"""
+        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        if self.training:
+            if self.add_noise and self.num_selects != self.num_experts:
+                batch_size = top_logits.size(0)
                 m = top_logits.size(1)
                 top_values_flat = top_logits.flatten()
                 threshold_positions_if_in = torch.arange(batch_size, device=x.device) * m + self.num_selects
@@ -194,29 +300,32 @@ class TopKBalancedNoisyGate(nn.Module):
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
                 load = prob.sum(0)
             else:
-                load = (scores_filtered > 0).sum(0)  # shape(num_experts)
+                load = (scores_filtered > 0).sum(0)
+                warnings.warn("Gradient-trackable implementation for load calculation is only available when \"add_noise=True\". "
+                              "Training without noise will block the gradient from load path and lead to inconsistency in optimization objective.")
+        else:
+            load = (scores_filtered > 0).sum(0)
 
-            """计算balance loss"""
+        """计算balance loss"""
+        if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
-
         else:
             balance_loss = None
 
         return {
             "scores": scores,
             "balance_loss": balance_loss,
+            "load": load,
+            "importance": importance,
         }
+
     # fmt: on
 
-    def reset_gate_network(self):
-        for name, param in self.gate_network.named_parameters():
-            if "weight" in name:
-                torch.nn.init.kaiming_normal_(param)
 
-
-class SwitchBalancedGate(nn.Module):
+class SwitchBalancedGate(BaseGate):
     """
+    Select 1 expert each time, with a learnable gate_network controlling expert scores.
     https://arxiv.org/pdf/2101.03961.pdf
     https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/labml_nn/transformers/switch/__init__.py
     https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/moe.py
@@ -265,12 +374,8 @@ class SwitchBalancedGate(nn.Module):
         """balance loss"""
         importance_mean = scores.mean(0)  # shape(num_experts)
 
-        load = top1_indices.bincount(minlength=self.num_experts)
+        load = top1_indices.bincount(minlength=self.num_experts)  # 不传递梯度，与原论文保持一致
         assert load.shape[0] == self.num_experts
-        # load = top1_indices.bincount()  # 不传递梯度，与原论文保持一致
-        # if load.shape[0] < self.num_experts:  # 如果长度不足，则使用0补齐load矩阵
-        #     pad_tensor = torch.zeros((self.num_experts - load.shape[0],), device=load.device, dtype=torch.int).flatten()
-        #     load = torch.cat((load, pad_tensor), dim=0)
         # print(f"ZHUTONG (RANK: {os.environ['RANK']}): GATE FORWARD LOAD: {load=}")
         load_mean = load / batch_size  # shape(num_experts)
 
@@ -285,8 +390,3 @@ class SwitchBalancedGate(nn.Module):
             "load": load_mean,
             "importance": importance_mean,
         }
-
-    def reset_gate_network(self):
-        for name, param in self.gate_network.named_parameters():
-            if "weight" in name:
-                torch.nn.init.kaiming_normal_(param)

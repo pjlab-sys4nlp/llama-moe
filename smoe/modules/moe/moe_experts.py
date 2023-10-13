@@ -83,17 +83,19 @@ class LinearGLUExperts(nn.Module):
         self.out_features = out_features
         self.hidden_act = hidden_act
         self.num_experts = num_experts
-        self.size_experts = size_experts
 
-        if size_experts is None:  # all experts share the same number of hidden neurons
+        if size_experts is None:
+            # all experts share the same number of hidden neurons
             assert hidden_features % num_experts == 0
             size_per_expert = hidden_features // num_experts
             size_experts = [size_per_expert for _ in range(num_experts)]
-        else:  # use specified expert sizes
+        else:
+            # use specified expert sizes
             assert (
                 len(size_experts) == num_experts
                 and sum(size_experts) == hidden_features
             )
+        self.size_experts = size_experts
 
         self.act_fn = ACT2FN[hidden_act]
 
@@ -102,15 +104,18 @@ class LinearGLUExperts(nn.Module):
         self.weight_down = nn.ParameterList()
 
         for i in range(num_experts):
+            # this matrix will be transposed when performing linear forwarding
             this_expert_weight_gate = nn.Parameter(
                 torch.empty((size_experts[i], in_features), **factory_kwargs)
-            )  # this matrix will be transposed when performing linear forwarding
+            )
+            # this matrix will be transposed when performing linear forwarding
             this_expert_weight_up = nn.Parameter(
                 torch.empty((size_experts[i], in_features), **factory_kwargs)
-            )  # this matrix will be transposed when performing linear forwarding
+            )
+            # this matrix will be transposed when performing linear forwarding
             this_expert_weight_down = nn.Parameter(
                 torch.empty((out_features, size_experts[i]), **factory_kwargs)
-            )  # this matrix will be transposed when performing linear forwarding
+            )
             self.weight_gate.append(this_expert_weight_gate)
             self.weight_up.append(this_expert_weight_up)
             self.weight_down.append(this_expert_weight_down)

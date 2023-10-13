@@ -1,7 +1,6 @@
 import argparse
 import os
 import pickle
-import types
 
 import torch
 from torch.utils.data import DataLoader
@@ -10,13 +9,9 @@ from transformers import LlamaTokenizer
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import LineByLineJsonlTextDataset
-from smoe.models.llama_moefication import LlamaMoEForCausalLM
-from smoe.modules.moe.moe_gates import TopKBalancedNoisyGate
-from smoe.utils.change_llama_moe_forward import (
-    forward_linear_glu_moe_layer_with_padding_mask,
-    forward_llama_moe_decoder_with_padding_mask,
-    forward_llama_moe_model_with_padding_mask,
-    forward_mlp_moe_gate_with_hidden_states_recording,
+from smoe.models.llama_moe import LlamaMoEForCausalLM
+from smoe.utils.model_operation.modify_llama_moe_model import (
+    llama_moe_with_hidden_states_recording,
 )
 from smoe.utils.seed import set_seed
 from smoe.utils.string_operation import str2bool
@@ -25,25 +20,7 @@ from smoe.utils.visualization.visualize import (
     visualize_expert_load_heatmap,
 )
 
-
 # fmt: off
-def change_forward(llama_model, device):
-    llama_model.forward = types.MethodType(forward_llama_moe_model_with_padding_mask, llama_model)  # change forward function for LlamaModel
-
-    for layer_idx, layer in enumerate(llama_model.layers):  # locate block by the name template
-        assert type(layer.mlp.gate) == TopKBalancedNoisyGate
-
-        layer.forward = types.MethodType(forward_llama_moe_decoder_with_padding_mask, layer)  # change forward function for LlamaDecoderLayer
-        layer.mlp.forward = types.MethodType(forward_linear_glu_moe_layer_with_padding_mask, layer.mlp)  # change forward function for LinearGLUMoELayer
-        layer.mlp.gate.forward = types.MethodType(forward_mlp_moe_gate_with_hidden_states_recording, layer.mlp.gate)  # change forward function TopKBalancedNoisyGate
-
-        layer.mlp.gate.samples_cnt = 0
-        layer.mlp.gate.importance_sum = torch.zeros((llama_model.config.num_experts,), device=device)
-        layer.mlp.gate.importance_loss_sum = torch.zeros((1,), device=device)
-        layer.mlp.gate.load_sum = torch.zeros((llama_model.config.num_experts,), device=device)
-        layer.mlp.gate.load_loss_sum = torch.zeros((1,), device=device)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--tokenizer_path', type=str, default="/mnt/petrelfs/share_data/quxiaoye/models/llama_7B")
@@ -55,6 +32,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_begin_index', type=int, default=0)
     parser.add_argument('--data_end_index', type=int, default=-1)
     parser.add_argument('--batch_size', type=int, default=8)  # 单次evaluate的batch_size
+    parser.add_argument('--block_size', type=int, default=2048)  # 单次evaluate的seq_len
     parser.add_argument('--use_cpu', type=str, default="False")
 
     args = parser.parse_args()
@@ -72,7 +50,7 @@ if __name__ == "__main__":
     """prepare datasets"""
     print("\nReading dataset from file \"" + args.data_path + "\"...")
     data_index_range = (args.data_begin_index, args.data_end_index)
-    dataset = LineByLineJsonlTextDataset(tokenizer, file_path=args.data_path, block_size=2048, data_index_range=data_index_range)
+    dataset = LineByLineJsonlTextDataset(tokenizer, file_path=args.data_path, block_size=args.block_size, data_index_range=data_index_range)
     print(f"Dataset: {sum([torch.sum(dataset[i]['attention_mask']).item() for i in range(len(dataset))])} total tokens.")  # 统计非special token的数量
 
     """prepare dataloader"""
@@ -81,14 +59,15 @@ if __name__ == "__main__":
     """load model"""
     print("Loading llama model...")
     model = LlamaMoEForCausalLM.from_pretrained(args.model_path).model
+    model = llama_moe_with_hidden_states_recording(model, device)
     if args.reinit_gate:
         set_seed(0)
         model.reset_gate_network()
-    change_forward(model, device)
 
     """evaluation"""
     print("Start evaluation...")
     model.to(device)
+    model.half()
     model.eval()
     iter_train = iter(data_loader)
     for step in tqdm(range(len(data_loader)), desc="forward step", position=0, leave=True):

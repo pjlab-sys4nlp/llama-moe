@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
+from smoe.utils.io import torch_load_template_score_file
 from smoe.utils.moefication.prune_llama import GradientPrune
 from smoe.utils.string_operation import str2bool
 
@@ -14,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str)
     parser.add_argument('--grad_file_path', type=str)
     parser.add_argument('--save_path', type=str)
-    parser.add_argument('--expert_index', type=int)
+    parser.add_argument('--expert_index', type=str)
     parser.add_argument('--retain_percent', type=float)
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
 
@@ -27,6 +28,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     args.use_grad_sum = str2bool(args.use_grad_sum)
+    if args.expert_index != "All":
+        args.expert_index = int(args.expert_index)
     print(args, "\n")
 
     print("Loading llama config...")
@@ -44,12 +47,7 @@ if __name__ == "__main__":
         raise NotImplementedError
 
     for i in tqdm(range(config.num_hidden_layers)):
-        grad_list = []
-        for expert_folder_name in os.listdir(args.grad_file_path):
-            grad_file_path = os.path.join(args.grad_file_path, expert_folder_name, args.template.format(i) + file_postfix)
-            grad = torch.load(grad_file_path, map_location="cpu")
-            # grad = torch.zeros_like(grad)  ##################################
-            grad_list.append(grad)
+        grad_list = torch_load_template_score_file(args.grad_file_path, args.template + file_postfix, i)
 
         if args.use_grad_sum:
             grad_list = torch.stack(grad_list, dim=0).sum(0)
@@ -58,7 +56,6 @@ if __name__ == "__main__":
 
         args.save_path = os.path.join(
             save_root_path,
-            # "Random",
             f"{os.path.split(args.model_path)[1]}-Prune-Gradient-{args.criterion}-{args.kernel}-{args.accumulate_level}-{args.importance_type}",
             f"{args.expert_index}-{format(args.retain_percent, '.2f')}Percent-{expert_size}Neurons"
         )

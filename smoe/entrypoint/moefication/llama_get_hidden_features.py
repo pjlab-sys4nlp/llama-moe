@@ -13,11 +13,12 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-from smoe.utils.change_llama_forward import (
+from smoe.utils.model_operation.change_llama_forward import (
     forward_llama_decoder_with_padding_mask,
     forward_llama_mlp_with_feature_dumping,
     forward_llama_model_with_padding_mask,
 )
+from smoe.utils.model_operation.modify_llama_model import llama_with_feature_dumping
 
 # fmt: off
 
@@ -48,38 +49,6 @@ def get_max_available_num(all_datasets, dataset_weight):
                         max_available_num[key2] = this_available_num[key2]
 
     return max_available_num
-
-
-def change_forward(llama_model, device_id, save_path, template, save_interval=1):
-    llama_model.forward = types.MethodType(forward_llama_model_with_padding_mask, llama_model)  # change forward function for LlamaModel
-
-    for layer_idx, layer in enumerate(llama_model.layers):  # locate block by the name template
-        mlp = layer.mlp
-        assert type(mlp) == LlamaMLP
-
-        layer.forward = types.MethodType(forward_llama_decoder_with_padding_mask, layer)  # change forward function for LlamaDecoderLayer
-        mlp.forward = types.MethodType(forward_llama_mlp_with_feature_dumping, mlp)  # change forward function for LlamaMLP
-
-        mlp.hidden_inputs = []
-        mlp.hidden_outputs = []
-
-        mlp.device_id = device_id
-        mlp.template = template
-        mlp.layer_idx = layer_idx
-        mlp.now_epoch = -1
-        mlp.hidden_dim = llama_model.config.hidden_size
-        mlp.hidden_neurons = llama_model.config.intermediate_size
-        mlp.save_path_hidden_inputs = os.path.join(save_path, "hidden_inputs", "layer" + str(layer_idx))
-        if "gate_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_gate_outputs", "layer" + str(layer_idx))
-        elif "up_proj" in template:
-            mlp.save_path_hidden_outputs = os.path.join(save_path, "hidden_up_outputs", "layer" + str(layer_idx))
-        mlp.save_interval = save_interval
-
-        if not os.path.exists(mlp.save_path_hidden_inputs):
-            os.makedirs(mlp.save_path_hidden_inputs)
-        if not os.path.exists(mlp.save_path_hidden_outputs):
-            os.makedirs(mlp.save_path_hidden_outputs)
 
 
 if __name__ == "__main__":
@@ -166,10 +135,10 @@ if __name__ == "__main__":
     """load model"""
     print("Loading llama model...")
     model = LlamaForCausalLM.from_pretrained(args.model_path).model
+    model = llama_with_feature_dumping(model, args.local_rank, args.save_path, args.template, save_interval=args.save_interval)
     model.half()
     num_layers = model.config.num_hidden_layers
     hidden_dim = model.config.hidden_size
-    change_forward(model, args.local_rank, args.save_path, args.template, save_interval=args.save_interval)
 
     with torch.cuda.device("cuda:" + str(args.local_rank)):
         print("Used GPU memory (GPU " + str(args.local_rank) + ") (Model-CPU): " + str(int(torch.cuda.memory_allocated() / 1024 / 1024)) + " MB")

@@ -19,7 +19,7 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.utils import ModelOutput, logging
 
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
 from smoe.modules.moe.moe_layers import LinearGLUMoELayer, MoEMlpOutput
 
 logger = logging.get_logger(__name__)
@@ -75,14 +75,19 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             "gate_use_softmax": config.gate_use_softmax,
             "gate_use_balance": config.gate_use_balance,
             "gate_balance_loss_weight": config.gate_balance_loss_weight,
-            # TopKBalancedNoisyGate
             "gate_add_noise": config.gate_add_noise,
+            # TopKBalancedNoisyGate
             "gate_noise_epsilon": config.gate_noise_epsilon,
         }
         calculator_config = {
             # all calculators
             "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
+            "score_scale_factor": (
+                config.score_scale_factor[layer_index]
+                if isinstance(config.score_scale_factor, list)
+                else config.score_scale_factor
+            ),
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -176,6 +181,9 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.mlp.set_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        self.mlp.set_calculator_score_scale_factor(score_scale_factor)
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.mlp.set_calculator_drop_tokens(drop_tokens)
 
@@ -187,6 +195,9 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
 
     def reset_gate_network(self):
         self.mlp.reset_gate_network()
+
+    def reset_experts(self):
+        self.mlp.reset_experts()
 
 
 class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
@@ -378,6 +389,72 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
             gate_importance=gate_importance,
         )
 
+    def update_config(self):
+        self.config.vocab_size = self.config.vocab_size
+        self.config.max_position_embeddings = self.config.max_position_embeddings
+        # ↓↓↓↓↓↓↓↓↓↓↓↓ changed here ↓↓↓↓↓↓↓↓↓↓↓↓ #
+        self.config.hidden_size = self.layers[0].mlp.input_size
+        self.config.intermediate_size = self.layers[0].mlp.hidden_size
+        self.config.num_hidden_layers = len(self.layers)
+        self.config.num_attention_heads = self.layers[0].self_attn.num_heads
+        self.config.hidden_act = self.layers[0].mlp.hidden_act
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
+        self.config.initializer_range = self.config.initializer_range
+        self.config.rms_norm_eps = self.config.rms_norm_eps
+        self.config.pretraining_tp = self.config.pretraining_tp
+        self.config.use_cache = self.config.use_cache
+        self.config.rope_scaling = self.config.rope_scaling
+        self.config._rope_scaling_validation()
+
+        self.config.num_experts = self.layers[0].mlp.num_experts
+        self.config.num_selects = self.layers[0].mlp.num_selects
+        self.config.size_experts = [
+            self.layers[i].mlp.calculator.experts.size_experts
+            for i in range(self.config.num_hidden_layers)
+        ]
+
+        self.config.gate_type = vars(self.layers[0].mlp).get(
+            "gate_type", "TopKBalancedNoisyGate"
+        )
+        self.config.gate_network = vars(self.layers[0].mlp.gate).get(
+            "gate_network_type", "mlp"
+        )
+        self.config.gate_use_softmax = vars(self.layers[0].mlp.gate).get(
+            "use_softmax", True
+        )
+        self.config.gate_use_balance = vars(self.layers[0].mlp.gate).get(
+            "use_balance", True
+        )
+        self.config.gate_balance_loss_weight = vars(self.layers[0].mlp.gate).get(
+            "balance_loss_weight", 1e-2
+        )
+        self.config.gate_add_noise = vars(self.layers[0].mlp.gate).get(
+            "add_noise", True
+        )
+        self.config.gate_noise_epsilon = vars(self.layers[0].mlp.gate).get(
+            "noise_epsilon", 1e-2
+        )
+
+        self.config.calculator_type = vars(self.layers[0].mlp).get(
+            "calculator_type", "UniversalCalculator"
+        )
+        self.config.multiply_gate_scores = vars(self.layers[0].mlp.calculator).get(
+            "multiply_gate_scores", True
+        )
+        self.config.score_scale_factor = [
+            vars(self.layers[i].mlp.calculator).get("score_scale_factor", 1.0)
+            for i in range(self.config.num_hidden_layers)
+        ]
+        self.config.drop_tokens = vars(self.layers[0].mlp.calculator).get(
+            "drop_tokens", True
+        )
+        self.config.dropped_padding = vars(self.layers[0].mlp.calculator).get(
+            "dropped_padding", "zero"
+        )
+        self.config.capacity_factor = vars(self.layers[0].mlp.calculator).get(
+            "capacity_factor", 1.25
+        )
+
     def set_moe_num_selects(self, num_selects):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_num_selects(num_selects)
@@ -406,6 +483,17 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(
+        self, score_scale_factor, layer_index=None
+    ):
+        if layer_index is None:
+            for idx, decoder_layer in enumerate(self.layers):
+                decoder_layer.set_moe_calculator_score_scale_factor(score_scale_factor)
+        else:
+            self.layers[layer_index].set_moe_calculator_score_scale_factor(
+                score_scale_factor
+            )
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_calculator_drop_tokens(drop_tokens)
@@ -421,6 +509,10 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
     def reset_gate_network(self):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.reset_gate_network()
+
+    def reset_experts(self):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.reset_experts()
 
 
 class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
@@ -503,6 +595,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             gate_importance=outputs.gate_importance,
         )
 
+    def update_config(self):
+        self.model.update_config()
+
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)
 
@@ -524,6 +619,13 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(
+        self, score_scale_factor, layer_index=None
+    ):
+        self.model.set_moe_calculator_score_scale_factor(
+            score_scale_factor, layer_index=layer_index
+        )
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
 
@@ -535,6 +637,9 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
+
+    def reset_experts(self):
+        self.model.reset_experts()
 
 
 class LlamaMoEForSequenceClassification(
@@ -642,6 +747,9 @@ class LlamaMoEForSequenceClassification(
             attentions=transformer_outputs.attentions,
         )
 
+    def update_config(self):
+        self.model.update_config()
+
     def set_moe_num_selects(self, num_selects):
         self.model.set_moe_num_selects(num_selects)
 
@@ -663,6 +771,13 @@ class LlamaMoEForSequenceClassification(
     def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
         self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
 
+    def set_moe_calculator_score_scale_factor(
+        self, score_scale_factor, layer_index=None
+    ):
+        self.model.set_moe_calculator_score_scale_factor(
+            score_scale_factor, layer_index=layer_index
+        )
+
     def set_moe_calculator_drop_tokens(self, drop_tokens):
         self.model.set_moe_calculator_drop_tokens(drop_tokens)
 
@@ -674,3 +789,6 @@ class LlamaMoEForSequenceClassification(
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
+
+    def reset_experts(self):
+        self.model.reset_experts()

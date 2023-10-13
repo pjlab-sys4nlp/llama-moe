@@ -25,8 +25,12 @@ from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
 from smoe.data.streaming import CachedJsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.metrics.preprocess import logits_argmax
-from smoe.models.llama_moefication.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moefication.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.llama_moe.modeling_llama_moe import LlamaMoEForCausalLM
+from smoe.models.llama_moe_residual import (
+    LlamaMoEResidualConfig,
+    LlamaMoEResidualForCausalLM,
+)
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
@@ -41,12 +45,14 @@ from smoe.utils.param import get_trainable_parameters
 MODEL_MAP = {
     "llama": LlamaForCausalLM,
     "llama_moe": LlamaMoEForCausalLM,
+    "llama_moe_residual": LlamaMoEResidualForCausalLM,
 }
 
 CONFIG_MAPPING.update(
     {
         "llama": LlamaConfig,
         "llama_moe": LlamaMoEConfig,
+        "llama_moe_residual": LlamaMoEResidualConfig,
     }
 )
 
@@ -128,6 +134,12 @@ def main():
     ConfigClass = AutoConfig
     if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":
         ConfigClass = LlamaMoEConfig
+    elif (
+        model_args.config_name == "llama_moe_residual"
+        or model_args.model_type == "llama_moe_residual"
+    ):
+        ConfigClass = LlamaMoEResidualConfig
+
     if model_args.config_name:
         config = ConfigClass.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
@@ -275,15 +287,17 @@ def main():
         # model.half()
         # model.to(torch_dtype)
 
-        model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-            torch_dtype=torch_dtype,
-            low_cpu_mem_usage=True,
+        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM = (
+            ModelClass.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=True,
+            )
         )
 
         # train an MoE model from scratch 👇
@@ -303,6 +317,9 @@ def main():
         logger.info(
             f"Training new model from scratch - Total size={n_params / 2 ** 20:.2f}M params"
         )
+
+    # update config for checkpoint retrival
+    model.update_config()
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
     if model_vocab_size != len(tokenizer):

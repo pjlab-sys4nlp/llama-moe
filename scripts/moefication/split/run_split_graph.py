@@ -24,7 +24,7 @@ cpus=16
 # STEP1
 
 for specify_layer in {0..39}; do
-  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.moefication.llama_split_graph \
     --model_path ${model_path} \
     --save_path ${save_path} \
@@ -45,7 +45,7 @@ template1=layers.
 template2=.mlp.up_proj.weight
 
 for layer in {0..39}; do
-  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     ${gpmetis_run} ${save_path}/${template1}${layer}${template2} ${num_experts} &
   sleep 0.7
 done
@@ -55,13 +55,13 @@ wait
 template3=.part.${num_experts}
 
 for layer in {0..39}; do
-  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 \
+  OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.moefication.llama_split_graph_trans_gp \
     --gpmetised_file_path ${save_path}/${template1}${layer}${template2}${template3} &
   sleep 0.7
 done
 wait
-chmod -R 777 ${save_path} >/dev/null 2>&1
+chmod -R 755 ${save_path} >/dev/null 2>&1
 """
 
 # Execute the bash commands using Python's subprocess module

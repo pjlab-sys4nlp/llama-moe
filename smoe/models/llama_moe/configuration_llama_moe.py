@@ -41,12 +41,13 @@ class LlamaMoEConfig(PretrainedConfig):
         gate_use_softmax=True,
         gate_use_balance=True,
         gate_balance_loss_weight=1e-2,
-        # TopKBalancedNoisyGate
         gate_add_noise=True,
+        # TopKBalancedNoisyGate
         gate_noise_epsilon=1e-2,
         #### -------- moe calculator configs -------- ####
         calculator_type="UniversalCalculator",
         multiply_gate_scores=True,
+        score_scale_factor=1.0,
         # SwitchDropTokenCalculator
         drop_tokens=True,
         dropped_padding="zero",
@@ -81,6 +82,7 @@ class LlamaMoEConfig(PretrainedConfig):
 
         self.calculator_type = calculator_type
         self.multiply_gate_scores = multiply_gate_scores
+        self.score_scale_factor = score_scale_factor
         self.drop_tokens = drop_tokens
         self.dropped_padding = dropped_padding
         self.capacity_factor = capacity_factor
