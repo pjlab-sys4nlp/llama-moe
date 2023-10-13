@@ -23,6 +23,8 @@ class UniversalCalculator(nn.Module):
     def __init__(self, experts, multiply_gate_scores=True):
         super(UniversalCalculator, self).__init__()
         self.experts = experts
+        # TODO (zhutong): use vmap to boost the training efficiency
+        # self.experts_vmap = torch.vmap(self.experts)
         self.multiply_gate_scores = multiply_gate_scores
         self.num_experts = experts.num_experts
 
@@ -36,25 +38,27 @@ class UniversalCalculator(nn.Module):
         num_selects = topK_indices.size(1)
         topK_indices = topK_indices.flatten()  # shape(batch_size*num_selects)
         topK_scores = topK_scores.flatten()  # shape(batch_size*num_selects)
-        batch_indices = torch.arange(batch_size, device=topK_scores.device).repeat_interleave(num_selects)  # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
+        # 选出的专家编号所对应的batch编号，shape(batch_size*num_selects)
+        # repeat_interleave(repeats=2): [1,2,3] -> [1,1,2,2,3,3]
+        batch_indices = torch.arange(batch_size, device=topK_scores.device).repeat_interleave(num_selects)
 
         """按照专家序号从小到大的顺序，生成专家索引"""
         _, index_sorted_topK_indices = topK_indices.sort(0)
 
         """按照索引重新排列scores与batch_indices，并计算专家的batch_size"""
         sorted_topK_scores = topK_scores.index_select(0, index_sorted_topK_indices)  # 各个输出对应的权重
-        sorted_batch_indices = batch_indices.index_select(0, index_sorted_topK_indices)  # 各个专家对应的batch编号
+        sorted_batch_indices = batch_indices.index_select(0, index_sorted_topK_indices)  # 各个专家对应的一个batch里所有token的编号
 
         if expert_batch_size is None:
-            expert_batch_size = topK_indices.bincount().tolist()  # 各个专家对应的batch_size
-            if len(expert_batch_size) < self.num_experts:  # 列表长度不足专家数，说明 被选择的最大专家序号 小于 所有专家中的最大专家序号
-                expert_batch_size.extend([0] * (self.num_experts - len(expert_batch_size)))  # 使用0补全列表
+            expert_batch_size = topK_indices.bincount(minlength=self.num_experts).tolist()  # 各个专家对应的batch_size
 
         """对每个专家重新组合batch"""
-        sorted_x = x.index_select(0, sorted_batch_indices).squeeze(1)  # 将输入按照排序后的batch编号，重新编制
+        sorted_x = x.index_select(0, sorted_batch_indices)  # 将输入按照排序后的batch编号，重新编制
         split_x = torch.split(sorted_x, expert_batch_size, dim=0)  # 按照排序后每个专家的batch_size进行分隔，恰好得到各个专家所需的batch
 
         """各专家分别正向传播"""  # 此处应该有并行优化的空间 (如果单次forward不足以占满显卡利用率)
+        # args = [(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
+        # expert_outputs = self.experts_vmap(args)
         expert_outputs = [self.experts(split_x[i], i) for i in range(self.num_experts) if split_x[i].shape[0] > 0]
 
         """重组各个专家的输出，并进行加权"""

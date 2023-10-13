@@ -163,6 +163,15 @@ class DataArguments:
         default=None,
         metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
+    validation_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": (
+                "An optional input evaluation data file to evaluate the perplexity on"
+                " (a folder of text files)."
+            )
+        },
+    )
     dataset_config_name: Optional[str] = field(
         default=None,
         metadata={
@@ -291,6 +300,18 @@ class EnhancedTrainingArguments(TrainingArguments):
     max_tokens: Optional[int] = field(
         default=-1,
         metadata={"help": "the number of max_tokens"},
+    )
+    flops_per_device: Optional[int] = field(
+        default=312e12,
+        metadata={
+            "help": "FLOPS of one device. A100 312 TFLOPS",
+        },
+    )
+    num_training_params: Optional[int] = field(
+        default=-1,
+        metadata={
+            "help": "The number of model parameters used for training. If set to -1, it will be calculated automatically."
+        },
     )
 
     @property

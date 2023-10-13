@@ -484,7 +484,7 @@ class LlamaMoEForCausalLM(LlamaForCausalLM, LlamaMoEPreTrainedModel):
             # Enable model parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
-            if outputs.balance_loss is not None:
+            if outputs.balance_loss is not None and outputs.balance_loss > 0:
                 loss += outputs.balance_loss
 
         if not return_dict:
@@ -628,7 +628,7 @@ class LlamaMoEForSequenceClassification(
             elif self.config.problem_type == "multi_label_classification":
                 loss_fct = BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)
-        if loss is not None and balance_loss is not None:
+        if loss is not None and balance_loss is not None and balance_loss > 0:
             loss += balance_loss
         if not return_dict:
             output = (pooled_logits,) + transformer_outputs[1:]

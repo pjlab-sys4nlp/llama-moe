@@ -4,7 +4,9 @@ from collections import defaultdict
 from pathlib import Path
 
 import pytest
+from torch.utils.data import DataLoader
 
+from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.streaming import JsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.utils.io import load_jsonlines
 
@@ -97,6 +99,38 @@ def test_weighted_streaming():
     for ds in lm_datasets:
         print(ds["input_ids"])
         break
+
+
+def test_weighted_streaming_loader():
+    prob_map = {
+        "en_cc": 0.67,
+        "en_c4": 0.15,
+        "github": 0.045,
+        "en_wikipedia": 0.045,
+        "en_book": 0.045,
+        "en_arxiv": 0.025,
+        "en_stack": 0.02,
+    }
+    lm_datasets = SubDirWeightedPackedJsonlDataset(
+        "/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed",
+        prob_map=prob_map,
+        seed=1227,
+        block_size=2048,
+    )
+    num_test_case = 2000
+    bsz = 8
+    loader = DataLoader(
+        lm_datasets,
+        batch_size=bsz,
+        num_workers=4,
+        collate_fn=fault_tolerance_data_collator,
+        pin_memory=True,
+    )
+    for batch in loader:
+        if num_test_case <= 0:
+            break
+        assert len(batch["input_ids"]) == bsz
+        num_test_case -= 1
 
 
 if __name__ == "__main__":

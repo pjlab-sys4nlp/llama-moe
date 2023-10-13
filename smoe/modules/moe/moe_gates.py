@@ -119,6 +119,7 @@ class TopKBalancedNoisyGate(nn.Module):
             zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
             scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
             importance = scores_filtered.sum(0)  # shape(num_experts)
+            # importance = scores_filtered.float().sum(0)  # shape(num_experts)
 
             """计算load"""
             batch_size = logits_gate.size(0)
@@ -133,14 +134,15 @@ class TopKBalancedNoisyGate(nn.Module):
             prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
             prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
             prob = torch.where(is_in, prob_if_in, prob_if_out)
+            # load = prob.float().sum(0)
             load = prob.sum(0)
 
             """计算balance loss"""
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
-
+            # balance_loss = balance_loss.to(logits)  # fallback to fp16
         else:
-            balance_loss = None
+            balance_loss = torch.tensor(-100.0)
 
         return {
             "topK_indices": top_k_indices,

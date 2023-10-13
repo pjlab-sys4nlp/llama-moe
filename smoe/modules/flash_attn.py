@@ -1,17 +1,17 @@
 from types import MethodType
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import torch
 import torch.nn as nn
 from transformers.models.llama.modeling_llama import (
     LlamaAttention,
+    LlamaRMSNorm,
     apply_rotary_pos_emb,
 )
 
 SUPPORT_XFORMERS = True
 SUPPORT_FLASH2 = False
 
-# from flash_attn import flash_attn_func, flash_attn_qkvpacked_func
 try:
     import xformers.ops as xops
 
@@ -95,7 +95,24 @@ def llama_flash_attention(
     return attn_output, attn_weights, past_key_value
 
 
+def llama_fast_rms_norm(self: LlamaRMSNorm, hidden_states: torch.FloatTensor):
+    # return rms_norm(hidden_states, self.weight, self.variance_epsilon)
+    from apex.normalization.fused_layer_norm import (
+        manual_rms_norm,
+        mixed_dtype_fused_rms_norm_affine,
+    )
+
+    hsz = self.weight.shape[0]
+    if not input.is_cuda:
+        return manual_rms_norm(hidden_states, hsz, self.weight, self.variance_epsilon)
+    return mixed_dtype_fused_rms_norm_affine(
+        hidden_states, self.weight, hsz, self.variance_epsilon
+    )
+
+
 def replace_xformers(model: nn.Module):
     for module in model.modules():
         if isinstance(module, LlamaAttention):
             module.forward = MethodType(llama_flash_attention, module)
+        # if isinstance(module, LlamaRMSNorm) and rms_norm is not None and isinstance(rms_norm, Callable):
+        #     module.forward = MethodType(llama_fast_rms_norm, module)
