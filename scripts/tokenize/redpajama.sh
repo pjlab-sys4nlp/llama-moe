@@ -2,13 +2,17 @@
 
 set -vx
 
-# tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-# data_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data
-# out_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+data_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data
+out_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
 
-tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_3B
-data_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples
-out_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+# tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_3B
+# data_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples
+# out_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+
+# tokenizer_dir=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
+# data_dir=/mnt/petrelfs/zhutong/lm-evaluation-harness-b281b0921b636bc36ad05c0b0b0763bd6dd43463/val_set/final
+# out_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
 logs_dir=logs
 

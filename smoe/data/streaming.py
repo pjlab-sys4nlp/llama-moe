@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Iterator
 
 import torch
-from torch.utils.data import IterableDataset
+from torch.utils.data import Dataset, IterableDataset
 
 from smoe.data.aggregation import group_instances
-from smoe.utils.io import load_jsonlines_iter
+from smoe.utils.io import load_jsonlines, load_jsonlines_iter
 from smoe.utils.logging import get_logger
 from smoe.utils.random import get_random_string
 from smoe.utils.vars import JSONL_DATASET_CACHE_NAME
@@ -191,6 +191,30 @@ class WeightedPackedDatasetBuilder:
     def __iter__(self) -> Iterator:
         for ds in self.datasets:
             yield from ds
+
+
+class CachedJsonlDataset(Dataset):
+    def __init__(
+        self,
+        filepath: str,
+        seed: int = 1227,
+        buffer_size: int = 700,
+        block_size: int = 2048,
+    ):
+        super().__init__()
+        self.filepath = filepath
+        self.rng = random.Random(seed)
+        self.buffer_size = buffer_size
+        self.block_size = block_size
+
+        dataset = load_jsonlines(self.filepath)
+        self.cached = group_instances(dataset, self.block_size)
+
+    def __getitem__(self, index: int):
+        return self.cached[index]
+
+    def __len__(self):
+        return len(self.cached)
 
 
 class PackedJsonlDataset(IterableDataset):

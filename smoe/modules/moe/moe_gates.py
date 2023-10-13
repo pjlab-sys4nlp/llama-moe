@@ -242,7 +242,7 @@ class TopKBalancedNoisyGate(BaseGate):
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
         else:
-            balance_loss = torch.tensor(0, device=x.device)
+            balance_loss = torch.tensor(-100.0, device=x.device)
 
         # print("weight", self.gate_network.weight, sep="\n")
         # print("logits_gate", logits_gate, sep="\n")

@@ -1,7 +1,11 @@
+import logging
 import os
+import sys
+from pathlib import Path
 
+import datasets
 import torch
-from torch.distributed.elastic.multiprocessing.errors import record
+import transformers
 from transformers import (
     CONFIG_MAPPING,
     AutoConfig,
@@ -19,8 +23,7 @@ from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
 from smoe.data.redpajama import load_streaming_datasets
-from smoe.data.streaming import SubDirWeightedPackedJsonlDataset
-from smoe.metrics.accuracy import compute_metrics
+from smoe.data.streaming import CachedJsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.metrics.preprocess import logits_argmax
 from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
 from smoe.models.llama_moe.modeling_llama_moe import LlamaMoEForCausalLM
@@ -36,7 +39,6 @@ from smoe.utils.config import (
     ModelArguments,
     parse_args,
 )
-from smoe.utils.logging import get_logger_from_training_args
 from smoe.utils.notification import wechat_sender
 from smoe.utils.param import get_trainable_parameters
 
@@ -55,12 +57,32 @@ CONFIG_MAPPING.update(
 )
 
 
-@wechat_sender()
+logger = logging.getLogger(__name__)
+
+
+# @wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
     )
-    logger = get_logger_from_training_args(__name__, training_args)
+
+    # Setup logging
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        datefmt="%m/%d/%Y %H:%M:%S",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+    if training_args.should_log:
+        # The default of training_args.log_level is passive, so we set log level at info here to have that default.
+        transformers.utils.logging.set_verbosity_info()
+
+    log_level = training_args.get_process_log_level()
+    logger.setLevel(log_level)
+    datasets.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.enable_default_handler()
+    transformers.utils.logging.enable_explicit_format()
+
     logger.warning(
         f"Process local rank: {training_args.local_rank}, "
         f"device: {training_args.device}, "
@@ -74,12 +96,9 @@ def main():
     logger.info(f"Training args: {training_args.to_json_string()}")
 
     if training_args.debug_mode:
-        import torch.distributed as dist
-
         from smoe.utils.debugging import remote_breakpoint
 
-        if dist.get_rank() == 0:
-            remote_breakpoint()
+        remote_breakpoint()
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -144,7 +163,7 @@ def main():
 
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
-        config.num_hidden_layers = 1
+        config.num_hidden_layers = 2
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
@@ -247,7 +266,14 @@ def main():
 
     eval_dataset = None
     if training_args.do_eval:
-        raise NotImplementedError
+        paths = Path(data_args.validation_dir).glob("*.jsonl")
+        eval_dataset = {
+            path.stem: CachedJsonlDataset(
+                str(path), training_args.seed, block_size=data_args.block_size
+            )
+            for path in paths
+        }
+        logger.info(f"eval types: {list(eval_dataset.keys())}")
 
     if model_args.model_name_or_path:
         torch_dtype = (
@@ -303,7 +329,8 @@ def main():
             f" tokenizer ({len(tokenizer)})"
         )
 
-    get_trainable_parameters(model, verbose=True)
+    trainable_params, _ = get_trainable_parameters(model, verbose=True)
+    training_args.num_training_params = trainable_params
 
     # Initialize our Trainer
     trainer = LlamaLrSchedulingTrainer(
@@ -313,11 +340,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         tokenizer=tokenizer,
         data_collator=fault_tolerance_data_collator,
-        compute_metrics=(
-            compute_metrics
-            if training_args.do_eval and not is_torch_tpu_available()
-            else None
-        ),
+        compute_metrics=None,
         preprocess_logits_for_metrics=(
             logits_argmax
             if training_args.do_eval and not is_torch_tpu_available()

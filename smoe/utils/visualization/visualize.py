@@ -219,9 +219,9 @@ def find_factors_with_minimal_sum(number):
 def plot_to_image(figure):
     """Converts the matplotlib plot specified by 'figure' to a PNG image and
     returns it. The supplied figure is closed and inaccessible after this call."""
-    # Save the plot to a PNG in memory.
+    # Save the plot to a image in memory.
     buf = io.BytesIO()
-    plt.savefig(buf, format="png")
+    plt.savefig(buf, format="jpg")
     # Closing the figure prevents it from being displayed directly inside
     # the notebook.
     plt.close(figure)

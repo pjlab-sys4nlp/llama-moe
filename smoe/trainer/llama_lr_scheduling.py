@@ -4,6 +4,7 @@ import re
 import shutil
 import sys
 import time
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
@@ -87,6 +88,12 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
         final_lr_portion,
         0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)),
     )
+
+
+@dataclass
+class EnhancedTrainerState(TrainerState):
+    # last Token/GPU/second timestamp
+    start_timestamp: float = 0.0
 
 
 class LlamaLrSchedulingTrainer(Trainer):
@@ -388,7 +395,7 @@ class LlamaLrSchedulingTrainer(Trainer):
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
-        self.state = TrainerState()
+        self.state = EnhancedTrainerState()
         self.state.is_hyper_param_search = trial is not None
 
         # Activate gradient checkpointing if needed
@@ -545,6 +552,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 for _ in train_dataloader:
                     break
 
+        self.state.start_timestamp = time.time()
         total_batched_samples = 0
         for epoch in range(epochs_trained, num_train_epochs):
             epoch_iterator = train_dataloader

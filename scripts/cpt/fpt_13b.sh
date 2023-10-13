@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-13b-test
+#SBATCH --job-name=cpt-7b-4_16_noisygate
 #SBATCH --output=logs/%x-%j.log
 #SBATCH --error=logs/%x-%j.log
 ##SBATCH --output=logs/%x.log
@@ -8,12 +8,12 @@
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=0
 
 #SBATCH --nodes=2
 #SBATCH --gres=gpu:8
-#SBATCH --quotatype=auto
+#SBATCH --quotatype=reserved
 ##SBATCH --time=5:00:00
 
 source ~/anaconda3/bin/activate smoe
@@ -29,9 +29,11 @@ source ~/anaconda3/bin/activate smoe
     # export TORCH_DISTRIBUTED_DEBUG=DETAIL
     # export TORCH_SHOW_CPP_STACKTRACES=1
     # export CUDA_LAUNCH_BLOCKING=1
+    # export ACCELERATE_DEBUG_MODE=1
 
     # comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4, expert weight re-scale"
-    comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4"
+    # comment="13B, expert 4/16, noisy gate, seq len 2048, lr=4e-4"
+    comment="llama2 7B, expert 4/16, noisy gate, seq len 4096, lr=2e-4"
     # comment="random initialized llama1-7B"
     # comment="random initialized llama1-13B"
     # comment="7B, expert 4/16, noisy gate, gradient shared neurons, w/o residual, w/o weight re-scale, lr2e-4"
@@ -42,9 +44,11 @@ source ~/anaconda3/bin/activate smoe
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
     model_type="llama_moe"
+    # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_7B-16Select16-up_proj
+    pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-16Select4-688Neurons-Share
     # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_3B-8Select2-4320Neurons-Share"
     # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-16Select4-688Neurons-Share"
-    pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
+    # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons-Share"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
     # pretrained_model="/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Clustering-l2/llama_13B-16Select4-up_proj"
     # pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
@@ -54,24 +58,28 @@ source ~/anaconda3/bin/activate smoe
     # pretrained_model=$1
     echo "==================> $pretrained_model <=================="
 
+    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama2_7B/
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-no-softmax-copy/Clustering-l2-l2_norm/llama_13B-16Select4-gate_proj
     # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama1_7B_random
-    tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
+    # tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_13B
     # tokenizer_path="/mnt/petrelfs/share_data/quxiaoye/models/llama_3B"
 
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed/
     # dataset_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
+    validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/
 
     lr=2e-4
     final_lr_portion=0.1
     per_device_train_batch_size=8
-    per_device_eval_batch_size=1
+    per_device_eval_batch_size=8
     gradient_accumulation_steps=4
-    num_tokens="3*10^11"
+    num_tokens="1*10^11"
     seed=1227
-    block_size=2048
+    block_size=4096
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
+    # deepspeed_config_file=conf/deepspeed/bf16_zero3.json
 
     max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
     max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
@@ -114,10 +122,13 @@ source ~/anaconda3/bin/activate smoe
             --tokenizer_name_or_path ${tokenizer_path} \
             --dataset_dir ${dataset_dir} \
             --data_cache_dir ${data_cache} \
-            --validation_split_percentage 0.001 \
+            --validation_dir ${validation_dir} \
             --per_device_train_batch_size ${per_device_train_batch_size} \
             --per_device_eval_batch_size ${per_device_eval_batch_size} \
             --do_train \
+            --do_eval \
+            --evaluation_strategy steps \
+            --eval_steps 1000 \
             --seed ${seed} \
             --bf16 \
             --num_train_epochs 1 \
@@ -135,6 +146,7 @@ source ~/anaconda3/bin/activate smoe
             --save_total_limit 1 \
             --save_steps 1000 \
             --dataloader_num_workers 0 \
+            --dataloader_pin_memory True \
             --gradient_accumulation_steps ${gradient_accumulation_steps} \
             --block_size ${block_size} \
             --output_dir ${output_dir} \
@@ -149,9 +161,9 @@ source ~/anaconda3/bin/activate smoe
             --log_level info \
             --log_level_replica warning \
             --log_on_each_node False \
+            --report_to none \
             --gate_type "TopKBalancedNoisyGate" \
             --calculator_type "UniversalCalculator" \
-            --num_selects 4 \
-            --report_to none
+            --num_selects 4
 
 }
