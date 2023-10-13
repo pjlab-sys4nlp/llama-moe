@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-7b-16-scale-test
+#SBATCH --job-name=cpt-7b-test
 #SBATCH --output=logs-cpt/%x-%j.log
 #SBATCH --error=logs-cpt/%x-%j.log
 
@@ -10,7 +10,7 @@
 #SBATCH --mem=0
 
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 #SBATCH --quotatype=reserved
 
 # reserved spot
@@ -19,7 +19,7 @@ source ~/anaconda3/bin/activate llama-moe
 
 {
   num_nodes=1        # should match with --nodes
-  num_gpu_per_node=8 # should match with --gres
+  num_gpu_per_node=4 # should match with --gres
 
   # #cpu/#num_gpu_per_node
   export OMP_NUM_THREADS=2
@@ -33,7 +33,6 @@ source ~/anaconda3/bin/activate llama-moe
   #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
   #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, reset experts, GPU num 1, per-device bs 64, lr 1e-4"
   #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, GPU num 1, per-device bs 64, lr 1e-4"
 
   comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, random gate, GPU num 1, per-device bs 64, lr 1e-4"
 

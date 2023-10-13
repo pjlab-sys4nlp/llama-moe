@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import torch
 
@@ -42,14 +44,86 @@ class GradientSplitResidual(LayerSplit):
 
         return new_residual_neuron_mask
 
-    def split(self, expert_num_moe, expert_num_residual, expert_size, criterion="min"):
-        assert expert_size <= self.neuron_num
+    def split_without_neuron_sharing(self, expert_num_moe, expert_num_residual, expert_size, criterion):
+        neuron_used_mark = [False] * self.neuron_num
+        expert_start_index = [0] * expert_num_moe
+        expert_neuron_count = [0] * expert_num_moe
+        expert_neuron_count_total = 0
+
+        # select residual neurons with the sharing algorithm
+        self.split_with_neuron_sharing(expert_num_moe, expert_num_residual, expert_size, criterion)
+
+        # clear labels for moe neurons
+        for expert_id in range(expert_num_residual, expert_num_residual + expert_num_moe):
+            self.labels[expert_id] = []
+
+        # exclude neurons selected by the residual block
+        residual_labels = self.labels[:expert_num_residual]
+        for index in list(itertools.chain(*residual_labels)):
+            neuron_used_mark[index] = True
+
+        sorted_score_list, sorted_index_list = self.sort_by_criterion(criterion)
+
+        # iterate over the "sorted_score_list" and compare
+        # greedily select the maximum score from the highest score of each expert
+        # O(neuron_num * expert_num_moe) time complexity
+        moe_neuron_num = expert_num_moe * expert_size
+        while expert_neuron_count_total < moe_neuron_num:
+            if criterion == "min":
+                now_selected_score = float('inf')
+            elif criterion == "max":
+                now_selected_score = float('-inf')
+            else:
+                raise NotImplementedError
+
+            now_selected_neuron = -1
+            now_selected_expert = -1
+
+            for expert_id in range(expert_num_moe):
+                while expert_start_index[expert_id] < self.neuron_num:
+                    if neuron_used_mark[sorted_index_list[expert_id][expert_start_index[expert_id]]]:
+                        expert_start_index[expert_id] += 1
+                    else:
+                        break
+
+                if expert_neuron_count[expert_id] == expert_size or expert_start_index[expert_id] == self.neuron_num:
+                    continue
+
+                if criterion == "min":
+                    if sorted_score_list[expert_id][expert_start_index[expert_id]] <= now_selected_score:  # ----- different here -----
+                        now_selected_score = sorted_score_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_expert = expert_id
+                elif criterion == "max":
+                    if sorted_score_list[expert_id][expert_start_index[expert_id]] >= now_selected_score:  # ----- different here -----
+                        now_selected_score = sorted_score_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_neuron = sorted_index_list[expert_id][expert_start_index[expert_id]]
+                        now_selected_expert = expert_id
+                else:
+                    raise NotImplementedError
+
+            self.labels[expert_num_residual + now_selected_expert].append(now_selected_neuron)
+            assert (not neuron_used_mark[now_selected_neuron])
+            neuron_used_mark[now_selected_neuron] = True
+            expert_start_index[now_selected_expert] += 1
+            expert_neuron_count[now_selected_expert] += 1
+            expert_neuron_count_total += 1
+            # print(now_selected_expert, now_selected_neuron)
+            # print(expert_neuron_count)
+            # print(expert_start_index)
+
+        # print(neuron_used_mark)
+        # print(expert_neuron_count)
+        # print(expert_start_index)
+
+    def split_with_neuron_sharing(self, expert_num_moe, expert_num_residual, expert_size, criterion="min"):
         sorted_score_list, sorted_index_list = self.sort_by_criterion(criterion)
 
         # 与其他的labels不同，此处选择的是神经元索引，而非专家索引
         residual_labels = []  # residual各专家选择的神经元索引(共享神经元)
         residual_neuron_mask = [False] * self.neuron_num  # 标识哪些神经元是共享的
 
+        # iteratively assign the indices of mostly shared neurons to the residual block
         while not len(residual_labels) >= expert_num_residual * expert_size:
             moe_labels = [sorted_index_list[i][:expert_size] for i in range(expert_num_moe)]  # moe各专家选择的神经元索引
 
@@ -84,18 +158,29 @@ class GradientSplitResidual(LayerSplit):
         self.labels = residual_labels
         self.labels.extend(moe_labels)
 
-    def visualize(self, save_path):
-        num_experts = len(self.labels)
-        expert_size = len(self.labels[0])
+    def split(self, expert_num_moe, expert_num_residual, expert_size, criterion="min", share_neurons=False):
+        assert expert_size <= self.neuron_num
+        if not share_neurons:
+            # print("***", expert_size, expert_num, self.neuron_num)
+            assert expert_size * (expert_num_moe + expert_num_residual) == self.neuron_num
+            self.split_without_neuron_sharing(expert_num_moe, expert_num_residual, expert_size, criterion)
+        else:
+            self.split_with_neuron_sharing(expert_num_moe, expert_num_residual, expert_size, criterion)
 
-        selected_mask_list = []
-        for i, indices in enumerate(self.labels):
-            indices_tensor = torch.tensor(indices)
-            selected_mask = torch.zeros((self.neuron_num,), dtype=torch.int)
-            selected_mask[indices_tensor] += 1
-            selected_mask_list.append(selected_mask)
-        selected_masks = torch.stack(selected_mask_list, dim=0)  # shape(num_experts, intermediate_size)
+    def visualize(self, save_path, share_neurons=False):
+        if share_neurons:  # 必须在share_neuron的情况下才可以可视化
+            num_experts = len(self.labels)
+            expert_size = len(self.labels[0])
 
-        visualize_expert_neuron_overlap(selected_masks, num_experts, self.neuron_num, expert_size, self.layer, save_dir=save_path)
+            selected_mask_list = []
+            for i, indices in enumerate(self.labels):
+                indices_tensor = torch.tensor(indices)
+                selected_mask = torch.zeros((self.neuron_num,), dtype=torch.int)
+                selected_mask[indices_tensor] += 1
+                selected_mask_list.append(selected_mask)
+            selected_masks = torch.stack(selected_mask_list, dim=0)  # shape(num_experts, intermediate_size)
 
+            visualize_expert_neuron_overlap(selected_masks, num_experts, self.neuron_num, expert_size, self.layer, save_dir=save_path)
+        else:
+            print("Skip visualization as share_neurons==False.")
     # fmt: on

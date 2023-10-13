@@ -120,6 +120,101 @@ class LlamaMoEResidualModel(LlamaMoEModel, LlamaMoEResidualPreTrainedModel):
             ]
         )
 
+    def update_config(self):
+        self.config.vocab_size = self.config.vocab_size
+        self.config.max_position_embeddings = self.config.max_position_embeddings
+        # ↓↓↓↓↓↓↓↓↓↓↓↓ changed here ↓↓↓↓↓↓↓↓↓↓↓↓ #
+        self.config.hidden_size = self.layers[0].mlp.moe_layer.input_size
+        self.config.intermediate_size_moe = self.layers[0].mlp.moe_layer.hidden_size
+        self.config.intermediate_size_residual = self.layers[
+            0
+        ].mlp.residual_block.hidden_size
+        self.config.intermediate_size = (
+            self.config.intermediate_size_moe + self.config.intermediate_size_residual
+        )
+        self.config.num_hidden_layers = len(self.layers)
+        self.config.num_attention_heads = self.layers[0].self_attn.num_heads
+        self.config.hidden_act = self.layers[0].mlp.moe_layer.hidden_act
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
+        self.config.initializer_range = self.config.initializer_range
+        self.config.rms_norm_eps = self.config.rms_norm_eps
+        self.config.pretraining_tp = self.config.pretraining_tp
+        self.config.use_cache = self.config.use_cache
+        self.config.rope_scaling = self.config.rope_scaling
+        self.config._rope_scaling_validation()
+
+        self.config.num_experts = self.layers[0].mlp.moe_layer.num_experts
+        self.config.num_selects = self.layers[0].mlp.moe_layer.num_selects
+        self.config.size_experts = [
+            self.layers[i].mlp.moe_layer.calculator.experts.size_experts
+            for i in range(self.config.num_hidden_layers)
+        ]
+
+        self.config.gate_type = vars(self.layers[0].mlp.moe_layer).get(
+            "gate_type", "TopKBalancedNoisyGate"
+        )
+        self.config.gate_network = vars(self.layers[0].mlp.moe_layer.gate).get(
+            "gate_network_type", "mlp"
+        )
+        self.config.gate_use_softmax = vars(self.layers[0].mlp.moe_layer.gate).get(
+            "use_softmax", True
+        )
+        self.config.gate_use_balance = vars(self.layers[0].mlp.moe_layer.gate).get(
+            "use_balance", True
+        )
+        self.config.gate_balance_loss_weight = vars(
+            self.layers[0].mlp.moe_layer.gate
+        ).get("balance_loss_weight", 1e-2)
+        self.config.gate_add_noise = vars(self.layers[0].mlp.moe_layer.gate).get(
+            "add_noise", True
+        )
+        self.config.gate_noise_epsilon = vars(self.layers[0].mlp.moe_layer.gate).get(
+            "noise_epsilon", 1e-2
+        )
+
+        self.config.calculator_type = vars(self.layers[0].mlp.moe_layer).get(
+            "calculator_type", "UniversalCalculator"
+        )
+        self.config.multiply_gate_scores = vars(
+            self.layers[0].mlp.moe_layer.calculator
+        ).get("multiply_gate_scores", True)
+        self.config.score_scale_factor = [
+            vars(self.layers[i].mlp.moe_layer.calculator).get("score_scale_factor", 1.0)
+            for i in range(self.config.num_hidden_layers)
+        ]
+        self.config.drop_tokens = vars(self.layers[0].mlp.moe_layer.calculator).get(
+            "drop_tokens", True
+        )
+        self.config.dropped_padding = vars(self.layers[0].mlp.moe_layer.calculator).get(
+            "dropped_padding", "zero"
+        )
+        self.config.capacity_factor = vars(self.layers[0].mlp.moe_layer.calculator).get(
+            "capacity_factor", 1.25
+        )
+
+        # ↓↓↓↓ different here ↓↓↓↓ #
+        self.config.num_experts_residual = self.layers[0].mlp.residual_block.num_experts
+        self.config.size_experts_residual = [
+            self.layers[i].mlp.residual_block.calculator.experts.size_experts
+            for i in range(self.config.num_hidden_layers)
+        ]
+        self.config.gate_use_softmax_residual = vars(
+            self.layers[0].mlp.residual_block.gate
+        ).get("use_softmax", True)
+        self.config.multiply_gate_scores_residual = vars(
+            self.layers[0].mlp.residual_block.calculator
+        ).get("multiply_gate_scores", True)
+        self.config.score_scale_factor_residual = [
+            vars(self.layers[i].mlp.residual_block.calculator).get(
+                "score_scale_factor", 1.0
+            )
+            for i in range(self.config.num_hidden_layers)
+        ]
+        self.config.use_weighting = "weighting_network" in vars(
+            self.layers[0].mlp.residual_block.gate
+        )
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
+
     def set_moe_residual_gate_use_softmax(self, use_softmax):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.set_moe_residual_gate_use_softmax(use_softmax)
@@ -153,6 +248,9 @@ class LlamaMoEResidualForCausalLM(LlamaMoEForCausalLM, LlamaMoEResidualPreTraine
         super(LlamaMoEForCausalLM, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
 
+    def update_config(self):
+        self.model.update_config()
+
     def set_moe_residual_gate_use_softmax(self, use_softmax):
         self.model.set_moe_residual_gate_use_softmax(use_softmax)
 
@@ -178,6 +276,9 @@ class LlamaMoEResidualForSequenceClassification(
     def __init__(self, config):
         super(LlamaMoEForSequenceClassification, self).__init__(config)
         self.model = LlamaMoEResidualModel(config)
+
+    def update_config(self):
+        self.model.update_config()
 
     def set_moe_residual_gate_use_softmax(self, use_softmax):
         self.model.set_moe_residual_gate_use_softmax(use_softmax)

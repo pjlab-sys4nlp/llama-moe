@@ -39,15 +39,6 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         num_experts=14,
         num_selects=2,
         size_experts=None,
-        #### -------- moe residual block configs -------- ####
-        # ↓↓↓↓ different here ↓↓↓↓ #
-        num_experts_residual=2,
-        size_experts_residual=None,
-        gate_use_softmax_residual=True,
-        multiply_gate_scores_residual=True,
-        score_scale_factor_residual=1.0,
-        use_weighting=False,
-        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
         #### -------- moe gate configs -------- ####
         gate_type="TopKBalancedNoisyGate",
         gate_network="mlp",
@@ -65,6 +56,15 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         drop_tokens=True,
         dropped_padding="zero",
         capacity_factor=1.25,
+        #### -------- moe residual block configs -------- ####
+        # ↓↓↓↓ different here ↓↓↓↓ #
+        num_experts_residual=2,
+        size_experts_residual=None,
+        gate_use_softmax_residual=True,
+        multiply_gate_scores_residual=True,
+        score_scale_factor_residual=1.0,
+        use_weighting=False,
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -89,15 +89,6 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         self.num_selects = num_selects
         self.size_experts = size_experts
 
-        # ↓↓↓↓ different here ↓↓↓↓ #
-        self.num_experts_residual = num_experts_residual
-        self.size_experts_residual = size_experts_residual
-        self.gate_use_softmax_residual = gate_use_softmax_residual
-        self.multiply_gate_scores_residual = multiply_gate_scores_residual
-        self.score_scale_factor_residual = score_scale_factor_residual
-        self.use_weighting = use_weighting
-        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
-
         self.gate_type = gate_type
         self.gate_network = gate_network
         self.gate_use_softmax = gate_use_softmax
@@ -112,6 +103,15 @@ class LlamaMoEResidualConfig(PretrainedConfig):
         self.drop_tokens = drop_tokens
         self.dropped_padding = dropped_padding
         self.capacity_factor = capacity_factor
+
+        # ↓↓↓↓ different here ↓↓↓↓ #
+        self.num_experts_residual = num_experts_residual
+        self.size_experts_residual = size_experts_residual
+        self.gate_use_softmax_residual = gate_use_softmax_residual
+        self.multiply_gate_scores_residual = multiply_gate_scores_residual
+        self.score_scale_factor_residual = score_scale_factor_residual
+        self.use_weighting = use_weighting
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ #
 
         # for backward compatibility
         if num_key_value_heads is None:

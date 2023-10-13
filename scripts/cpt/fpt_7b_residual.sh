@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-7b-16-scale-test
+#SBATCH --job-name=cpt-7b-residual-16-scale
 #SBATCH --output=logs-cpt/%x-%j.log
 #SBATCH --error=logs-cpt/%x-%j.log
 
@@ -29,22 +29,9 @@ source ~/anaconda3/bin/activate llama-moe
   #  export TORCH_SHOW_CPP_STACKTRACES=1
   #  export CUDA_LAUNCH_BLOCKING=1
 
-  #  comment="llama 7B, moefication random split, 4/16, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, reset experts, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, GPU num 1, per-device bs 64, lr 1e-4"
-
-  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, random gate, GPU num 1, per-device bs 64, lr 1e-4"
-
-  #  comment="llama 7B, moefication random split, 12/16, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 12/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 12/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
-
-  #  comment="llama 7B, moefication random split, 16/16, softmax, scale factor 16.0, GPU num 2, lr 1e-4"
-
-  model_type="llama_moe"
-  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_7B-16Select16-up_proj
+  model_type="llama_moe_residual"
+  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-14Select2-2Residuals-688Neurons-Share
+  comment="llama 7B residual, gradient, 2 + 2/14 | soft residual 2.0 | soft moe 2.0 | GPU num 1, per-device bs 64, lr 1e-4"
 
   tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
   dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
