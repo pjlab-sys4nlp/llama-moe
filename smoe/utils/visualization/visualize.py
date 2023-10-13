@@ -269,7 +269,7 @@ def vis_tuple_heatmaps(tensors: tuple[torch.FloatTensor]):
                 ax.text(
                     col,
                     row,
-                    f"{data[i, row, col]:.5f}",
+                    f"{data[i, row, col]:.0f}",
                     ha="center",
                     va="center",
                     color="black",

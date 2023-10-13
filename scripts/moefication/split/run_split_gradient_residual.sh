@@ -2,9 +2,10 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama2_7B"
 
-expert_num_moe=15
+share_neurons=False #  True  False
+expert_num_moe=7
 expert_num_residual=1
 total_expert_num=$((${expert_num_moe} + ${expert_num_residual}))
 
@@ -12,12 +13,12 @@ total_expert_num=$((${expert_num_moe} + ${expert_num_residual}))
 #scale_factor=1
 #expert_size=$(expr ${scale_factor} \* ${intermediate_size} / ${total_expert_num})
 
-expert_size=688
+expert_size=1376
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824
 
-echo ${total_expert_num}\(${expert_num_moe}+${expert_num_residual}\) ${expert_size}
+echo ${total_expert_num}\(${expert_num_moe}+${expert_num_residual}\) ${expert_size} ${share_neurons}
 
 kernel=l1_norm
 accumulate_level=sample        #  sample  total
@@ -46,6 +47,7 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${
   --kernel ${kernel} \
   --accumulate_level ${accumulate_level} \
   --importance_type ${importance_type} \
-  --criterion ${criterion}
+  --criterion ${criterion} \
+  --share_neurons ${share_neurons}
 
 chmod -R 755 ${save_path} >/dev/null 2>&1

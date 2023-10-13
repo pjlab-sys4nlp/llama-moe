@@ -386,12 +386,13 @@ class GradientSplit(LayerSplit):
 
         # iterate over the "sorted_score_list" and compare
         # greedily select the maximum score from the highest score of each expert
-        # O(neuron_num * expert_num) complexity
+        # O(neuron_num * expert_num) time complexity
         neuron_used_mark = [False] * self.neuron_num
-        expert_neuron_count = [0] * expert_num
         expert_start_index = [0] * expert_num
+        expert_neuron_count = [0] * expert_num
+        expert_neuron_count_total = 0
 
-        while sum(expert_neuron_count) < self.neuron_num:
+        while expert_neuron_count_total < self.neuron_num:
             if criterion == "min":
                 now_selected_score = float('inf')
             elif criterion == "max":
@@ -428,8 +429,9 @@ class GradientSplit(LayerSplit):
             self.labels[now_selected_neuron] = now_selected_expert
             assert (not neuron_used_mark[now_selected_neuron])
             neuron_used_mark[now_selected_neuron] = True
-            expert_neuron_count[now_selected_expert] += 1
             expert_start_index[now_selected_expert] += 1
+            expert_neuron_count[now_selected_expert] += 1
+            expert_neuron_count_total += 1
             # print(now_selected_neuron, now_selected_expert)
 
         # print(neuron_used_mark)

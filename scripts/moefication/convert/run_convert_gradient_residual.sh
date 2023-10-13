@@ -2,19 +2,21 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+llama_size="llama2_7B"
 
-num_experts=13                           #  7  14  28
-num_experts_residual=3                   #  1  2  3  4
-num_selects=1                            #  1  2  3  4
-score_scale_factor_residual=12.0         #  4.0  8.0  12.0  16.0
-score_scale_factor=4.0                   #  4.0  8.0  12.0  16.0
-convert_type=LlamaMoEResidualForCausalLM #  LlamaMoEResidualModel  LlamaMoEResidualForCausalLM  LlamaMoEResidualForSequenceClassification
-
-expert_size=688
+share_neurons=True    #  True  False
+num_experts=7          #  7  14  28
+num_experts_residual=1 #  1  2  3  4
+num_selects=1          #  1  2  3  4
+expert_size=1376
 # 540 1080 2160 4320 8640
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824
+
+score_scale_factor_residual=4.0 #  4.0  8.0  12.0  16.0
+score_scale_factor=4.0          #  4.0  8.0  12.0  16.0
+
+convert_type=LlamaMoEResidualForCausalLM #  LlamaMoEResidualModel  LlamaMoEResidualForCausalLM  LlamaMoEResidualForSequenceClassification
 
 kernel=l1_norm
 criterion=max                  #  min  max
@@ -24,8 +26,12 @@ proj_type=up_proj              #  gate_proj  up_proj
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
-split_file_path=${data_path}/moefication_results/split/${llama_size}-Split-Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${num_experts}Experts-${num_experts_residual}Residuals-${expert_size}Neurons-Share
-save_path=${data_path}/models/${convert_type}/Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${llama_size}-${num_experts}Select${num_selects}-${num_experts_residual}Residuals-${expert_size}Neurons-Share
+split_file_path=${data_path}/moefication_results/split/${llama_size}-Split-Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${num_experts}Experts-${num_experts_residual}Residuals-${expert_size}Neurons
+save_path=${data_path}/models/${convert_type}/Gradient-${criterion}-${kernel}-${accumulate_level}-${importance_type}/${llama_size}-${num_experts}Select${num_selects}-${num_experts_residual}Residuals-${expert_size}Neurons
+if [ ${share_neurons} = "True" ]; then
+  split_file_path=${split_file_path}-Share
+  save_path=${save_path}-Share
+fi
 
 gpus=0
 cpus=8

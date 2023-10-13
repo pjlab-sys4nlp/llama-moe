@@ -24,8 +24,10 @@ if __name__ == "__main__":
     parser.add_argument('--accumulate_level', type=str, default="sample", choices=("sample", "total"))
     parser.add_argument('--criterion', type=str, default="min", choices=("min", "max"))
     parser.add_argument('--importance_type', type=str, default="feature_grad", choices=("feature_grad", "feature_change"))
+    parser.add_argument('--share_neurons', type=str, default="False")
 
     args = parser.parse_args()
+    args.share_neurons = str2bool(args.share_neurons)
     print(args, "\n")
 
     print("Loading llama config...")
@@ -50,14 +52,14 @@ if __name__ == "__main__":
         args.save_path = os.path.join(
             save_root_path,
             f"{os.path.split(args.model_path)[1]}-Split-Gradient-{args.criterion}-{args.kernel}-{args.accumulate_level}-{args.importance_type}",
-            f"{args.expert_num_moe}Experts-{args.expert_num_residual}Residuals-{args.expert_size}Neurons-Share"
+            f"{args.expert_num_moe}Experts-{args.expert_num_residual}Residuals-{args.expert_size}Neurons{'-Share' if args.share_neurons else ''}"
         )
 
         split = GradientSplitResidual(args, args.template, i, score_list)
-        split.split(args.expert_num_moe, args.expert_num_residual, args.expert_size, criterion=args.criterion)
+        split.split(args.expert_num_moe, args.expert_num_residual, args.expert_size, criterion=args.criterion, share_neurons=args.share_neurons)
         split.save()
 
         if args.visualization_path is not None:
-            split.visualize(args.visualization_path)
+            split.visualize(args.visualization_path, share_neurons=args.share_neurons)
     print("Done.")
     # fmt: on
