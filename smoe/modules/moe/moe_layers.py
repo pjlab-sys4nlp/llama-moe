@@ -9,13 +9,16 @@ from transformers.utils import ModelOutput
 from .moe_calculators import (
     CalculatorOutput,
     SwitchDropTokenCalculator,
+    UniformCalculator,
     UniversalCalculator,
 )
 from .moe_experts import LinearExperts, LinearGLUExperts
 from .moe_gates import (
     RandomLearnableGate,
+    RandomPlainGate,
     SwitchBalancedGate,
     TopKBalancedNoisyGate,
+    UniformLearnableGate,
     UniformPlainGate,
 )
 
@@ -33,13 +36,52 @@ class BaseMoELayer(nn.Module):
     def __init__(self):
         super(BaseMoELayer, self).__init__()
 
-        self.gate: Union[SwitchBalancedGate, TopKBalancedNoisyGate]
-        self.calculator: Union[SwitchDropTokenCalculator, UniversalCalculator]
+        self.gate: Union[
+            UniformPlainGate,
+            UniformLearnableGate,
+            RandomPlainGate,
+            RandomLearnableGate,
+            TopKBalancedNoisyGate,
+            SwitchBalancedGate,
+        ]
+        self.calculator: Union[
+            UniformCalculator, UniversalCalculator, SwitchDropTokenCalculator
+        ]
 
     def _create_gate(self, **kwargs):
         self.gate_type = kwargs.get("gate_type", "TopKBalancedNoisyGate")
 
-        if self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
+        if self.gate_type == "UniformPlainGate":  # all select gate
+            self.gate = UniformPlainGate(
+                self.input_size,
+                self.num_experts,
+                use_softmax=kwargs.get("gate_use_softmax", False),
+            )
+        elif self.gate_type == "UniformLearnableGate":  # all select gate with network
+            self.gate = UniformLearnableGate(
+                self.input_size,
+                self.num_experts,
+                gate_network=kwargs.get("gate_network", "mlp"),
+                use_softmax=kwargs.get("gate_use_softmax", False),
+            )
+        elif self.gate_type == "RandomPlainGate":  # random select gate
+            self.gate = RandomPlainGate(
+                self.input_size,
+                self.num_experts,
+                self.num_selects,
+                use_softmax=kwargs.get("gate_use_softmax", False),
+            )
+        elif self.gate_type == "RandomLearnableGate":  # random gate with network
+            self.gate = RandomLearnableGate(
+                self.input_size,
+                self.num_experts,
+                self.num_selects,
+                gate_network=kwargs.get("gate_network", "mlp"),
+                use_softmax=kwargs.get("gate_use_softmax", False),
+                add_noise=kwargs.get("gate_add_noise", True),
+                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
+            )
+        elif self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
             self.gate = TopKBalancedNoisyGate(
                 self.input_size,
                 self.num_experts,
@@ -62,29 +104,19 @@ class BaseMoELayer(nn.Module):
                 balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
                 add_noise=kwargs.get("gate_add_noise", True),
             )
-        elif self.gate_type == "UniformPlainGate":  # all select gate
-            self.gate = UniformPlainGate(
-                self.input_size,
-                self.num_experts,
-                use_softmax=kwargs.get("gate_use_softmax", False),
-            )
-        elif self.gate_type == "RandomLearnableGate":  # random gate with network
-            self.gate = RandomLearnableGate(
-                self.input_size,
-                self.num_experts,
-                self.num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", False),
-                add_noise=kwargs.get("gate_add_noise", True),
-                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
-            )
         else:
             raise NotImplementedError
 
     def _create_calculator(self, experts, **kwargs):
         self.calculator_type = kwargs.get("calculator_type", "UniversalCalculator")
 
-        if self.calculator_type == "UniversalCalculator":  # top K calculator
+        if self.calculator_type == "UniformCalculator":  # all select calculator
+            self.calculator = UniformCalculator(
+                experts,
+                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+                score_scale_factor=kwargs.get("score_scale_factor", 1.0),
+            )
+        elif self.calculator_type == "UniversalCalculator":  # top K calculator
             self.calculator = UniversalCalculator(
                 experts,
                 multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
@@ -104,16 +136,16 @@ class BaseMoELayer(nn.Module):
 
     def forward(self, x) -> MoEMlpOutput:
         original_shape = x.shape[:-1]
-        # shape(batch_size*seq_len, input_size)
         x = x.reshape(-1, self.input_size)
+        # shape(batch_size*seq_len, input_size)
 
         # 计算被选出的专家及其分数，以及gate的loss
         gate_outputs: dict = self.gate(x)
         # 合并各专家的计算结果
         calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
         y = calc_outs.hidden_states
-        # shape(batch_size, seq_len, output_size)
         y = y.reshape(original_shape + (self.output_size,))
+        # shape(batch_size, seq_len, output_size)
 
         return MoEMlpOutput(
             hidden_states=y,
