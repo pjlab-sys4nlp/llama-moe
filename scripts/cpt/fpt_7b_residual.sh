@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-7b-residual-16-scale
+#SBATCH --job-name=cpt-v2-7b-residual
 #SBATCH --output=logs-cpt/%x-%j.log
 #SBATCH --error=logs-cpt/%x-%j.log
 
@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=0
 
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
 
@@ -18,7 +18,7 @@
 source ~/anaconda3/bin/activate llama-moe
 
 {
-  num_nodes=1        # should match with --nodes
+  num_nodes=2        # should match with --nodes
   num_gpu_per_node=8 # should match with --gres
 
   # #cpu/#num_gpu_per_node
@@ -29,22 +29,43 @@ source ~/anaconda3/bin/activate llama-moe
   #  export TORCH_SHOW_CPP_STACKTRACES=1
   #  export CUDA_LAUNCH_BLOCKING=1
 
-  model_type="llama_moe_residual"
-  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-14Select2-2Residuals-688Neurons-Share
-  comment="llama 7B residual, gradient, 2 + 2/14 | soft residual 2.0 | soft moe 2.0 | GPU num 1, per-device bs 64, lr 1e-4"
+  ##############################################################
+  ############### LLAMA 7B Moefication 16Experts ###############
+  #  comment="llama 7B residual, gradient, 2 + 2/14 | soft residual 2.0 | soft moe 2.0 | GPU num 1, per-device bs 64, lr 1e-4"
+  #  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-14Select2-2Residuals-688Neurons-Share
 
+  ##############################################################
+  ######## LLAMA 2 7B 16 Experts all kinds of ablations ########
+  #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual learn soft 2.0, moe soft 2.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-14Select2-2Residuals-688Neurons
+
+  #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual learn soft 2.0, moe soft 2.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-14Select2-2Residuals-688Neurons-Share
+
+  ##############################################################
+
+  model_type="llama_moe_residual"
   tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
   dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+  validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
-  lr=1e-4
+  lr=3e-4
   final_lr_portion=0.1
   per_device_train_batch_size=8
-  per_device_eval_batch_size=1
-  gradient_accumulation_steps=8
-  block_size=2048
+  per_device_eval_batch_size=8
+  gradient_accumulation_steps=4
+  block_size=4096
   num_tokens="1*10^11"
   seed=1227
   deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
+
+  num_selects=2
 
   max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
   max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
@@ -85,10 +106,13 @@ source ~/anaconda3/bin/activate llama-moe
     --tokenizer_name_or_path ${tokenizer_path} \
     --dataset_dir ${dataset_dir} \
     --data_cache_dir ${data_cache} \
-    --validation_split_percentage 0.001 \
+    --validation_dir ${validation_dir} \
     --per_device_train_batch_size ${per_device_train_batch_size} \
     --per_device_eval_batch_size ${per_device_eval_batch_size} \
     --do_train \
+    --do_eval \
+    --evaluation_strategy steps \
+    --eval_steps 1000 \
     --seed ${seed} \
     --bf16 \
     --num_train_epochs 1 \
@@ -106,6 +130,7 @@ source ~/anaconda3/bin/activate llama-moe
     --save_total_limit 1 \
     --save_steps 1000 \
     --dataloader_num_workers 0 \
+    --dataloader_pin_memory True \
     --gradient_accumulation_steps ${gradient_accumulation_steps} \
     --block_size ${block_size} \
     --output_dir ${output_dir} \
@@ -120,7 +145,10 @@ source ~/anaconda3/bin/activate llama-moe
     --log_level info \
     --log_level_replica warning \
     --log_on_each_node False \
-    --report_to none
+    --report_to none \
+    --gate_type "TopKBalancedNoisyGate" \
+    --calculator_type "UniversalCalculator" \
+    --num_selects ${num_selects}
 }
 #SBATCH --job-name=cpt-moe-fpt-test_lr_change
 #改动前：--logging_steps 10 \

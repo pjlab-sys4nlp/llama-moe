@@ -12,7 +12,7 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
     def __init__(self, tb_writer=None):
         super().__init__(tb_writer)
 
-        self._heatmap_img_dump_step = 200
+        self._heatmap_img_dump_step = 20
 
     def on_log(
         self,

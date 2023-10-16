@@ -124,9 +124,10 @@ class LinearMoEResidualLayer(BaseMoEResidualLayer):
             num_experts_residual,
             bias=bias,
             **{
-                "gate_type": "UniformPlainGate",
+                "gate_type": "UniformLearnableGate",
+                "gate_network": "linear",
                 "gate_use_softmax": kwargs.get("gate_use_softmax_residual", True),
-                "calculator_type": "UniversalCalculator",
+                "calculator_type": "UniformCalculator",
                 "multiply_gate_scores": kwargs.get(
                     "multiply_gate_scores_residual", True
                 ),
@@ -221,17 +222,18 @@ class LinearGLUMoEResidualLayer(BaseMoEResidualLayer):
         # )
         self.residual_block = LinearGLUMoELayer(
             input_size,
-            residual_hidden_size,
+            residual_hidden_size,  # calculated from "size_experts_residual"
             output_size,
             hidden_act,
             num_experts_residual,
             num_experts_residual,
-            size_experts=size_experts_residual,  # calculated by "size_experts_residual"
+            size_experts=size_experts_residual,
             bias=bias,
             **{
-                "gate_type": "UniformPlainGate",
+                "gate_type": "UniformLearnableGate",
+                "gate_network": "linear",
                 "gate_use_softmax": kwargs.get("gate_use_softmax_residual", True),
-                "calculator_type": "UniversalCalculator",
+                "calculator_type": "UniformCalculator",
                 "multiply_gate_scores": kwargs.get(
                     "multiply_gate_scores_residual", True
                 ),
