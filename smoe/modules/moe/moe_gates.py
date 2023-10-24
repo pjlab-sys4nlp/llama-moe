@@ -162,18 +162,27 @@ class TopKBalancedNoisyGate(BaseGate):
         # add_noise
         self.add_noise = add_noise
         self.noise_epsilon = noise_epsilon
-        self.weight_noise = nn.Linear(input_size, num_experts, bias=False)
-        self.weight_noise.weight.data = torch.zeros(
-            (num_experts, input_size),
-            requires_grad=True,
-            device=self.weight_noise.weight.data.device,
-            dtype=self.weight_noise.weight.data.dtype,
-        )
-        # print(self.weight_noise.weight.data)
-        self.mean = 0.0
-        self.std = 1.0
-        self.normal = Normal(self.mean, self.std)
-        self.softplus = nn.Softplus()
+        self.warned = False
+        if self.add_noise:
+            self.weight_noise = nn.Linear(input_size, num_experts, bias=False)
+            # self.weight_noise = nn.Parameter(torch.empty(input_size, num_experts))
+            self.weight_noise.weight.data = torch.zeros(
+                (num_experts, input_size),
+                requires_grad=True,
+                device=self.weight_noise.weight.data.device,
+                dtype=self.weight_noise.weight.data.dtype,
+            )
+            self.mean = 0.0
+            self.std = 1.0
+            self.normal = Normal(self.mean, self.std)
+            self.softplus = nn.Softplus()
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        if self.add_noise:
+            nn.init.zeros_(self.weight_noise.weight)
+            # nn.init.zeros_(self.weight_noise)
 
     def cv_squared(self, x, eps=1e-10):
         """The squared coefficient of variation of a sample.
@@ -196,6 +205,7 @@ class TopKBalancedNoisyGate(BaseGate):
         logits_gate = self.gate_network(x)  # gate计算出的权重
         if self.training and self.add_noise:
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
+            # noise_mm = torch.mm(x, self.weight_noise)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
             logits = logits_gate + logits_noise  # 最终权重
@@ -232,8 +242,10 @@ class TopKBalancedNoisyGate(BaseGate):
                 load = prob.sum(0)
             else:
                 load = (scores_filtered > 0).sum(0)
-                warnings.warn('Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
-                              'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.')
+                if not self.warned:
+                    warnings.warn('Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
+                                  'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.')
+                    self.warned = True
         else:
             load = (scores_filtered > 0).sum(0)
 
@@ -343,7 +355,7 @@ class SwitchBalancedGate(BaseGate):
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
-        assert num_selects == 1
+        assert num_selects in [1, 2]
         self.input_size = input_size
         self.num_experts = num_experts
         self.num_selects = num_selects

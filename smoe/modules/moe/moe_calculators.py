@@ -3,7 +3,12 @@ from typing import Optional
 
 import torch
 from torch import nn
+from transformers.models.llama.modeling_llama import LlamaRMSNorm
 from transformers.utils import ModelOutput
+
+from smoe.modules.moe.moe_experts import LinearGLUExperts
+from smoe.modules.norm import WeightNorm
+from smoe.utils.debugging import remote_breakpoint
 
 
 @dataclass
@@ -28,7 +33,13 @@ class UniversalCalculator(BaseCalculator):
     原理依旧是重新分配各个专家的batch。
     """
 
-    def __init__(self, experts, multiply_gate_scores=True, score_scale_factor=1.0):
+    def __init__(
+        self,
+        experts: LinearGLUExperts,
+        multiply_gate_scores=True,
+        score_scale_factor=1.0,
+        add_weight_norm: bool = False,
+    ):
         super(UniversalCalculator, self).__init__()
         self.experts = experts
         # TODO (zhutong): use vmap to boost the training efficiency
@@ -36,6 +47,12 @@ class UniversalCalculator(BaseCalculator):
         self.multiply_gate_scores = multiply_gate_scores
         self.score_scale_factor = score_scale_factor
         self.num_experts = experts.num_experts
+        self.mlp_norm = None
+        if multiply_gate_scores and add_weight_norm:
+            # self.mlp_norm = LlamaRMSNorm(self.experts.out_features, eps=1e-5)
+            # self.mlp_norm = WeightNorm(self.experts.out_features, scale=score_scale_factor)
+            self.mlp_norm = WeightNorm(1, scale=score_scale_factor)
+            self.mlp_norm.reset_parameters()
 
     def forward(
         self, x, topK_indices, topK_scores, expert_batch_size=None, **kwargs
@@ -52,6 +69,7 @@ class UniversalCalculator(BaseCalculator):
         batch_indices = torch.arange(batch_size, device=topK_scores.device).repeat_interleave(num_selects)
 
         """按照专家序号从小到大的顺序，生成专家索引"""
+        # index_sorted_topK_indices: (token_num*num_selects)
         _, index_sorted_topK_indices = topK_indices.sort(0)
 
         """按照索引重新排列scores与batch_indices，并计算专家的batch_size"""
@@ -77,7 +95,12 @@ class UniversalCalculator(BaseCalculator):
         cat_expert_outputs = torch.cat(expert_outputs, 0)  # 拼接专家输出
         output_dim = cat_expert_outputs.size(1)
         if self.multiply_gate_scores:
-            cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1) * self.score_scale_factor)  # 乘权重
+            if self.mlp_norm is None:
+                cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1) * self.score_scale_factor)  # 乘权重
+            else:
+                cat_expert_outputs = torch.mul(cat_expert_outputs, sorted_topK_scores.reshape(-1, 1))  # 乘权重
+                cat_expert_outputs = self.mlp_norm(cat_expert_outputs)
+
         zeros = torch.zeros((batch_size, output_dim), device=cat_expert_outputs.device, dtype=cat_expert_outputs.dtype)
         y = zeros.index_add(0, sorted_batch_indices, cat_expert_outputs)  # 按照对应的batch编号，添加输出
 
@@ -101,6 +124,7 @@ class SwitchDropTokenCalculator(BaseCalculator):
         drop_tokens=True,
         dropped_padding="zero",  # zero input
         capacity_factor=1.25,
+        add_weight_norm: bool = False,
     ):
         super(SwitchDropTokenCalculator, self).__init__()
         self.available_dropped_padding_choices = ("zero", "input")
@@ -114,6 +138,12 @@ class SwitchDropTokenCalculator(BaseCalculator):
         self.score_scale_factor = score_scale_factor
         self.num_experts = experts.num_experts
         self.out_features = experts.out_features
+        self.mlp_norm = None
+        if multiply_gate_scores and add_weight_norm:
+            self.mlp_norm = WeightNorm(
+                self.experts.out_features, scale=score_scale_factor
+            )
+            self.mlp_norm.reset_parameters()
 
         # capacity
         self.drop_tokens = drop_tokens
@@ -161,6 +191,8 @@ class SwitchDropTokenCalculator(BaseCalculator):
         if self.multiply_gate_scores:
             # 乘权重
             y = torch.mul(y, topK_scores.reshape(-1, 1) * self.score_scale_factor)
+            if self.mlp_norm is not None:
+                y = self.mlp_norm(y)
 
         return CalculatorOutput(
             hidden_states=y, num_dropped_tokens=torch.tensor(num_dropped_tokens)

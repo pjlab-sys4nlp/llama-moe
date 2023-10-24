@@ -12,8 +12,6 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
     def __init__(self, tb_writer=None):
         super().__init__(tb_writer)
 
-        self._heatmap_img_dump_step = 200
-
     def on_log(
         self,
         args: TrainingArguments,
@@ -69,11 +67,7 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                 elif k == "train/num_dropped_tokens" and isinstance(v, Iterable):
                     # (tensor(1.0), tensor(2.3)) -> [1.0, 2.3]
                     if all(isinstance(n, torch.Tensor) for n in v):
-                        if (
-                            state.global_step
-                            % (self._heatmap_img_dump_step * args.logging_steps)
-                            == 0
-                        ):
+                        if control.should_evaluate:
                             self.tb_writer.add_image(
                                 k, get_heatmap_img_grid_for_tb(v), state.global_step
                             )
@@ -95,11 +89,7 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                     #     {str(i): n.std().item() for i, n in enumerate(v)},
                     #     state.global_step,
                     # )
-                    if (
-                        state.global_step
-                        % (self._heatmap_img_dump_step * args.logging_steps)
-                        == 0
-                    ):
+                    if control.should_evaluate:
                         self.tb_writer.add_image(
                             k, get_heatmap_img_grid_for_tb(v), state.global_step
                         )
