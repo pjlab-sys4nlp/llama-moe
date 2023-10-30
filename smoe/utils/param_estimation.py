@@ -55,3 +55,10 @@ if __name__ == "__main__":
     # 13B
     res_13B = estimate_moe_param(32000, 5120, 40, 13824, 16, 4)
     print("13B", res_13B)
+
+    # 3B upcycling
+    for num_experts in range(1, 9):
+        res_3B_up = estimate_moe_param(
+            32000, 3200, 26, 8640 * num_experts, num_experts, 1
+        )
+        print(f"3B upcycling {num_experts} experts", res_3B_up)

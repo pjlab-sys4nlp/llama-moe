@@ -25,6 +25,36 @@ class BaseCalculator(nn.Module):
         self.experts.reset_parameters()
 
 
+class UniformCalculator(BaseCalculator):
+    # efficient calculator for all-select-all gates
+
+    def __init__(self, experts, multiply_gate_scores=True, score_scale_factor=1.0):
+        super(UniformCalculator, self).__init__()
+        self.experts = experts
+        self.multiply_gate_scores = multiply_gate_scores
+        self.score_scale_factor = score_scale_factor
+        self.num_experts = experts.num_experts
+
+    def forward(self, x, topK_scores, **kwargs) -> CalculatorOutput:
+        # num_selects * (bsz*seq_len, hidden_size)
+        expert_outputs = [self.experts(x, i) for i in range(self.num_experts)]
+
+        # (num_selects, bsz*seq_len, hidden_size)
+        stack_expert_outputs = torch.stack(expert_outputs, 0)  # 拼接专家输出
+        if self.multiply_gate_scores:
+            expanded_socre = (
+                topK_scores.transpose(0, 1)
+                .unsqueeze(2)
+                .expand(stack_expert_outputs.shape)
+            )
+            stack_expert_outputs = stack_expert_outputs * (
+                expanded_socre * self.score_scale_factor
+            )
+        y = torch.sum(stack_expert_outputs, dim=0)
+
+        return CalculatorOutput(hidden_states=y, num_dropped_tokens=torch.tensor(-1.0))
+
+
 class UniversalCalculator(BaseCalculator):
     # traditional calculation mode, forward $num_experts$ times with re-batch optimization
     """

@@ -58,7 +58,8 @@ class UniformPlainGate(BaseGate):
         self.use_softmax = use_softmax
 
     def forward(self, x):
-        batch_size = x.shape[0]  # gate计算出的权重
+        batch_size = x.shape[0]
+
         scores = torch.ones((batch_size, self.num_experts), device=x.device)
         if self.use_softmax:
             scores /= self.num_experts
@@ -71,6 +72,85 @@ class UniformPlainGate(BaseGate):
         return {
             "topK_indices": indices,
             "topK_scores": scores,
+            "balance_loss": torch.tensor(0, device=x.device),
+            "load": torch.tensor(-1, device=x.device),
+            "importance": torch.tensor(-1, device=x.device),
+        }
+
+
+class UniformLearnableGate(BaseGate):
+    """
+    Select all experts with the same score, with a learnable gate_network controlling expert scores.
+    """
+
+    def __init__(
+        self,
+        input_size,
+        num_experts,
+        gate_network="mlp",
+        use_softmax=True,
+    ):
+        super(UniformLearnableGate, self).__init__()
+        self.input_size = input_size
+        self.num_experts = num_experts
+
+        self.gate_network_type = gate_network
+        self.gate_network = get_gate_network(gate_network, input_size, num_experts)
+
+        self.use_softmax = use_softmax
+        self.softmax = nn.Softmax(1)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+
+        logits = self.gate_network(x)  # gate计算出的权重
+        scores = self.softmax(logits) if self.use_softmax else logits
+        indices = (
+            torch.arange(0, self.num_experts, device=x.device)
+            .unsqueeze(0)
+            .expand(batch_size, self.num_experts)
+        )
+
+        return {
+            "topK_indices": indices,
+            "topK_scores": scores,
+            "balance_loss": torch.tensor(0, device=x.device),
+            "load": torch.tensor(-1, device=x.device),
+            "importance": torch.tensor(-1, device=x.device),
+        }
+
+
+class RandomPlainGate(BaseGate):
+    """
+    Randomly select k experts each time.
+    If use_softmax=True, then score=1/num_selects.
+    If use_softmax=False, then score=1.
+    """
+
+    def __init__(
+        self,
+        input_size,
+        num_experts,
+        num_selects,
+        use_softmax=True,
+    ):
+        super(RandomPlainGate, self).__init__()
+        self.input_size = input_size
+        self.num_experts = num_experts
+        self.num_selects = num_selects
+        self.use_softmax = use_softmax
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+
+        top_k_scores = torch.ones((batch_size, self.num_experts), device=x.device)
+        if self.use_softmax:
+            top_k_scores /= self.num_experts
+        _, top_k_indices = torch.rand_like(top_k_scores).topk(self.num_selects, dim=1)
+
+        return {
+            "topK_indices": top_k_indices,
+            "topK_scores": top_k_scores,
             "balance_loss": torch.tensor(0, device=x.device),
             "load": torch.tensor(-1, device=x.device),
             "importance": torch.tensor(-1, device=x.device),

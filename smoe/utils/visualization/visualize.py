@@ -221,7 +221,7 @@ def plot_to_image(figure):
     returns it. The supplied figure is closed and inaccessible after this call."""
     # Save the plot to a image in memory.
     buf = io.BytesIO()
-    plt.savefig(buf, format="jpg")
+    plt.savefig(buf, format="png")
     # Closing the figure prevents it from being displayed directly inside
     # the notebook.
     plt.close(figure)

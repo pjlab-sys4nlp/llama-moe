@@ -2,6 +2,7 @@ import math
 import os
 import re
 import shutil
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -17,10 +18,12 @@ from transformers.integrations import hp_params, is_fairscale_available
 
 # isort: on
 
+import datasets
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
 from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
 from transformers.deepspeed import deepspeed_init
 from transformers.dependency_versions_check import dep_version_check
@@ -35,16 +38,20 @@ from transformers.trainer_utils import (
     ShardedDDPOption,
     TrainOutput,
     has_length,
+    seed_worker,
     speed_metrics,
 )
 from transformers.training_args import ParallelMode
 from transformers.utils import (
     is_accelerate_available,
     is_apex_available,
+    is_datasets_available,
     is_sagemaker_mp_enabled,
     is_torch_tpu_available,
     logging,
 )
+
+from smoe.utils.config import EnhancedTrainingArguments
 
 if is_apex_available():
     from apex import amp
@@ -131,11 +138,15 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
 class EnhancedTrainerState(TrainerState):
     # last Token/GPU/second timestamp
     start_timestamp: float = 0.0
+    consumed_tokens: int = 0
 
 
 class LlamaLrSchedulingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.args: EnhancedTrainingArguments
+        self.state: EnhancedTrainerState
 
     def create_optimizer(self):
         """
@@ -322,6 +333,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 x.detach().cpu().tolist() for x in gate_importance
             ]
             logs["balance_loss"] = balance_loss.item()
+            logs["consumed_tokens"] = self.state.consumed_tokens
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -407,6 +419,48 @@ class LlamaLrSchedulingTrainer(Trainer):
                 if re.search(r"global_step\d+", str(optim_folder)):
                     shutil.rmtree(optim_folder, ignore_errors=True)
 
+    def get_train_dataloader(self) -> DataLoader:
+        """
+        Returns the training [`~torch.utils.data.DataLoader`].
+
+        Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
+        training if necessary) otherwise.
+
+        Subclass and override this method if you want to inject some custom behavior.
+        """
+        if self.train_dataset is None:
+            raise ValueError("Trainer: training requires a train_dataset.")
+
+        train_dataset = self.train_dataset
+        data_collator = self.data_collator
+
+        # if not self.args.ignore_data_skip:
+        #     skip_tokens = self.state.global_step * self.args.num_tokens_per_batch
+        #     train_dataset.skip_tokens(skip_tokens)
+
+        if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
+            train_dataset = self._remove_unused_columns(
+                train_dataset, description="training"
+            )
+        else:
+            data_collator = self._get_collator_with_removed_columns(
+                data_collator, description="training"
+            )
+
+        dataloader_params = {
+            "batch_size": self._train_batch_size,
+            "collate_fn": data_collator,
+            "num_workers": self.args.dataloader_num_workers,
+            "pin_memory": self.args.dataloader_pin_memory,
+        }
+
+        if not isinstance(train_dataset, torch.utils.data.IterableDataset):
+            dataloader_params["sampler"] = self._get_train_sampler()
+            dataloader_params["drop_last"] = self.args.dataloader_drop_last
+            dataloader_params["worker_init_fn"] = seed_worker
+
+        return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+
     def _inner_training_loop(
         self,
         batch_size=None,
@@ -417,6 +471,23 @@ class LlamaLrSchedulingTrainer(Trainer):
         ds_load_optimizer_states: bool = True,
         ds_load_lr_scheduler_states: bool = True,
     ):
+        hostname = socket.gethostname()
+        logger.info(
+            f"rank: {self.accelerator.process_index} / {self.accelerator.num_processes}"
+            f" local rank: {self.accelerator.local_process_index}"
+            f" is_main_process: {self.accelerator.is_main_process}, is_local_main_process: {self.accelerator.is_local_main_process}"
+            f" device: {self.accelerator.device}"
+            f" node hostname: {hostname}, ip: {socket.gethostbyname(hostname)}"
+        )
+        if dist.is_available() and dist.is_initialized():
+            logger.info("Testing connection availability")
+            tensor = torch.ones(1, device=self.accelerator.device)
+            dist.all_reduce(tensor)
+            if tensor.item() == self.accelerator.num_processes:
+                logger.info("Testing connection success!")
+            else:
+                logger.error("Testing connection success, verification failed!")
+
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
         logger.debug(
@@ -634,6 +705,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
+                    f" Total skip tokens: {self.state.consumed_tokens}"
                 )
 
         # Update the references
@@ -843,6 +915,9 @@ class LlamaLrSchedulingTrainer(Trainer):
 
                     model.zero_grad()
                     self.state.global_step += 1
+                    self.state.consumed_tokens = (
+                        self.state.global_step * self.args.num_tokens_per_batch
+                    )
                     self.state.epoch = (
                         epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     )

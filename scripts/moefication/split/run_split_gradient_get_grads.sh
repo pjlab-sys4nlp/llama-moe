@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --mem=0
-#SBATCH --quotatype=reserved
+#SBATCH --quotatype=spot
 
 # reserved spot
 
@@ -45,7 +45,7 @@ export LOGLEVEL=INFO
   per_device_train_batch_size=1
   block_size=4096
 
-  total_clusters=16 #  4  8  16  32
+  total_clusters=8 #  4  8  16  32
   dataset_dir=${data_path}/data/clustering_tokenized/${total_clusters}clusters
   #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
   dataset_name=()
@@ -53,38 +53,38 @@ export LOGLEVEL=INFO
     dataset_name+=("${i}.jsonl")
   done
 
-  dataset_name=("0.jsonl")
-  #  dataset_name=("1.jsonl")
-  #  dataset_name=("2.jsonl")
-  #  dataset_name=("3.jsonl")
-  #  dataset_name=("4.jsonl")
-  #  dataset_name=("5.jsonl")
-  #  dataset_name=("6.jsonl")
-  #  dataset_name=("7.jsonl")
-  #  dataset_name=("8.jsonl")
-  #  dataset_name=("9.jsonl")
-  #  dataset_name=("10.jsonl")
-  #  dataset_name=("11.jsonl")
-  #  dataset_name=("12.jsonl")
-  #  dataset_name=("13.jsonl")
-  #  dataset_name=("14.jsonl")
-  #  dataset_name=("15.jsonl")
-  #  dataset_name=("16.jsonl")
-  #  dataset_name=("17.jsonl")
-  #  dataset_name=("18.jsonl")
-  #  dataset_name=("19.jsonl")
-  #  dataset_name=("20.jsonl")
-  #  dataset_name=("21.jsonl")
-  #  dataset_name=("22.jsonl")
-  #  dataset_name=("23.jsonl")
-  #  dataset_name=("24.jsonl")
-  #  dataset_name=("25.jsonl")
-  #  dataset_name=("26.jsonl")
-  #  dataset_name=("27.jsonl")
-  #  dataset_name=("28.jsonl")
-  #  dataset_name=("29.jsonl")
-  #  dataset_name=("30.jsonl")
-  #  dataset_name=("31.jsonl")
+#  dataset_name=("0.jsonl")
+#    dataset_name=("1.jsonl")
+#    dataset_name=("2.jsonl")
+#    dataset_name=("3.jsonl")
+#    dataset_name=("4.jsonl")
+#    dataset_name=("5.jsonl")
+#    dataset_name=("6.jsonl")
+    dataset_name=("7.jsonl")
+#    dataset_name=("8.jsonl")
+#    dataset_name=("9.jsonl")
+#    dataset_name=("10.jsonl")
+#    dataset_name=("11.jsonl")
+#    dataset_name=("12.jsonl")
+#    dataset_name=("13.jsonl")
+#    dataset_name=("14.jsonl")
+#    dataset_name=("15.jsonl")
+#    dataset_name=("16.jsonl")
+#    dataset_name=("17.jsonl")
+#    dataset_name=("18.jsonl")
+#    dataset_name=("19.jsonl")
+#    dataset_name=("20.jsonl")
+#    dataset_name=("21.jsonl")
+#    dataset_name=("22.jsonl")
+#    dataset_name=("23.jsonl")
+#    dataset_name=("24.jsonl")
+#    dataset_name=("25.jsonl")
+#    dataset_name=("26.jsonl")
+#    dataset_name=("27.jsonl")
+#    dataset_name=("28.jsonl")
+#    dataset_name=("29.jsonl")
+#    dataset_name=("30.jsonl")
+#    dataset_name=("31.jsonl")
 
   ###################################################################
 

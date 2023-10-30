@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import sys
 from pathlib import Path
 
@@ -82,7 +83,10 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
+    hostname = socket.gethostname()
     logger.warning(
+        f"Global rank: {training_args.process_index}, "
+        f"Host: {hostname}, IP: {socket.gethostbyname(hostname)}, "
         f"Process local rank: {training_args.local_rank}, "
         f"device: {training_args.device}, "
         f"n_gpu: {training_args.n_gpu}, "
@@ -340,6 +344,7 @@ def main():
     # update config for checkpoint retrival
     # model.set_moe_gate_balance_loss_weight(0.1)
     model.set_moe_calculator_score_scale_factor(4.0)
+    # model.set_moe_calculator_score_scale_factor(1.0)
     model.update_config()
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
