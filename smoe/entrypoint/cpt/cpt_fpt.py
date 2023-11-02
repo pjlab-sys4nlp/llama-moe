@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import sys
 from pathlib import Path
 
@@ -22,7 +23,6 @@ from transformers.trainer_utils import get_last_checkpoint
 from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
-from smoe.data.redpajama import load_streaming_datasets
 from smoe.data.streaming import CachedJsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.metrics.preprocess import logits_argmax
 from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
@@ -60,7 +60,7 @@ CONFIG_MAPPING.update(
 logger = logging.getLogger(__name__)
 
 
-# @wechat_sender()
+@wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -83,7 +83,10 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
+    hostname = socket.gethostname()
     logger.warning(
+        f"Global rank: {training_args.process_index}, "
+        f"Host: {hostname}, IP: {socket.gethostbyname(hostname)}, "
         f"Process local rank: {training_args.local_rank}, "
         f"device: {training_args.device}, "
         f"n_gpu: {training_args.n_gpu}, "
@@ -157,9 +160,14 @@ def main():
     if training_args.gradient_checkpointing:
         config.use_cache = False
 
+    config: LlamaMoEConfig
     config.gate_type = model_args.gate_type
     config.calculator_type = model_args.calculator_type
     config.num_selects = model_args.num_selects
+    # config.add_weight_norm = True
+    # config.score_scale_factor = 4.0
+    # config.gate_use_balance = False
+    # config.gate_add_noise = False
 
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
@@ -318,7 +326,25 @@ def main():
             f"Training new model from scratch - Total size={n_params / 2 ** 20:.2f}M params"
         )
 
+    # for name, param in model.named_parameters():
+    #     # if ".mlp_norm." not in name:
+    #     if ".gate." not in name and ".mlp_norm." not in name:
+    #         param.requires_grad = False
+    #     logger.info(f"{name} ({param.numel()}) - Grad: {param.requires_grad}")
+
+    if hasattr(model, "enable_input_require_grads"):
+        model.enable_input_require_grads()
+    else:
+
+        def make_inputs_require_grad(module, input, output):
+            output.requires_grad_(True)
+
+        model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+
     # update config for checkpoint retrival
+    # model.set_moe_gate_balance_loss_weight(0.1)
+    model.set_moe_calculator_score_scale_factor(4.0)
+    # model.set_moe_calculator_score_scale_factor(1.0)
     model.update_config()
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)

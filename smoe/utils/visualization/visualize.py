@@ -311,15 +311,15 @@ def visualize_expert_load_heatmap(
 
     for i in range(shape[0]):
         for j in range(shape[1]):
-            ax.text(j, i, f"{data[i, j]:.5f}", ha="center", va="center", color="black")
+            ax.text(j, i, f"{data[i, j]:.0f}", ha="center", va="center", color="black")
 
     ax.set_title(f"{dataset_name} - Layer {layer_idx}")
     ax.set_axis_off()
     fig.colorbar(im)
     fig.tight_layout()
     if save_fig:
-        fig.savefig(path, dpi=320, bbox_inches="tight")
-        compress_png_image(path, print_info=False)
+        fig.savefig(str(path), dpi=320, bbox_inches="tight")
+        compress_png_image(str(path), print_info=False)
     return fig
 
 

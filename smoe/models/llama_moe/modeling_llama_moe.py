@@ -21,6 +21,7 @@ from transformers.utils import ModelOutput, logging
 
 from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
 from smoe.modules.moe.moe_layers import LinearGLUMoELayer, MoEMlpOutput
+from smoe.modules.norm import WeightNorm
 
 logger = logging.get_logger(__name__)
 
@@ -60,8 +61,8 @@ class BaseMoEModelOutputWithPast(ModelOutput):
 class MoECausalLMOutputWithPast(CausalLMOutputWithPast):
     balance_loss: Optional[float] = None
     num_dropped_tokens: Optional[Tuple[int]] = None
-    gate_load: Optional[Tuple[list]] = None
-    gate_importance: Optional[Tuple[list]] = None
+    gate_load: Optional[Tuple[list[torch.Tensor]]] = None
+    gate_importance: Optional[Tuple[list[torch.Tensor]]] = None
 
 
 class LlamaMoEDecoderLayer(LlamaDecoderLayer):
@@ -88,6 +89,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
                 if isinstance(config.score_scale_factor, list)
                 else config.score_scale_factor
             ),
+            "add_weight_norm": config.add_weight_norm,
             # SwitchDropTokenCalculator
             "drop_tokens": config.drop_tokens,
             "dropped_padding": config.dropped_padding,
@@ -207,6 +209,11 @@ class LlamaMoEPreTrainedModel(LlamaPreTrainedModel):
     _no_split_modules = ["LlamaMoEDecoderLayer"]
     _skip_keys_device_placement = "past_key_values"
 
+    def _init_weights(self, module):
+        super()._init_weights(module)
+        if isinstance(module, WeightNorm):
+            module.reset_parameters()
+
     def _set_gradient_checkpointing(self, module, value=False):
         if isinstance(module, LlamaMoEModel):
             module.gradient_checkpointing = value
@@ -218,6 +225,7 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
         self.layers = nn.ModuleList(
             [LlamaMoEDecoderLayer(config, i) for i in range(config.num_hidden_layers)]
         )
+        self.post_init()
 
     def forward(
         self,

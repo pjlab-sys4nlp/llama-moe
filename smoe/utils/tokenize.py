@@ -3,6 +3,7 @@ import json
 import multiprocessing as mp
 from pathlib import Path
 
+import numpy as np
 from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -52,6 +53,33 @@ def load_txt(filepath):
     return data
 
 
+def prepare_meta(jsonl_filepath: str):
+    """Prepare metadata for the given jsonl file.
+
+    Args:
+        jsonl_filepath (str): tokenized jsonl file path.
+
+    References: https://github.com/InternLM/InternLM/blob/main/tools/tokenizer.py
+    License: https://github.com/InternLM/InternLM/blob/main/LICENSE
+    """
+
+    meta = []
+    cur = 0
+    with open(jsonl_filepath, "r", encoding="utf8") as fin:
+        for line in fin:
+            ins = json.loads(line)
+            length = len(ins["input_ids"])
+            meta.append((cur, length))
+            cur += len(line)
+
+    # define path of the generated meta file
+    meta_fp = jsonl_filepath + ".meta"
+    # save the generated meta information
+    with open(meta_fp, "wb") as f:
+        meta = np.array(meta, dtype=np.int32)
+        np.save(f, meta)
+
+
 def tokenize_jsonl():
     args = get_parser()
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=args.use_fast)
@@ -93,6 +121,7 @@ def tokenize_jsonl():
         )
 
         tokenized_ds.to_json(output_filepath, lines=True, num_proc=args.num_proc)
+        prepare_meta(output_filepath)
 
     if input_path.is_dir():
         input_files = list(input_path.glob(f"*.{args.format}"))
@@ -112,5 +141,27 @@ def tokenize_jsonl():
         pbar.write(f"Finished: {input_file} -> {output_file}")
 
 
+def update_meta_without_tokenization(data_dir: str):
+    """Update meta information for the given data directory.
+
+    Args:
+        data_dir (str): data directory path.
+    """
+    folder = Path(data_dir)
+    jsonl_filepaths = [str(p) for p in folder.glob("**/*.jsonl")]
+    sub_dirs = [str(p) for p in folder.glob("*")]
+    print(f"Sub directories (tot={len(sub_dirs)}): {sub_dirs}")
+    print(f"#Total Jsonl files: {len(jsonl_filepaths)}")
+
+    mp.cpu_count()
+    bar = tqdm(range(len(jsonl_filepaths)), desc="Preparing meta")
+    with mp.Pool(mp.cpu_count()) as pool:
+        for _ in pool.imap_unordered(prepare_meta, jsonl_filepaths):
+            bar.update()
+
+
 if __name__ == "__main__":
     tokenize_jsonl()
+    # update_meta_without_tokenization(
+    #     "/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed"
+    # )

@@ -17,6 +17,12 @@ logger = logging.getLogger(logger_name)
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
+def get_slurm_job_name():
+    job_name = os.environ.get("SLURM_JOB_NAME", "SLURM_JOB_NAME")
+    job_id = os.environ.get("SLURM_JOB_ID", "SLURM_JOB_ID")
+    return f"{job_name}-{job_id}"
+
+
 def wechat_sender(
     webhook_url: str = None,
     user_mentions: list[str] = [],
@@ -83,6 +89,7 @@ def wechat_sender(
                     "Your training has started 🎬",
                     "Machine name: %s" % host_name,
                     "Main call: %s" % func_name,
+                    f"Job {get_slurm_job_name()}",
                     "Starting date: %s" % start_time.strftime(DATE_FORMAT),
                 ]
 
@@ -101,6 +108,7 @@ def wechat_sender(
                         "Your training is complete 🎉",
                         "Machine name: %s" % host_name,
                         "Main call: %s" % func_name,
+                        f"Job {get_slurm_job_name()}",
                         "Starting date: %s" % start_time.strftime(DATE_FORMAT),
                         "End date: %s" % end_time.strftime(DATE_FORMAT),
                         "Training duration: %s" % str(elapsed_time),
@@ -129,6 +137,7 @@ def wechat_sender(
                     "Your training has crashed ☠️",
                     "Machine name: %s" % host_name,
                     "Main call: %s" % func_name,
+                    f"Job {get_slurm_job_name()}",
                     "Starting date: %s" % start_time.strftime(DATE_FORMAT),
                     "Crash date: %s" % end_time.strftime(DATE_FORMAT),
                     "Crashed training duration: %s\n\n" % str(elapsed_time),

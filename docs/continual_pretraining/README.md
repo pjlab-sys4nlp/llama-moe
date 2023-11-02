@@ -77,3 +77,18 @@ Here, the `short_name` is an abbreviation for your task, and the port number cou
 ```bash
 $ tensorboard --logdir_spec moe_from_scratch:outputs/cpt-llama-moe-scratch-lora-bs16-1476932/runs/Jul26_21-53-42_SH-IDCA1404-10-140-54-121,moe_lora:outputs/cpt-llama-lora-bs16-1476918/runs/Jul26_21-31-09_SH-IDCA1404-10-140-54-122 --port 8001
 ```
+
+## 📋 Checklist before Starting an Experiment
+
+- [ ] balance loss weight
+- [ ] scale factor
+- [ ] learning rate
+- [ ] warmup steps
+- [ ] evaluation steps
+- [ ] logging steps
+- [ ] global batch size
+- [ ] number of selected experts
+- [ ] pretrained model
+- [ ] data path
+- [ ] GPUs
+- [ ] comment

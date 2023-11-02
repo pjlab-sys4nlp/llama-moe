@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, IterableDataset
 from smoe.data.aggregation import group_instances
 from smoe.utils.io import load_jsonlines, load_jsonlines_iter
 from smoe.utils.logging import get_logger
-from smoe.utils.random import get_random_string
+from smoe.utils.random_utils import get_random_string
 from smoe.utils.vars import JSONL_DATASET_CACHE_NAME
 
 logger = get_logger(__file__)
@@ -226,6 +226,7 @@ class PackedJsonlDataset(IterableDataset):
         block_size: int = 2048,
     ) -> None:
         super().__init__()
+        self.data_dir = data_dir
         self.rng = random.Random(seed)
         self.buffer_size = buffer_size
         self.block_size = block_size
@@ -233,8 +234,9 @@ class PackedJsonlDataset(IterableDataset):
         data_dir_path = Path(data_dir)
         filepaths = sorted(data_dir_path.glob("**/*.jsonl"))
         self.rng.shuffle(filepaths)
-
         self.filepaths = filepaths
+        self.visited_filepaths = []
+
         self.buffer = []
 
     def __iter__(self) -> Iterator:
@@ -254,6 +256,7 @@ class PackedJsonlDataset(IterableDataset):
                         self.buffer.clear()
 
                 self.buffer.append(ins)
+            self.visited_filepaths.append(filepath)
 
         # for the last batch < buffer_size
         if len(self.buffer) > 0:
@@ -332,6 +335,9 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
                 )
             )
             self.task_type_to_dataset[task_type] = ds
+
+    def skip_tokens(self, skip_tokens: int):
+        raise NotImplementedError
 
     def __iter__(self) -> Iterator:
         while len(self.task_type_to_dataset) > 0:

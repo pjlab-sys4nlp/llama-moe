@@ -121,6 +121,7 @@ class BaseMoELayer(nn.Module):
                 experts,
                 multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
                 score_scale_factor=kwargs.get("score_scale_factor", 1.0),
+                add_weight_norm=kwargs.get("add_weight_norm", False),
             )
         elif self.calculator_type == "SwitchDropTokenCalculator":  # switch calculator
             self.calculator = SwitchDropTokenCalculator(
@@ -130,6 +131,7 @@ class BaseMoELayer(nn.Module):
                 drop_tokens=kwargs.get("drop_tokens", True),
                 dropped_padding=kwargs.get("dropped_padding", "zero"),
                 capacity_factor=kwargs.get("capacity_factor", 1.25),
+                add_weight_norm=kwargs.get("add_weight_norm", False),
             )
         else:
             raise NotImplementedError

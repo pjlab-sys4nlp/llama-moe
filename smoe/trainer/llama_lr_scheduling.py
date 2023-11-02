@@ -2,6 +2,7 @@ import math
 import os
 import re
 import shutil
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -13,36 +14,44 @@ from packaging import version
 
 # Integrations must be imported before ML frameworks:
 # isort: off
-from transformers.integrations import hp_params
+from transformers.integrations import hp_params, is_fairscale_available
 
 # isort: on
 
+import datasets
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
+from torch.utils.data import DataLoader
 from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
-from transformers.deepspeed import deepspeed_init, deepspeed_load_checkpoint
+from transformers.deepspeed import deepspeed_init
+from transformers.dependency_versions_check import dep_version_check
 from transformers.modeling_utils import unwrap_model
 from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
+from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from transformers.trainer import OPTIMIZER_NAME, TRAINER_STATE_NAME, Trainer
 from transformers.trainer_callback import TrainerState
-from transformers.trainer_pt_utils import get_model_param_count
+from transformers.trainer_pt_utils import get_model_param_count, get_parameter_names
 from transformers.trainer_utils import (
     HPSearchBackend,
     ShardedDDPOption,
     TrainOutput,
     has_length,
+    seed_worker,
     speed_metrics,
 )
 from transformers.training_args import ParallelMode
 from transformers.utils import (
     is_accelerate_available,
     is_apex_available,
+    is_datasets_available,
     is_sagemaker_mp_enabled,
     is_torch_tpu_available,
     logging,
 )
+
+from smoe.utils.config import EnhancedTrainingArguments
 
 if is_apex_available():
     from apex import amp
@@ -68,7 +77,42 @@ if is_accelerate_available():
     from accelerate import skip_first_batches
 
 
+if is_fairscale_available():
+    dep_version_check("fairscale")
+    from fairscale.optim import OSS
+
+
 logger = logging.get_logger(__name__)
+
+
+def deepspeed_load_checkpoint(
+    deepspeed_engine,
+    checkpoint_path,
+    load_optimizer_states: bool = True,
+    load_lr_scheduler_states: bool = True,
+):
+    # it's possible that the user is trying to resume from model_path, which doesn't necessarily
+    # contain a deepspeed checkpoint. e.g. examples just check if the dir exists and assume it's
+    # a resume from a checkpoint and not just a local pretrained weight. So we check here if the
+    # path contains what looks like a deepspeed checkpoint
+    import glob
+
+    deepspeed_checkpoint_dirs = sorted(glob.glob(f"{checkpoint_path}/global_step*"))
+
+    if len(deepspeed_checkpoint_dirs) > 0:
+        logger.info(f"Attempting to resume from {checkpoint_path}")
+        # this magically updates self.optimizer and self.lr_scheduler
+        load_path, _ = deepspeed_engine.load_checkpoint(
+            checkpoint_path,
+            load_optimizer_states=load_optimizer_states,
+            load_lr_scheduler_states=load_lr_scheduler_states,
+        )
+        if load_path is None:
+            raise ValueError(
+                f"[deepspeed] failed to resume from checkpoint {checkpoint_path}"
+            )
+    else:
+        raise ValueError(f"Can't find a valid checkpoint at {checkpoint_path}")
 
 
 def _get_cosine_schedule_with_warmup_lr_lambda(
@@ -94,11 +138,94 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
 class EnhancedTrainerState(TrainerState):
     # last Token/GPU/second timestamp
     start_timestamp: float = 0.0
+    consumed_tokens: int = 0
 
 
 class LlamaLrSchedulingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.args: EnhancedTrainingArguments
+        self.state: EnhancedTrainerState
+
+    def create_optimizer(self):
+        """
+        Setup the optimizer.
+
+        We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
+        Trainer's init through `optimizers`, or subclass and override this method in a subclass.
+        """
+        opt_model = self.model_wrapped if is_sagemaker_mp_enabled() else self.model
+
+        if self.optimizer is None:
+            decay_parameters = get_parameter_names(opt_model, ALL_LAYERNORM_LAYERS)
+            decay_parameters = [
+                name
+                for name in decay_parameters
+                if "bias" not in name and "norm.weight" not in name
+            ]
+            optim_decay_param_group = {
+                "params": [
+                    p
+                    for n, p in opt_model.named_parameters()
+                    if (n in decay_parameters and p.requires_grad)
+                ],
+                "weight_decay": self.args.weight_decay,
+            }
+            optim_nodecay_param_group = {
+                "params": [
+                    p
+                    for n, p in opt_model.named_parameters()
+                    if (n not in decay_parameters and p.requires_grad)
+                ],
+                "weight_decay": 0.0,
+            }
+            optimizer_grouped_parameters = []
+            if len(optim_decay_param_group["params"]) > 0:
+                optimizer_grouped_parameters.append(optim_decay_param_group)
+            if len(optim_nodecay_param_group["params"]) > 0:
+                optimizer_grouped_parameters.append(optim_nodecay_param_group)
+
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(
+                self.args
+            )
+
+            if self.sharded_ddp == ShardedDDPOption.SIMPLE:
+                self.optimizer = OSS(
+                    params=optimizer_grouped_parameters,
+                    optim=optimizer_cls,
+                    **optimizer_kwargs,
+                )
+            else:
+                self.optimizer = optimizer_cls(
+                    optimizer_grouped_parameters, **optimizer_kwargs
+                )
+                if optimizer_cls.__name__ == "Adam8bit":
+                    import bitsandbytes
+
+                    manager = bitsandbytes.optim.GlobalOptimManager.get_instance()
+
+                    skipped = 0
+                    for module in opt_model.modules():
+                        if isinstance(module, nn.Embedding):
+                            skipped += sum(
+                                {
+                                    p.data_ptr(): p.numel() for p in module.parameters()
+                                }.values()
+                            )
+                            logger.info(f"skipped {module}: {skipped/2**20}M params")
+                            manager.register_module_override(
+                                module, "weight", {"optim_bits": 32}
+                            )
+                            logger.debug(
+                                f"bitsandbytes: will optimize {module} in fp32"
+                            )
+                    logger.info(f"skipped: {skipped/2**20}M params")
+
+        if is_sagemaker_mp_enabled():
+            self.optimizer = smp.DistributedOptimizer(self.optimizer)
+
+        return self.optimizer
 
     def create_scheduler(
         self, num_training_steps: int, optimizer: torch.optim.Optimizer = None
@@ -206,6 +333,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 x.detach().cpu().tolist() for x in gate_importance
             ]
             logs["balance_loss"] = balance_loss.item()
+            logs["consumed_tokens"] = self.state.consumed_tokens
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -291,6 +419,48 @@ class LlamaLrSchedulingTrainer(Trainer):
                 if re.search(r"global_step\d+", str(optim_folder)):
                     shutil.rmtree(optim_folder, ignore_errors=True)
 
+    def get_train_dataloader(self) -> DataLoader:
+        """
+        Returns the training [`~torch.utils.data.DataLoader`].
+
+        Will use no sampler if `train_dataset` does not implement `__len__`, a random sampler (adapted to distributed
+        training if necessary) otherwise.
+
+        Subclass and override this method if you want to inject some custom behavior.
+        """
+        if self.train_dataset is None:
+            raise ValueError("Trainer: training requires a train_dataset.")
+
+        train_dataset = self.train_dataset
+        data_collator = self.data_collator
+
+        # if not self.args.ignore_data_skip:
+        #     skip_tokens = self.state.global_step * self.args.num_tokens_per_batch
+        #     train_dataset.skip_tokens(skip_tokens)
+
+        if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
+            train_dataset = self._remove_unused_columns(
+                train_dataset, description="training"
+            )
+        else:
+            data_collator = self._get_collator_with_removed_columns(
+                data_collator, description="training"
+            )
+
+        dataloader_params = {
+            "batch_size": self._train_batch_size,
+            "collate_fn": data_collator,
+            "num_workers": self.args.dataloader_num_workers,
+            "pin_memory": self.args.dataloader_pin_memory,
+        }
+
+        if not isinstance(train_dataset, torch.utils.data.IterableDataset):
+            dataloader_params["sampler"] = self._get_train_sampler()
+            dataloader_params["drop_last"] = self.args.dataloader_drop_last
+            dataloader_params["worker_init_fn"] = seed_worker
+
+        return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+
     def _inner_training_loop(
         self,
         batch_size=None,
@@ -298,7 +468,26 @@ class LlamaLrSchedulingTrainer(Trainer):
         resume_from_checkpoint=None,
         trial=None,
         ignore_keys_for_eval=None,
+        ds_load_optimizer_states: bool = True,
+        ds_load_lr_scheduler_states: bool = True,
     ):
+        hostname = socket.gethostname()
+        logger.info(
+            f"rank: {self.accelerator.process_index} / {self.accelerator.num_processes}"
+            f" local rank: {self.accelerator.local_process_index}"
+            f" is_main_process: {self.accelerator.is_main_process}, is_local_main_process: {self.accelerator.is_local_main_process}"
+            f" device: {self.accelerator.device}"
+            f" node hostname: {hostname}, ip: {socket.gethostbyname(hostname)}"
+        )
+        if dist.is_available() and dist.is_initialized():
+            logger.info("Testing connection availability")
+            tensor = torch.ones(1, device=self.accelerator.device)
+            dist.all_reduce(tensor)
+            if tensor.item() == self.accelerator.num_processes:
+                logger.info("Testing connection success!")
+            else:
+                logger.error("Testing connection success, verification failed!")
+
         self.accelerator.free_memory()
         self._train_batch_size = batch_size
         logger.debug(
@@ -444,7 +633,12 @@ class LlamaLrSchedulingTrainer(Trainer):
 
         # deepspeed ckpt loading
         if resume_from_checkpoint is not None and self.is_deepspeed_enabled:
-            deepspeed_load_checkpoint(self.model_wrapped, resume_from_checkpoint)
+            deepspeed_load_checkpoint(
+                self.model_wrapped,
+                resume_from_checkpoint,
+                load_optimizer_states=ds_load_optimizer_states,
+                load_lr_scheduler_states=ds_load_lr_scheduler_states,
+            )
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
@@ -468,6 +662,9 @@ class LlamaLrSchedulingTrainer(Trainer):
             f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size:,}"
         )
         logger.info(
+            f"  Total Train tokens per batch (w. parallel, distributed & accumulation) = {args.num_tokens_per_batch:,}"
+        )
+        logger.info(
             f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}"
         )
         logger.info(f"  Total optimization steps = {max_steps:,}")
@@ -485,7 +682,7 @@ class LlamaLrSchedulingTrainer(Trainer):
         if resume_from_checkpoint is not None and os.path.isfile(
             os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
         ):
-            self.state = TrainerState.load_from_json(
+            self.state = EnhancedTrainerState.load_from_json(
                 os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
             )
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
@@ -508,6 +705,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
+                    f" Total skip tokens: {self.state.consumed_tokens}"
                 )
 
         # Update the references
@@ -711,8 +909,15 @@ class LlamaLrSchedulingTrainer(Trainer):
                         ):
                             self.lr_scheduler.step()
 
+                    # logger.info(f"after step gate weight_noise: {self.model.model.layers[0].mlp.gate.weight_noise.weight}")
+                    # for i in range(len(self.model.model.layers)):
+                    #     logger.info(f"after step weight norm: {self.model.model.layers[i].mlp.calculator.mlp_norm.weight}")
+
                     model.zero_grad()
                     self.state.global_step += 1
+                    self.state.consumed_tokens = (
+                        self.state.global_step * self.args.num_tokens_per_batch
+                    )
                     self.state.epoch = (
                         epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     )
