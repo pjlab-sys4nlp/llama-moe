@@ -126,10 +126,14 @@ def test_weighted_streaming_loader():
         collate_fn=fault_tolerance_data_collator,
         pin_memory=True,
     )
-    for batch in loader:
+    for batch_idx, batch in enumerate(loader):
         if num_test_case <= 0:
             break
         assert len(batch["input_ids"]) == bsz
+
+        tot_consumed_tokens = sum(loader.dataset.consumed_tokens.values())
+        assert tot_consumed_tokens == bsz * (1 + batch_idx)
+
         num_test_case -= 1
 
 
