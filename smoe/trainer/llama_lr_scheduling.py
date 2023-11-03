@@ -5,7 +5,7 @@ import shutil
 import socket
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
@@ -138,7 +138,7 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
 class EnhancedTrainerState(TrainerState):
     # last Token/GPU/second timestamp
     start_timestamp: float = 0.0
-    consumed_tokens: int = 0
+    consumed_tokens: dict = field(default_factory=dict)
 
 
 class LlamaLrSchedulingTrainer(Trainer):
@@ -146,7 +146,10 @@ class LlamaLrSchedulingTrainer(Trainer):
         super().__init__(*args, **kwargs)
 
         self.args: EnhancedTrainingArguments
-        self.state: EnhancedTrainerState
+        self.state: EnhancedTrainerState = EnhancedTrainerState(
+            is_local_process_zero=self.is_local_process_zero(),
+            is_world_process_zero=self.is_world_process_zero(),
+        )
 
     def create_optimizer(self):
         """
@@ -434,9 +437,13 @@ class LlamaLrSchedulingTrainer(Trainer):
         train_dataset = self.train_dataset
         data_collator = self.data_collator
 
-        # if not self.args.ignore_data_skip:
-        #     skip_tokens = self.state.global_step * self.args.num_tokens_per_batch
-        #     train_dataset.skip_tokens(skip_tokens)
+        # zhutong: update consumed_tokens
+        state_ctokens = sum(self.state.consumed_tokens.values())
+        dataset_ctokens = sum(train_dataset.consumed_tokens.values())
+        if state_ctokens > dataset_ctokens:
+            train_dataset.skip_tokens(state_ctokens)
+        # bind dataset recordings to state
+        self.state.consumed_tokens = train_dataset.consumed_tokens
 
         if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(
@@ -705,7 +712,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
-                    f" Total skip tokens: {self.state.consumed_tokens}"
+                    f" Consumed tokens: {self.state.consumed_tokens}"
                 )
 
         # Update the references
@@ -915,9 +922,7 @@ class LlamaLrSchedulingTrainer(Trainer):
 
                     model.zero_grad()
                     self.state.global_step += 1
-                    self.state.consumed_tokens = (
-                        self.state.global_step * self.args.num_tokens_per_batch
-                    )
+                    self.state.consumed_tokens = self.train_dataset.consumed_tokens
                     self.state.epoch = (
                         epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     )

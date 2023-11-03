@@ -8,6 +8,8 @@ from datasets import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
+from smoe.utils.vars import META_SUFFIX
+
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -70,10 +72,10 @@ def prepare_meta(jsonl_filepath: str):
             ins = json.loads(line)
             length = len(ins["input_ids"])
             meta.append((cur, length))
-            cur += len(line)
+            cur += length
 
     # define path of the generated meta file
-    meta_fp = jsonl_filepath + ".meta"
+    meta_fp = jsonl_filepath + META_SUFFIX
     # save the generated meta information
     with open(meta_fp, "wb") as f:
         meta = np.array(meta, dtype=np.int32)
@@ -162,6 +164,8 @@ def update_meta_without_tokenization(data_dir: str):
 
 if __name__ == "__main__":
     tokenize_jsonl()
+
+    # # uncomment and run: srun -p MoE -c 16 python -m smoe.utils.tokenize
     # update_meta_without_tokenization(
     #     "/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed"
     # )

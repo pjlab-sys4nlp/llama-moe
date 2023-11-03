@@ -60,6 +60,11 @@ class load_jsonlines_iter:
         if start_from:
             self.fin.seek(start_from, os.SEEK_SET)
 
+    def skip_lines(self, num_skip_lines: int):
+        for i, _ in enumerate(self.fin, 1):
+            if i == num_skip_lines:
+                break
+
     def tell(self):
         return self.fin.tell()
 

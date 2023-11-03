@@ -111,29 +111,37 @@ def test_weighted_streaming_loader():
         "en_arxiv": 0.025,
         "en_stack": 0.02,
     }
+    num_test_case = 2000
+    block_size = 2048
+    bsz = 1
+
     lm_datasets = SubDirWeightedPackedJsonlDataset(
-        "/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed",
+        "/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed",
         prob_map=prob_map,
         seed=1227,
-        block_size=2048,
+        block_size=block_size,
     )
-    num_test_case = 2000
-    bsz = 8
     loader = DataLoader(
         lm_datasets,
         batch_size=bsz,
-        num_workers=4,
+        num_workers=0,
         collate_fn=fault_tolerance_data_collator,
         pin_memory=True,
     )
-    for batch in loader:
+    for batch_idx, batch in enumerate(loader):
         if num_test_case <= 0:
             break
         assert len(batch["input_ids"]) == bsz
+        assert sum(loader.dataset.consumed_tokens.values()) == bsz * block_size
         num_test_case -= 1
+
+
+def test_skip_tokens():
+    pass
 
 
 if __name__ == "__main__":
     # test_jsonl_dataset()
     # test_subdir_weighted_pack_with_type()
-    test_weighted_streaming()
+    # test_weighted_streaming()
+    test_weighted_streaming_loader()
