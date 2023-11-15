@@ -51,6 +51,11 @@ from transformers.utils import (
     logging,
 )
 
+from smoe.data.dynamic_selection import (
+    LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+    update_weight_sheared_llama,
+    update_weight_sheared_llama_paper,
+)
 from smoe.utils.config import EnhancedTrainingArguments
 
 if is_apex_available():
@@ -139,6 +144,7 @@ class EnhancedTrainerState(TrainerState):
     # last Token/GPU/second timestamp
     start_timestamp: float = 0.0
     consumed_tokens: dict = field(default_factory=dict)
+    tot_consumed_tokens: int = 0
 
 
 class LlamaLrSchedulingTrainer(Trainer):
@@ -336,7 +342,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 x.detach().cpu().tolist() for x in gate_importance
             ]
             logs["balance_loss"] = balance_loss.item()
-            logs["consumed_tokens"] = self.state.consumed_tokens
+            logs["consumed_tokens"] = self.state.tot_consumed_tokens
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -367,6 +373,33 @@ class LlamaLrSchedulingTrainer(Trainer):
                 if not metric_to_check.startswith("eval_"):
                     metric_to_check = f"eval_{metric_to_check}"
                 self.lr_scheduler.step(metrics[metric_to_check])
+
+            if (
+                isinstance(self.args.dynamic_data_selection, str)
+                and self.args.dynamic_data_selection != "none"
+                and metrics is not None
+                and self.train_dataset is not None
+            ):
+                curr_loss_map = {}
+                for key, value in metrics.items():
+                    sobj = re.search(r"eval_(.*?)_loss", key)
+                    if sobj:
+                        dataset_name = sobj.group(1)
+                        curr_loss_map[dataset_name] = value
+                new_prob_map = self.train_dataset.prob_map
+                if self.args.dynamic_data_selection == "sheared_llama_paper":
+                    new_prob_map = update_weight_sheared_llama_paper(
+                        self.train_dataset.prob_map,
+                        LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+                        curr_loss_map,
+                    )
+                elif self.args.dynamic_data_selection == "sheared_llama":
+                    new_prob_map = update_weight_sheared_llama(
+                        self.train_dataset.prob_map,
+                        LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+                        curr_loss_map,
+                    )
+                self.train_dataset.update_existed_prob_map(new_prob_map)
 
         if self.control.should_save:
             self._save_checkpoint(model, trial, metrics=metrics)
@@ -437,13 +470,13 @@ class LlamaLrSchedulingTrainer(Trainer):
         train_dataset = self.train_dataset
         data_collator = self.data_collator
 
-        # zhutong: update consumed_tokens
-        state_ctokens = sum(self.state.consumed_tokens.values())
-        dataset_ctokens = sum(train_dataset.consumed_tokens.values())
-        if state_ctokens > dataset_ctokens:
-            train_dataset.skip_tokens(state_ctokens)
-        # bind dataset recordings to state
-        self.state.consumed_tokens = train_dataset.consumed_tokens
+        # # zhutong: update consumed_tokens
+        # state_ctokens = sum(self.state.consumed_tokens.values())
+        # dataset_ctokens = sum(train_dataset.consumed_tokens.values())
+        # if state_ctokens > dataset_ctokens:
+        #     train_dataset.skip_tokens(state_ctokens)
+        # # bind dataset recordings to state
+        # self.state.consumed_tokens = train_dataset.consumed_tokens
 
         if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(
@@ -712,7 +745,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
-                    f" Consumed tokens: {self.state.consumed_tokens}"
+                    f" Consumed tokens: {self.state.tot_consumed_tokens}"
                 )
 
         # Update the references
@@ -922,7 +955,8 @@ class LlamaLrSchedulingTrainer(Trainer):
 
                     model.zero_grad()
                     self.state.global_step += 1
-                    self.state.consumed_tokens = self.train_dataset.consumed_tokens
+                    # self.state.consumed_tokens = self.train_dataset.consumed_tokens
+                    self.state.tot_consumed_tokens += self.args.num_tokens_per_batch
                     self.state.epoch = (
                         epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     )

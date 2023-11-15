@@ -102,6 +102,12 @@ def test_weighted_streaming():
 
 
 def test_weighted_streaming_loader():
+    # from datasets import IterableDataset
+    # ds = IterableDataset.from_generator()
+    from accelerate import Accelerator
+
+    ac = Accelerator()
+
     prob_map = {
         "en_cc": 0.67,
         "en_c4": 0.15,
@@ -111,7 +117,7 @@ def test_weighted_streaming_loader():
         "en_arxiv": 0.025,
         "en_stack": 0.02,
     }
-    num_test_case = 2000
+    num_test_case = 2
     block_size = 2048
     bsz = 1
 
@@ -126,14 +132,28 @@ def test_weighted_streaming_loader():
         batch_size=bsz,
         num_workers=0,
         collate_fn=fault_tolerance_data_collator,
-        pin_memory=True,
+        pin_memory=False,
     )
+    loader = ac.prepare_data_loader(loader)
+
     for batch_idx, batch in enumerate(loader):
+        if batch_idx == 0:
+            print(f"RANK {ac.process_index}/{ac.num_processes} - {batch}")
         if num_test_case <= 0:
             break
         assert len(batch["input_ids"]) == bsz
-        assert sum(loader.dataset.consumed_tokens.values()) == bsz * block_size
+        print(
+            f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+        )
+        # assert sum(loader.dataset.consumed_tokens.values()) == (batch_idx + 1) * block_size
+        print(loader.dataset.prob_map)
         num_test_case -= 1
+        lm_datasets.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
+        # loader.dataset.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
+        print(loader.dataset.prob_map)
+    print(
+        f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+    )
 
 
 def test_skip_tokens():

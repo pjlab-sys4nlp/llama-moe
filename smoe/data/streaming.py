@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterable, Iterator
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
 from smoe.data.aggregation import group_instances
 from smoe.utils.io import load_jsonlines, load_jsonlines_iter
@@ -356,7 +356,7 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
     def __init__(
         self,
         dataset_dir: str,
-        prob_map: dict[str, float] = None,
+        prob_map: dict[str, float] | list[tuple[str, int]] = None,
         seed: int = 1227,
         buffer_size: int = 200,
         block_size: int = 2048,
@@ -379,7 +379,17 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
                 logger.warning(
                     f"Task type {task_type} not found in dataset dir. Skip it."
                 )
-        self.prob_map = prob_map
+        self.source2idx = {}
+        self.prob_map = {}
+        if isinstance(prob_map, dict):
+            _prob_map = list(prob_map.items())
+        elif isinstance(prob_map, list):
+            _prob_map = prob_map
+        else:
+            raise ValueError(f"Unknown prob_map type: {type(prob_map)}")
+        for task_type, sampling_weight in _prob_map:
+            self.source2idx[task_type] = len(self.source2idx)
+            self.prob_map[task_type] = sampling_weight
 
         self.consumed_tokens = skip_tokens
         self.task_type_to_dataset = {}
@@ -411,6 +421,14 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
             if task_type not in self.consumed_tokens:
                 self.consumed_tokens[task_type] = 0
             self.consumed_tokens[task_type] += num_skip_tokens
+
+    def update_prob_map(self, new_prob_map: dict):
+        self.prob_map.update(new_prob_map)
+
+    def update_existed_prob_map(self, new_prob_map: dict):
+        for name in self.prob_map:
+            if name in new_prob_map:
+                self.prob_map[name] = new_prob_map[name]
 
     def __iter__(self) -> Iterator:
         while len(self.task_type_to_dataset) > 0:

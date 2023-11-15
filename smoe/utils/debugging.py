@@ -1,8 +1,10 @@
+import socket
+
 import debugpy
 import torch.distributed as dist
 
 
-def remote_breakpoint(host: str = "0.0.0.0", port: int = 5678):
+def remote_breakpoint(host: str = "0.0.0.0", port: int = 5678, rank: int = 0):
     """
     This function helps to debug programs running in the remote computing node.
 
@@ -41,10 +43,18 @@ def remote_breakpoint(host: str = "0.0.0.0", port: int = 5678):
 
     After the program starts and encounters the breakpoint, you could remote attach the debugger.
     """
+
+    def _dp():
+        print(
+            f"Waiting for debugger to attach on {host}:{port}, server: {socket.gethostname()}..."
+        )
+        debugpy.listen((host, port))
+        debugpy.wait_for_client()
+        breakpoint()
+
     if dist.is_available() and dist.is_initialized():
-        rank = dist.get_rank()
-        if rank == 0:
-            debugpy.listen((host, port))
-            debugpy.wait_for_client()
-            breakpoint()
+        if dist.get_rank() == rank:
+            _dp()
         dist.barrier()
+    else:
+        _dp()

@@ -177,6 +177,7 @@ results/random_16select4_moe/
 results/llama2_7B_gradient_share_gate_load/
 results/gate_loss.png
 results/scale_distribution/
+results/analysis_scale_factor/
 smoe/utils/gpu_diag.py
 /visualization_change_13B/
 /visualization_change_7B/

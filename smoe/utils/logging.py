@@ -7,7 +7,7 @@ from transformers import TrainingArguments
 
 # Setup logging
 logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(name)s - %(filename)s - %(funcName)s - %(processName)s(%(process)d)/%(threadName)s(%(thread)d) %(message)s",
     datefmt="%m/%d/%Y %H:%M:%S",
     level=logging.INFO,
     handlers=[logging.StreamHandler(sys.stdout)],
