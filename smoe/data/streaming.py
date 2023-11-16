@@ -219,29 +219,6 @@ class CachedJsonlDataset(Dataset):
         return len(self.cached)
 
 
-def batchify_loader(dataset: Iterable, batch_size: int, collate_fn: Callable):
-    batch = []
-    for ins in dataset:
-        batch.append(ins)
-        if len(batch) >= batch_size:
-            yield collate_fn(batch)
-            batch.clear()
-    if len(batch) > 0:
-        yield collate_fn(batch)
-        batch.clear()
-
-
-class BufferAggregation:
-    def __init__(self, block_size: int) -> None:
-        self.block_size = block_size
-
-    def __call__(self, buffer) -> Any:
-        results = buffer
-        if self.block_size > 0 and len(buffer) > 0:
-            results = group_instances(buffer, self.block_size)
-        return results
-
-
 class PackedJsonlDataset(IterableDataset):
     def __init__(
         self,
@@ -249,71 +226,48 @@ class PackedJsonlDataset(IterableDataset):
         seed: int = 1227,
         buffer_size: int = 200,
         block_size: int = 2048,
-        skip_tokens: int = 0,
     ) -> None:
         super().__init__()
         self.data_dir = data_dir
         self.rng = random.Random(seed)
         self.buffer_size = buffer_size
         self.block_size = block_size
-        self.skip_tokens = skip_tokens
 
         data_dir_path = Path(data_dir)
         filepaths = sorted(data_dir_path.glob("**/*.jsonl"))
         self.rng.shuffle(filepaths)
         self.filepaths = filepaths
-        self.curr_filepath_pointer = -1
-        self.consumed_tokens: int = 0
-
-        self.buffer_aggregation = BufferAggregation(self.block_size)
-
-    def next_filepath(self) -> str:
-        if len(self.filepaths) == 0:
-            raise RuntimeError(f"There's no filepath in {self.data_dir}")
-
-        self.curr_filepath_pointer += 1
-        if self.curr_filepath_pointer >= len(self.filepaths):
-            self.curr_filepath_pointer = 0
-
-        num_skipped_filepath = 0
-        while self.consumed_tokens < self.skip_tokens:
-            filepath = self.filepaths[self.curr_filepath_pointer]
-            # meta: [[current token number in the whole file, length of the current instance], ...]
-            meta: np.ndarray = np.load(filepath + META_SUFFIX)
-            curr_filepath_tokens = meta.sum(axis=0)[1]
-            if self.consumed_tokens + curr_filepath_tokens > self.skip_tokens:
-                break
-            self.consumed_tokens += curr_filepath_tokens
-            self.curr_filepath_pointer += 1
-            if self.curr_filepath_pointer >= len(self.filepaths):
-                self.curr_filepath_pointer = 0
-            num_skipped_filepath += 1
-
-        if num_skipped_filepath > 0:
-            logger.info(
-                f"Skip {num_skipped_filepath} files,"
-                f" {self.consumed_tokens} tokens,"
-                f" remaining {self.skip_tokens - self.consumed_tokens} tokens to skip."
-            )
-
-        return self.filepaths[self.curr_filepath_pointer]
+        self.buffer = []
 
     def __iter__(self) -> Iterator:
-        filepath = self.next_filepath()
-        logger.debug(f"Iter over jsonl file: {filepath}")
-        ds = load_jsonlines_iter(filepath)
-        # if self.consumed_tokens < self.skip_tokens:
-        #     remaining_skip_tokens = self.skip_tokens - self.consumed_tokens
-        #     # zhutong: here, the skip method is not perfect since there is batch grouping,
-        #     #   and the final token number per instance may be different.
-        #     num_skip_lines = (meta[:, 1].cumsum() > remaining_skip_tokens).nonzero()[0][0]
-        #     ds.skip_lines(num_skip_lines)
-        #     self.consumed_tokens += meta[:num_skip_lines].sum(axis=0)[1]
-        for batch in batchify_loader(ds, self.buffer_size, self.buffer_aggregation):
-            for ins in batch:
-                if self.consumed_tokens >= self.skip_tokens:
-                    self.consumed_tokens += len(ins["input_ids"])
+        self.buffer = []
+        for filepath in self.filepaths:
+            logger.debug(f"Iter over jsonl file: {filepath}")
+            for ins in load_jsonlines_iter(filepath):
+                if self.buffer_size <= 1:
                     yield ins
+                    continue
+
+                if len(self.buffer) >= self.buffer_size:
+                    if len(self.buffer) > 0:
+                        self.rng.shuffle(self.buffer)
+                        self.buffer_aggregation()
+                        yield from self.buffer
+                        self.buffer.clear()
+
+                self.buffer.append(ins)
+
+        # for the last batch < buffer_size
+        if len(self.buffer) > 0:
+            self.rng.shuffle(self.buffer)
+            self.buffer_aggregation()
+            yield from self.buffer
+            self.buffer.clear()
+
+    def buffer_aggregation(self):
+        if self.block_size > 0 and len(self.buffer) > 0:
+            results = group_instances(self.buffer, self.block_size)
+            self.buffer = results
 
     def state_dict(self):
         return {
@@ -323,7 +277,6 @@ class PackedJsonlDataset(IterableDataset):
             "buffer_size": self.buffer_size,
             "block_size": self.block_size,
             "filepaths": self.filepaths,
-            "consumed_tokens": self.consumed_tokens,
         }
 
 
@@ -360,7 +313,6 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
         seed: int = 1227,
         buffer_size: int = 200,
         block_size: int = 2048,
-        skip_tokens: dict = {},
     ) -> None:
         self.rng = random.Random(seed)
         self.seed = seed
@@ -391,7 +343,6 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
             self.source2idx[task_type] = len(self.source2idx)
             self.prob_map[task_type] = sampling_weight
 
-        self.consumed_tokens = skip_tokens
         self.task_type_to_dataset = {}
         for task_type in task_types:
             # zhutong: use iter to support next() calling, since the dataset itself
@@ -402,25 +353,9 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
                     seed=seed,
                     buffer_size=buffer_size,
                     block_size=block_size,
-                    skip_tokens=skip_tokens.get(task_type, 0),
                 )
             )
             self.task_type_to_dataset[task_type] = ds
-
-    def skip_tokens(self, skip_tokens: dict):
-        for task_type, num_skip_tokens in skip_tokens.items():
-            self.task_type_to_dataset[task_type] = iter(
-                PackedJsonlDataset(
-                    str(self.dataset_dir_path.joinpath(task_type)),
-                    seed=self.seed,
-                    buffer_size=self.buffer_size,
-                    block_size=self.block_size,
-                    skip_tokens=skip_tokens.get(task_type, 0),
-                )
-            )
-            if task_type not in self.consumed_tokens:
-                self.consumed_tokens[task_type] = 0
-            self.consumed_tokens[task_type] += num_skip_tokens
 
     def update_prob_map(self, new_prob_map: dict):
         self.prob_map.update(new_prob_map)
@@ -436,11 +371,7 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
             weights = [self.prob_map[task_type] for task_type in candidate_task_types]
             choice = self.rng.choices(candidate_task_types, weights=weights, k=1)[0]
             try:
-                ins = next(self.task_type_to_dataset[choice])
-                if choice not in self.consumed_tokens:
-                    self.consumed_tokens[choice] = 0
-                self.consumed_tokens[choice] += len(ins["input_ids"])
-                yield ins
+                yield next(self.task_type_to_dataset[choice])
             except StopIteration:
                 # self.task_type_to_dataset.pop(choice)
                 # logger.debug(f"Task type {choice} finished, drop it")

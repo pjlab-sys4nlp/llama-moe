@@ -1,15 +1,15 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=cpt-llama2_random_scale4_112gpus_dynamic_data
-#SBATCH --output=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data/%x-%j.log
-#SBATCH --error=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data/%x-%j.log
+#SBATCH --job-name=llama2_random_scale4_32gpus_dynamic_data
+#SBATCH --output=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data/%x-%j.log
+#SBATCH --error=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data/%x-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=0
 
-#SBATCH --nodes=14
+#SBATCH --nodes=4
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
 
@@ -18,7 +18,7 @@
 source ~/anaconda3/bin/activate smoe
 
 {
-    num_nodes=14        # should match with --nodes
+    num_nodes=4        # should match with --nodes
     num_gpu_per_node=8 # should match with --gres
 
     # #cpu/#num_gpu_per_node
@@ -40,7 +40,7 @@ source ~/anaconda3/bin/activate smoe
     #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
     #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
     model_type="llama_moe"
-    comment="llama 2 7B, random 4/16"
+    comment="llama 2 7B, random 4/16, per-device bsz 4M tokens, lr 1e-4, 16gpus"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama2_7B-16Select4-up_proj-Scale4.0
 
     #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
@@ -62,7 +62,7 @@ source ~/anaconda3/bin/activate smoe
     gradient_accumulation_steps=4
     block_size=4096
     num_tokens="200*10^9"
-    warmup_tokens="15*10^8"
+    warmup_tokens="1*10^9"
     # warmup_tokens="0"
     eval_tokens="1*10^9"
     seed=1227
@@ -84,7 +84,7 @@ source ~/anaconda3/bin/activate smoe
     echo "eval interval (tokens): $eval_tokens, steps: $eval_steps"
 
     data_cache=resources/cache
-    base_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data"
+    base_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data"
     output_dir=$base_dir/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     mkdir -p $output_dir
     echo "output_dir: $output_dir"
@@ -135,7 +135,7 @@ source ~/anaconda3/bin/activate smoe
         --learning_rate ${lr} \
         --weight_decay 0.1 \
         --max_grad_norm 1.0 \
-        --warmup_steps 100 \
+        --warmup_steps ${warmup_steps} \
         --max_steps ${max_steps} \
         --max_train_samples ${max_train_samples} \
         --save_strategy steps \

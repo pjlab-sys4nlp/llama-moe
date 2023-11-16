@@ -60,7 +60,7 @@ CONFIG_MAPPING.update(
 logger = logging.getLogger(__name__)
 
 
-# @wechat_sender()
+@wechat_sender()
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments

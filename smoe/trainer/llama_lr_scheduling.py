@@ -24,6 +24,8 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
+
+# from torch.profiler import profile, schedule, tensorboard_trace_handler, ProfilerActivity
 from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
 from transformers.deepspeed import deepspeed_init
 from transformers.dependency_versions_check import dep_version_check
@@ -342,7 +344,8 @@ class LlamaLrSchedulingTrainer(Trainer):
                 x.detach().cpu().tolist() for x in gate_importance
             ]
             logs["balance_loss"] = balance_loss.item()
-            logs["consumed_tokens"] = self.state.tot_consumed_tokens
+            logs["tot_consumed_tokens"] = self.state.tot_consumed_tokens
+            logs["prob_map"] = self.train_dataset.prob_map
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -825,6 +828,18 @@ class LlamaLrSchedulingTrainer(Trainer):
                 steps_trained_in_current_epoch = 0
                 rng_to_sync = True
 
+            # tracing_schedule = schedule(skip_first=5, wait=5, warmup=2, active=2, repeat=1)
+            # trace_handler = tensorboard_trace_handler(dir_name="/mnt/petrelfs/zhutong/smoe/results/profiling", use_gzip=True)
+
+            # with profile(
+            #     activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            #     schedule=tracing_schedule,
+            #     on_trace_ready=trace_handler,
+            #     profile_memory=True,
+            #     record_shapes=True,
+            #     with_stack=True
+            # ) as prof:
+
             step = -1
             for step, inputs in enumerate(epoch_iterator):
                 total_batched_samples += 1
@@ -955,6 +970,7 @@ class LlamaLrSchedulingTrainer(Trainer):
 
                     model.zero_grad()
                     self.state.global_step += 1
+                    # prof.step()
                     # self.state.consumed_tokens = self.train_dataset.consumed_tokens
                     self.state.tot_consumed_tokens += self.args.num_tokens_per_batch
                     self.state.epoch = (

@@ -122,7 +122,6 @@ source ~/anaconda3/bin/activate smoe
         --per_device_train_batch_size ${per_device_train_batch_size} \
         --per_device_eval_batch_size ${per_device_eval_batch_size} \
         --do_train \
-        --do_eval \
         --evaluation_strategy steps \
         --eval_steps ${eval_steps} \
         --seed ${seed} \

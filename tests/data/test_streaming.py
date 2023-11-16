@@ -142,18 +142,18 @@ def test_weighted_streaming_loader():
         if num_test_case <= 0:
             break
         assert len(batch["input_ids"]) == bsz
-        print(
-            f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
-        )
+        # print(
+        #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+        # )
         # assert sum(loader.dataset.consumed_tokens.values()) == (batch_idx + 1) * block_size
         print(loader.dataset.prob_map)
         num_test_case -= 1
         lm_datasets.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
         # loader.dataset.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
         print(loader.dataset.prob_map)
-    print(
-        f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
-    )
+    # print(
+    #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+    # )
 
 
 def test_skip_tokens():

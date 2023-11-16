@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=llama2_random_scale4_32gpus
-#SBATCH --output=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus/%x-%j.log
-#SBATCH --error=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus/%x-%j.log
+#SBATCH --job-name=llama2_random_scale4_32gpus_dynamic_data
+#SBATCH --output=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data/%x-%j.log
+#SBATCH --error=/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data/%x-%j.log
 
 #SBATCH --partition=MoE
 #SBATCH --ntasks-per-node=1
@@ -55,11 +55,11 @@ source ~/anaconda3/bin/activate smoe
     dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
     validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
-    lr=1e-4
+    lr=2e-4
     final_lr_portion=0.1
     per_device_train_batch_size=8
     per_device_eval_batch_size=8
-    gradient_accumulation_steps=8
+    gradient_accumulation_steps=4
     block_size=4096
     num_tokens="200*10^9"
     warmup_tokens="1*10^9"
@@ -84,7 +84,7 @@ source ~/anaconda3/bin/activate smoe
     echo "eval interval (tokens): $eval_tokens, steps: $eval_steps"
 
     data_cache=resources/cache
-    base_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus"
+    base_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_32gpus_dynamic_data"
     output_dir=$base_dir/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     mkdir -p $output_dir
     echo "output_dir: $output_dir"
@@ -122,7 +122,6 @@ source ~/anaconda3/bin/activate smoe
         --per_device_train_batch_size ${per_device_train_batch_size} \
         --per_device_eval_batch_size ${per_device_eval_batch_size} \
         --do_train \
-        --do_eval \
         --evaluation_strategy steps \
         --eval_steps ${eval_steps} \
         --seed ${seed} \
