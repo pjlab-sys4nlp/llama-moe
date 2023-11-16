@@ -12,6 +12,7 @@
 #SBATCH --nodes=14
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
+#SBATCH -x SH-IDCA1404-10-140-54-36
 
 # reserved spot
 
@@ -64,23 +65,23 @@ source ~/anaconda3/bin/activate smoe
     num_tokens="200*10^9"
     warmup_tokens="15*10^8"
     # warmup_tokens="0"
-    eval_tokens="1*10^9"
+    eval_tokens="2.5*10^9"
     seed=1227
     deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
     num_selects=4
 
     max_steps=$(echo "${num_tokens} / ($block_size * $per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node)" | bc)
-    max_train_samples=$(echo "${num_tokens} / $block_size" | bc)
+    max_train_samples=$(echo "${num_tokens} / ($block_size)" | bc)
     echo "max_steps: $max_steps"
     echo "max_train_samples: $max_train_samples"
     global_bs=$(echo "$per_device_train_batch_size * $gradient_accumulation_steps * $num_nodes * $num_gpu_per_node" | bc)
     echo "global batch size: $global_bs"
     tokens_per_batch=$(echo "$global_bs * $block_size" | bc)
     echo "#tokens/batch: $tokens_per_batch"
-    warmup_steps=$(echo "$warmup_tokens / $tokens_per_batch" | bc)
+    warmup_steps=$(echo "$warmup_tokens / ($tokens_per_batch)" | bc)
     echo "warmup tokens: $warmup_tokens, warmup steps: $warmup_steps"
-    eval_steps=$(echo "$eval_tokens / $tokens_per_batch" | bc)
+    eval_steps=$(echo "$eval_tokens / ($tokens_per_batch)" | bc)
     echo "eval interval (tokens): $eval_tokens, steps: $eval_steps"
 
     data_cache=resources/cache
