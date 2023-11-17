@@ -93,4 +93,16 @@ class EnhancedTensorboardCallback(TensorBoardCallback):
                         self.tb_writer.add_image(
                             k, get_heatmap_img_grid_for_tb(v), state.global_step
                         )
+                elif k == "train/prob_map" and isinstance(v, dict):
+                    for name, val in v.items():
+                        self.tb_writer.add_scalar(
+                            f"prob_map/{name}", val, state.global_step
+                        )
+
+                # elif k == "train/consumed_tokens":
+                #     v.update({"total_tokens": sum(v.values())})
+                #     for name, val in v.items():
+                #         self.tb_writer.add_scalar(
+                #             f"consumed_tokens/{name}", val, state.global_step
+                #         )
             self.tb_writer.flush()

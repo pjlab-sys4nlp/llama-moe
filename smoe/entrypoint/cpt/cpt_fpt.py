@@ -341,11 +341,12 @@ def main():
 
         model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
-    # update config for checkpoint retrival
-    # model.set_moe_gate_balance_loss_weight(0.1)
-    model.set_moe_calculator_score_scale_factor(4.0)
-    # model.set_moe_calculator_score_scale_factor(1.0)
-    model.update_config()
+    if hasattr(model, "set_moe_calculator_score_scale_factor"):
+        # update config for checkpoint retrival
+        # model.set_moe_gate_balance_loss_weight(0.1)
+        model.set_moe_calculator_score_scale_factor(4.0)
+        # model.set_moe_calculator_score_scale_factor(1.0)
+        model.update_config()
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
     if model_vocab_size != len(tokenizer):
@@ -393,7 +394,18 @@ def main():
 
     # Evaluation
     if training_args.do_eval:
-        raise NotImplementedError
+        if isinstance(trainer.eval_dataset, dict):
+            metrics = {}
+            for eval_dataset_name, eval_dataset in trainer.eval_dataset.items():
+                dataset_metrics = trainer.evaluate(
+                    eval_dataset=eval_dataset,
+                    ignore_keys=None,
+                    metric_key_prefix=f"eval_{eval_dataset_name}",
+                )
+                metrics.update(dataset_metrics)
+        else:
+            metrics = trainer.evaluate(ignore_keys=None)
+        logger.info(f"{metrics}")
 
 
 if __name__ == "__main__":

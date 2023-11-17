@@ -6,17 +6,19 @@ References:
 """
 
 import random
+from collections import defaultdict
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Callable, Iterable, Iterator
 
+import numpy as np
 import torch
-from torch.utils.data import Dataset, IterableDataset
+from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
 from smoe.data.aggregation import group_instances
 from smoe.utils.io import load_jsonlines, load_jsonlines_iter
 from smoe.utils.logging import get_logger
 from smoe.utils.random_utils import get_random_string
-from smoe.utils.vars import JSONL_DATASET_CACHE_NAME
+from smoe.utils.vars import JSONL_DATASET_CACHE_NAME, META_SUFFIX
 
 logger = get_logger(__file__)
 
@@ -235,8 +237,6 @@ class PackedJsonlDataset(IterableDataset):
         filepaths = sorted(data_dir_path.glob("**/*.jsonl"))
         self.rng.shuffle(filepaths)
         self.filepaths = filepaths
-        self.visited_filepaths = []
-
         self.buffer = []
 
     def __iter__(self) -> Iterator:
@@ -256,7 +256,6 @@ class PackedJsonlDataset(IterableDataset):
                         self.buffer.clear()
 
                 self.buffer.append(ins)
-            self.visited_filepaths.append(filepath)
 
         # for the last batch < buffer_size
         if len(self.buffer) > 0:
@@ -269,6 +268,16 @@ class PackedJsonlDataset(IterableDataset):
         if self.block_size > 0 and len(self.buffer) > 0:
             results = group_instances(self.buffer, self.block_size)
             self.buffer = results
+
+    def state_dict(self):
+        return {
+            "data_dir": self.data_dir,
+            "seed": self.seed,
+            "rng": self.rng.getstate(),
+            "buffer_size": self.buffer_size,
+            "block_size": self.block_size,
+            "filepaths": self.filepaths,
+        }
 
 
 class SubDirWeightedPackedJsonlDataset(IterableDataset):
@@ -300,13 +309,15 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
     def __init__(
         self,
         dataset_dir: str,
-        prob_map: dict[str, float] = None,
+        prob_map: dict[str, float] | list[tuple[str, int]] = None,
         seed: int = 1227,
         buffer_size: int = 200,
         block_size: int = 2048,
     ) -> None:
         self.rng = random.Random(seed)
+        self.seed = seed
         self.buffer_size = buffer_size
+        self.block_size = block_size
         self.dataset_dir_path = Path(dataset_dir)
 
         task_types = [p.stem for p in self.dataset_dir_path.glob("*") if p.is_dir()]
@@ -320,7 +331,17 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
                 logger.warning(
                     f"Task type {task_type} not found in dataset dir. Skip it."
                 )
-        self.prob_map = prob_map
+        self.source2idx = {}
+        self.prob_map = {}
+        if isinstance(prob_map, dict):
+            _prob_map = list(prob_map.items())
+        elif isinstance(prob_map, list):
+            _prob_map = prob_map
+        else:
+            raise ValueError(f"Unknown prob_map type: {type(prob_map)}")
+        for task_type, sampling_weight in _prob_map:
+            self.source2idx[task_type] = len(self.source2idx)
+            self.prob_map[task_type] = sampling_weight
 
         self.task_type_to_dataset = {}
         for task_type in task_types:
@@ -336,8 +357,13 @@ class SubDirWeightedPackedJsonlDataset(IterableDataset):
             )
             self.task_type_to_dataset[task_type] = ds
 
-    def skip_tokens(self, skip_tokens: int):
-        raise NotImplementedError
+    def update_prob_map(self, new_prob_map: dict):
+        self.prob_map.update(new_prob_map)
+
+    def update_existed_prob_map(self, new_prob_map: dict):
+        for name in self.prob_map:
+            if name in new_prob_map:
+                self.prob_map[name] = new_prob_map[name]
 
     def __iter__(self) -> Iterator:
         while len(self.task_type_to_dataset) > 0:

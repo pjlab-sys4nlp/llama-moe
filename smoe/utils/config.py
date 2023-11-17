@@ -313,6 +313,12 @@ class EnhancedTrainingArguments(TrainingArguments):
             "help": "The number of model parameters used for training. If set to -1, it will be calculated automatically."
         },
     )
+    dynamic_data_selection: Optional[str] = field(
+        default="none",
+        metadata={
+            "help": "dynamic data selection strategy (change data portion dynamically based on current loss and reference loss)."
+        },
+    )
 
     @property
     def block_size(self):

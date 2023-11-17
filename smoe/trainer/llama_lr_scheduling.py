@@ -5,7 +5,7 @@ import shutil
 import socket
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
@@ -24,6 +24,8 @@ import torch.distributed as dist
 import torch.nn as nn
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
+
+# from torch.profiler import profile, schedule, tensorboard_trace_handler, ProfilerActivity
 from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
 from transformers.deepspeed import deepspeed_init
 from transformers.dependency_versions_check import dep_version_check
@@ -51,6 +53,11 @@ from transformers.utils import (
     logging,
 )
 
+from smoe.data.dynamic_selection import (
+    LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+    update_weight_sheared_llama,
+    update_weight_sheared_llama_paper,
+)
 from smoe.utils.config import EnhancedTrainingArguments
 
 if is_apex_available():
@@ -138,7 +145,8 @@ def _get_cosine_schedule_with_warmup_lr_lambda(
 class EnhancedTrainerState(TrainerState):
     # last Token/GPU/second timestamp
     start_timestamp: float = 0.0
-    consumed_tokens: int = 0
+    consumed_tokens: dict = field(default_factory=dict)
+    tot_consumed_tokens: int = 0
 
 
 class LlamaLrSchedulingTrainer(Trainer):
@@ -146,7 +154,10 @@ class LlamaLrSchedulingTrainer(Trainer):
         super().__init__(*args, **kwargs)
 
         self.args: EnhancedTrainingArguments
-        self.state: EnhancedTrainerState
+        self.state: EnhancedTrainerState = EnhancedTrainerState(
+            is_local_process_zero=self.is_local_process_zero(),
+            is_world_process_zero=self.is_world_process_zero(),
+        )
 
     def create_optimizer(self):
         """
@@ -333,7 +344,8 @@ class LlamaLrSchedulingTrainer(Trainer):
                 x.detach().cpu().tolist() for x in gate_importance
             ]
             logs["balance_loss"] = balance_loss.item()
-            logs["consumed_tokens"] = self.state.consumed_tokens
+            logs["tot_consumed_tokens"] = self.state.tot_consumed_tokens
+            logs["prob_map"] = self.train_dataset.prob_map
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -364,6 +376,33 @@ class LlamaLrSchedulingTrainer(Trainer):
                 if not metric_to_check.startswith("eval_"):
                     metric_to_check = f"eval_{metric_to_check}"
                 self.lr_scheduler.step(metrics[metric_to_check])
+
+            if (
+                isinstance(self.args.dynamic_data_selection, str)
+                and self.args.dynamic_data_selection != "none"
+                and metrics is not None
+                and self.train_dataset is not None
+            ):
+                curr_loss_map = {}
+                for key, value in metrics.items():
+                    sobj = re.search(r"eval_(.*?)_loss", key)
+                    if sobj:
+                        dataset_name = sobj.group(1)
+                        curr_loss_map[dataset_name] = value
+                new_prob_map = self.train_dataset.prob_map
+                if self.args.dynamic_data_selection == "sheared_llama_paper":
+                    new_prob_map = update_weight_sheared_llama_paper(
+                        self.train_dataset.prob_map,
+                        LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+                        curr_loss_map,
+                    )
+                elif self.args.dynamic_data_selection == "sheared_llama":
+                    new_prob_map = update_weight_sheared_llama(
+                        self.train_dataset.prob_map,
+                        LLAMA2_7B_SLIMPAJAMA_VAL_REF_LOSS,
+                        curr_loss_map,
+                    )
+                self.train_dataset.update_existed_prob_map(new_prob_map)
 
         if self.control.should_save:
             self._save_checkpoint(model, trial, metrics=metrics)
@@ -434,9 +473,13 @@ class LlamaLrSchedulingTrainer(Trainer):
         train_dataset = self.train_dataset
         data_collator = self.data_collator
 
-        # if not self.args.ignore_data_skip:
-        #     skip_tokens = self.state.global_step * self.args.num_tokens_per_batch
-        #     train_dataset.skip_tokens(skip_tokens)
+        # # zhutong: update consumed_tokens
+        # state_ctokens = sum(self.state.consumed_tokens.values())
+        # dataset_ctokens = sum(train_dataset.consumed_tokens.values())
+        # if state_ctokens > dataset_ctokens:
+        #     train_dataset.skip_tokens(state_ctokens)
+        # # bind dataset recordings to state
+        # self.state.consumed_tokens = train_dataset.consumed_tokens
 
         if is_datasets_available() and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(
@@ -705,7 +748,7 @@ class LlamaLrSchedulingTrainer(Trainer):
                 logger.info(
                     f"  Will skip the first {epochs_trained} epochs then the first"
                     f" {steps_trained_in_current_epoch} batches in the first epoch."
-                    f" Total skip tokens: {self.state.consumed_tokens}"
+                    f" Consumed tokens: {self.state.tot_consumed_tokens}"
                 )
 
         # Update the references
@@ -784,6 +827,18 @@ class LlamaLrSchedulingTrainer(Trainer):
                 steps_skipped = steps_trained_in_current_epoch
                 steps_trained_in_current_epoch = 0
                 rng_to_sync = True
+
+            # tracing_schedule = schedule(skip_first=5, wait=5, warmup=2, active=2, repeat=1)
+            # trace_handler = tensorboard_trace_handler(dir_name="/mnt/petrelfs/zhutong/smoe/results/profiling", use_gzip=True)
+
+            # with profile(
+            #     activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            #     schedule=tracing_schedule,
+            #     on_trace_ready=trace_handler,
+            #     profile_memory=True,
+            #     record_shapes=True,
+            #     with_stack=True
+            # ) as prof:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
@@ -915,9 +970,9 @@ class LlamaLrSchedulingTrainer(Trainer):
 
                     model.zero_grad()
                     self.state.global_step += 1
-                    self.state.consumed_tokens = (
-                        self.state.global_step * self.args.num_tokens_per_batch
-                    )
+                    # prof.step()
+                    # self.state.consumed_tokens = self.train_dataset.consumed_tokens
+                    self.state.tot_consumed_tokens += self.args.num_tokens_per_batch
                     self.state.epoch = (
                         epoch + (step + 1 + steps_skipped) / steps_in_epoch
                     )
