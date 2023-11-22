@@ -232,6 +232,7 @@ class TopKBalancedNoisyGate(BaseGate):
 
         self.gate_network_type = gate_network
         self.gate_network = get_gate_network(gate_network, input_size, num_experts)
+        # self.gate_network = get_gate_network("linear", input_size, num_experts)
 
         self.use_softmax = use_softmax
         self.softmax = nn.Softmax(1)

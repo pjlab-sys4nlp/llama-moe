@@ -23,6 +23,11 @@ from transformers.trainer_utils import get_last_checkpoint
 from smoe.callbacks.save_model import SchedulerStateCallback
 from smoe.callbacks.tensorboard import EnhancedTensorboardCallback
 from smoe.data.collate_fn import fault_tolerance_data_collator
+from smoe.data.dynamic_selection import (
+    AVERAGE_SLIMPAJAMA_DATA_PORTION,
+    LLAMA_DATA_PORTION,
+    SHEAREDLLAMA_DATA_PORTION,
+)
 from smoe.data.streaming import CachedJsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.metrics.preprocess import logits_argmax
 from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
@@ -133,6 +138,11 @@ def main():
         "cache_dir": model_args.cache_dir,
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
+        "gate_type": model_args.gate_type,
+        "calculator_type": model_args.calculator_type,
+        "num_selects": model_args.num_selects,
+        "gate_network": model_args.gate_network_type,
+        "score_scale_factor": model_args.moe_calculator_score_scale_factor,
     }
     ConfigClass = AutoConfig
     if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":
@@ -159,15 +169,6 @@ def main():
 
     if training_args.gradient_checkpointing:
         config.use_cache = False
-
-    config: LlamaMoEConfig
-    config.gate_type = model_args.gate_type
-    config.calculator_type = model_args.calculator_type
-    config.num_selects = model_args.num_selects
-    # config.add_weight_norm = True
-    # config.score_scale_factor = 4.0
-    # config.gate_use_balance = False
-    # config.gate_add_noise = False
 
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
@@ -215,37 +216,16 @@ def main():
             )
         block_size = min(data_args.block_size, tokenizer.model_max_length)
 
-    if data_args.prob_map is None:
-        # slimpajama samples openllama-3B tokenized
-        # data_args.prob_map = {
-        #     "cc": 0.67,
-        #     "wikipedia": 0.33,
-        # }
-
-        # redpajama
-        data_args.prob_map = {
-            "en_cc": 0.67,
-            "en_c4": 0.15,
-            "github": 0.045,
-            "en_wikipedia": 0.045,
-            "en_book": 0.045,
-            "en_arxiv": 0.025,
-            "en_stack": 0.02,
-        }
-        # data_args.prob_map = {
-        #     "en_cc_v2": 0.67,
-        #     "en_c4_v2": 0.15,
-        #     "github_v2": 0.045,
-        #     "en_wikipedia": 0.045,
-        #     "en_book": 0.045,
-        #     "en_arxiv": 0.025,
-        #     "en_stack": 0.02,
-        # }
+    prob_map = LLAMA_DATA_PORTION
+    if data_args.prob_map == "uniform":
+        prob_map = AVERAGE_SLIMPAJAMA_DATA_PORTION
+    elif data_args.prob_map == "sheared_llama":
+        prob_map = SHEAREDLLAMA_DATA_PORTION
 
     with training_args.main_process_first(desc="dataset map tokenization and grouping"):
         lm_datasets = SubDirWeightedPackedJsonlDataset(
             data_args.dataset_dir,
-            prob_map=data_args.prob_map,
+            prob_map=prob_map,
             seed=training_args.seed,
             block_size=data_args.block_size,
         )
@@ -341,12 +321,15 @@ def main():
 
         model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
-    if hasattr(model, "set_moe_calculator_score_scale_factor"):
-        # update config for checkpoint retrival
-        # model.set_moe_gate_balance_loss_weight(0.1)
-        model.set_moe_calculator_score_scale_factor(4.0)
-        # model.set_moe_calculator_score_scale_factor(1.0)
-        model.update_config()
+    # if hasattr(model, "set_moe_calculator_score_scale_factor"):
+    #     # update config for checkpoint retrival
+    #     # model.set_moe_gate_balance_loss_weight(0.1)
+    #     # model.set_moe_calculator_score_scale_factor(4.0)
+    #     model.set_moe_calculator_score_scale_factor(
+    #         model_args.moe_calculator_score_scale_factor
+    #     )
+    #     # model.set_moe_calculator_score_scale_factor(1.0)
+    #     model.update_config()
 
     model_vocab_size = model.get_output_embeddings().weight.size(0)
     if model_vocab_size != len(tokenizer):

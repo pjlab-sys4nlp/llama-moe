@@ -2,13 +2,15 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base  llama_3B
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
-model_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons
+llama_size="llama2_7B"
+# model_path=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM-copy/Gradient-max-l1_norm-sample-feature_change/llama_13B-16Select4-864Neurons
+model_path=/mnt/petrelfs/share_data/quxiaoye/models/llama2_7B
 
 data_begin_index=0
 data_end_index=500
 batch_size=8
-block_size=2048
+# block_size=2048
+block_size=4096
 
 #save_folder=${llama_size}_dense
 save_folder=${llama_size}_moe_trained
