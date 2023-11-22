@@ -125,6 +125,12 @@ class ModelArguments:
             "choices": ["auto", "bfloat16", "float16", "float32"],
         },
     )
+    gate_network_type: Literal["mlp", "linear"] = field(
+        default="mlp",
+        metadata={
+            "help": "The type of gate network, should be one of `mlp` and `linear`"
+        },
+    )
     gate_type: Literal["TopKBalancedNoisyGate", "SwitchBalancedGate"] = field(
         default="TopKBalancedNoisyGate",
         metadata={
@@ -138,6 +144,10 @@ class ModelArguments:
         metadata={
             "help": "The type of gate calculator, should be one of `UniversalCalculator` and `SwitchDropTokenCalculator`"
         },
+    )
+    moe_calculator_score_scale_factor: float = field(
+        default=4.0,
+        metadata={"help": "scale factor for the calculator to be multiplied"},
     )
     num_selects: int = field(
         default=4, metadata={"help": "The number of experts to be selected"}
@@ -247,13 +257,10 @@ class DataArguments:
     data_cache_dir: Optional[str] = field(
         default="./", metadata={"help": "The datasets processed stored"}
     )
-    prob_map: Optional[dict[str, float]] = field(
-        default=None,
+    prob_map: Optional[str] = field(
+        default="llama",
         metadata={
-            "help": (
-                'data type to sampling probabilities. e.g. {"commoncrawl": 0.67, "c4":'
-                " 0.15}"
-            )
+            "help": ("data portion. choices in ['llama', 'uniform', 'sheared_llama']")
         },
     )
 

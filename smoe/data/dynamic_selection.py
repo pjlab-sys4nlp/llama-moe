@@ -11,7 +11,17 @@ LLAMA_DATA_PORTION = {
     "en_stack": 0.02,
 }
 
-LLAMA_DATA_PORTION_AVG = {
+SHEAREDLLAMA_DATA_PORTION = {
+    "en_cc": 0.361,
+    "en_c4": 0.492,
+    "github": 0.008,
+    "en_wikipedia": 0.031,
+    "en_book": 0.091,
+    "en_arxiv": 0.007,
+    "en_stack": 0.01,
+}
+
+AVERAGE_SLIMPAJAMA_DATA_PORTION = {
     "en_cc": 1 / 7,
     "en_c4": 1 / 7,
     "github": 1 / 7,

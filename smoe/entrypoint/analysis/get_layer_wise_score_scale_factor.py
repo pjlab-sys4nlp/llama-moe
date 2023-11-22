@@ -4,21 +4,24 @@ import os
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import LlamaTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import LineByLineJsonlTextDataset
 from smoe.models.llama_moe import LlamaMoEForCausalLM
+from smoe.utils.model_operation.modify_llama_model import (
+    llama_with_hidden_states_scale_recording,
+)
 from smoe.utils.model_operation.modify_llama_moe_model import (
     llama_moe_with_hidden_states_scale_recording_early_stop,
 )
-from smoe.utils.string_operation import str2bool
 
 # fmt: off
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--tokenizer_path', type=str)
     parser.add_argument('--model_path', type=str)
+    parser.add_argument('--model_type', type=str, choices=["llama", "llama_moe"], default="llama_moe")
     parser.add_argument('--target_scale_file_path', type=str)
     parser.add_argument('--data_path', type=str)
     parser.add_argument('--save_path', type=str)
@@ -59,8 +62,16 @@ if __name__ == "__main__":
 
     """load model"""
     print("Loading llama model...", flush=True)
-    model = LlamaMoEForCausalLM.from_pretrained(args.model_path).model
-    model.set_moe_calculator_score_scale_factor(1.0)
+    new_forward = None
+    if args.model_type == "llama_moe":
+        model = LlamaMoEForCausalLM.from_pretrained(args.model_path).model
+        new_forward = llama_moe_with_hidden_states_scale_recording_early_stop
+        model.set_moe_calculator_score_scale_factor(1.0)
+    elif args.model_type == "llama":
+        model = LlamaForCausalLM.from_pretrained(args.model_path).model
+        new_forward = llama_with_hidden_states_scale_recording
+    else:
+        raise ValueError("Unknown model type: " + args.model_type)
 
     """calculate scale factor layer by layer"""
     print("Start evaluation...", flush=True)
@@ -70,7 +81,8 @@ if __name__ == "__main__":
     model.half()
     model.eval()
     for layer_index in tqdm(range(model.config.num_hidden_layers), desc="forward by layer", leave=True):
-        model = llama_moe_with_hidden_states_scale_recording_early_stop(model, early_stop_layer=layer_index)
+        # model = llama_moe_with_hidden_states_scale_recording_early_stop(model, early_stop_layer=layer_index)
+        model = new_forward(model)
 
         iter_train = iter(data_loader)
         for step in tqdm(range(len(data_loader)), desc="forward step", leave=False):
