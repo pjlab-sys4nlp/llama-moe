@@ -12,7 +12,7 @@
 #SBATCH --nodes=14
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
-#SBATCH -x SH-IDCA1404-10-140-54-36
+#SBATCH -x SH-IDCA1404-10-140-54-36,SH-IDCA1404-10-140-54-24
 
 # reserved spot
 
@@ -53,7 +53,9 @@ source ~/anaconda3/bin/activate smoe
     ##############################################################
 
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama2_7B
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
+    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
+    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama-no-ad-processed
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama-fluency-processed-agg
     validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
     lr=2e-4

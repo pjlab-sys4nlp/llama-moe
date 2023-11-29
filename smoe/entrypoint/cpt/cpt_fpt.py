@@ -65,7 +65,7 @@ CONFIG_MAPPING.update(
 logger = logging.getLogger(__name__)
 
 
-@wechat_sender()
+@wechat_sender(msg_prefix="CPT Training")
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -143,6 +143,7 @@ def main():
         "num_selects": model_args.num_selects,
         "gate_network": model_args.gate_network_type,
         "score_scale_factor": model_args.moe_calculator_score_scale_factor,
+        "gate_balance_loss_weight": model_args.gate_balance_loss_weight,
     }
     ConfigClass = AutoConfig
     if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":

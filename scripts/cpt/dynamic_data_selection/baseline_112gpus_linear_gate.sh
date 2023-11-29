@@ -41,7 +41,7 @@ source ~/anaconda3/bin/activate smoe
     #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
     #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
     model_type="llama_moe"
-    comment="llama 2 7B, random 4/16, mlp gate, sheared llama data portion"
+    comment="llama 2 7B, random 4/16, one linear layer gate"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama2_7B-16Select4-up_proj-Scale4.0
 
     #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
@@ -115,7 +115,7 @@ source ~/anaconda3/bin/activate smoe
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
     smoe/entrypoint/cpt/cpt_fpt.py \
-        --prob_map "sheared_llama" \
+        --gate_network_type "linear" \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \
         --model_type ${model_type} \

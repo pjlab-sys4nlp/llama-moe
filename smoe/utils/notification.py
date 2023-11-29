@@ -23,10 +23,37 @@ def get_slurm_job_name():
     return f"{job_name}-{job_id}"
 
 
+def send_to_wechat(
+    msg: str,
+    webhook_url: str = None,
+    user_mentions: list[str] = None,
+    user_mentions_mobile: list[str] = None,
+):
+    if not webhook_url:
+        webhook_url = os.environ.get("WECHAT_ROBOT_WEBHOOK")
+    if not user_mentions:
+        env_user_mentions = os.environ.get("WECHAT_ROBOT_MENTIONS", "")
+        user_mentions = env_user_mentions.split(",")
+    if not user_mentions_mobile:
+        env_user_mentions_mobile = os.environ.get("WECHAT_ROBOT_MENTIONS_MOBILE", "")
+        user_mentions_mobile = env_user_mentions_mobile.split(",")
+
+    msg_template = {
+        "msgtype": "text",
+        "text": {
+            "content": msg,
+            "mentioned_list": user_mentions,
+            "mentioned_mobile_list": user_mentions_mobile,
+        },
+    }
+    requests.post(webhook_url, json=msg_template)
+
+
 def wechat_sender(
     webhook_url: str = None,
     user_mentions: list[str] = [],
     user_mentions_mobile: list[str] = [],
+    msg_prefix: str = "",
 ):
     """
     WeChat Work sender wrapper: execute func, send a WeChat Work notification with the end status
@@ -60,7 +87,7 @@ def wechat_sender(
     msg_template = {
         "msgtype": "text",
         "text": {
-            "content": "",
+            "content": f"{msg_prefix}",
             "mentioned_list": user_mentions,
             "mentioned_mobile_list": user_mentions_mobile,
         },

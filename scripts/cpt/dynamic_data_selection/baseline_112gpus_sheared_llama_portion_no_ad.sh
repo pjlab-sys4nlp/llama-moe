@@ -53,7 +53,8 @@ source ~/anaconda3/bin/activate smoe
     ##############################################################
 
     tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama2_7B
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
+    # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama-no-ad-processed
     validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
     lr=2e-4
@@ -115,6 +116,7 @@ source ~/anaconda3/bin/activate smoe
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
     smoe/entrypoint/cpt/cpt_fpt.py \
+        --resume_from_checkpoint "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data/outputs/cpt-llama2_random_scale4_112gpus_dynamic_data-2323339/checkpoint-340" \
         --prob_map "sheared_llama" \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \

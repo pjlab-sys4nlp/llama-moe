@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -15,10 +14,13 @@ from smoe.utils.visualization.visualize import visualize_expert_load_heatmap
 
 
 @torch.no_grad()
-def main():
+def main(
+    model_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus/outputs/cpt-llama2_random_scale4_112gpus-2220221/checkpoint-13600/",
+    result_dir="/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_baseline_gate_load/",
+):
     bsz = 8
     # model_dir = "/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-16Select4-688Neurons-Share"
-    model_dir = "/mnt/petrelfs/zhutong/smoe/outputs/cpt-7b-4_16_noisygate-gate_stage1-2090437/checkpoint-4000"
+    # model_dir = "/mnt/petrelfs/zhutong/smoe/outputs/cpt-7b-4_16_noisygate-gate_stage1-2090437/checkpoint-4000"
     # model_dir = "/mnt/petrelfs/zhutong/smoe/outputs/cpt-7b-4_16_noisygate-gate_stage2-2105807/checkpoint-4000"
     eval_path_map = {
         "en_wikipedia": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/en_wikipedia.jsonl",
@@ -33,7 +35,7 @@ def main():
         "hellaswag": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/hellaswag.jsonl",
         "mmlu": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/mmlu.jsonl",
     }
-    result_dir = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_gradient_share_gate_load/stage1_trained_more/"
+    # result_dir = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_gradient_share_gate_load/stage1_trained_more/"
 
     result_dir = Path(result_dir)
     result_dir.mkdir(exist_ok=True, parents=True)
@@ -57,7 +59,13 @@ def main():
             eval_dataset, batch_size=bsz, collate_fn=fault_tolerance_data_collator
         )
         loader = accel.prepare_data_loader(loader)
-        for batch in tqdm(loader, desc=name):
+        if name == "en_book":
+            num_batch = 20
+        else:
+            num_batch = 9999999999999999
+        for batch_idx, batch in enumerate(tqdm(loader, desc=name)):
+            if batch_idx >= num_batch:
+                break
             outs = model(**batch, output_attentions=False, use_cache=False)
             # gate_load: (tensor([1.0, 2.3, ... num_experts]), tensor([3.0, 4.5, ... num_experts]), ... num_layers)
             gate_load = outs.gate_load
@@ -102,20 +110,26 @@ def heatmap(
     fig.savefig(save_path, dpi=320, bbox_inches="tight")
 
 
-def calc_sim():
-    gate_load_folder = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_gradient_share_gate_load/stage1_trained_more/"
+def calc_sim(
+    # gate_load_folder = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_gradient_share_gate_load/stage1_trained_more/"
+    gate_load_folder="/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_baseline_gate_load/",
+    layer_idx=0,
+    plot=True,
+):
     # title = "SlimPajama"
     # sim_pairs = [["wiki", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"], ["wiki", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"]]
-    # title = "Dev vs. SlimPajama"
-    # sim_pairs = [["arc_challenge", "gsm8k", "hellaswag", "mmlu"], ["wiki", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"]]
-    title = "Dev vs. Dev"
+    title = "Dev vs. SlimPajama"
     sim_pairs = [
         ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
-        ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+        ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
     ]
+    # title = "Dev vs. Dev"
+    # sim_pairs = [
+    #     ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+    #     ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+    # ]
     # title = "test"
     # sim_pairs = [["wiki", "github"], ["wiki", "github"]]
-    layer_idx = 0
 
     folder = Path(gate_load_folder)
     name2arr = {}
@@ -135,14 +149,41 @@ def calc_sim():
         t1_load = name2arr[type1]
         for t2_idx, type2 in enumerate(sim_pairs[1]):
             t2_load = name2arr[type2]
-            # _sim = np.dot(t1_load, t2_load) / (np.linalg.norm(t1_load) * np.linalg.norm(t2_load))
-            _sim = 1.0 - np.linalg.norm(t1_load - t2_load, 2)
+            _sim = np.dot(t1_load, t2_load) / (
+                np.linalg.norm(t1_load) * np.linalg.norm(t2_load)
+            )
+            # _sim = 1.0 - np.linalg.norm(t1_load - t2_load, 2)
             sim_arr[t1_idx][t2_idx] = _sim
-    heatmap(
-        sim_arr, sim_pairs[1], sim_pairs[0], str(folder / f"sim_{title}.png"), title
-    )
+    if plot:
+        heatmap(
+            sim_arr,
+            sim_pairs[1],
+            sim_pairs[0],
+            str(folder / f"layer{layer_idx}" / f"cos_sim_{title}.png"),
+            title,
+        )
+
+    return sim_arr
 
 
 if __name__ == "__main__":
     # main()
-    calc_sim()
+
+    sim_arr_list = []
+    for layer_idx in range(32):
+        sim_arr = calc_sim(layer_idx=layer_idx)
+        sim_arr_list.append(sim_arr)
+    sim_arr = np.stack(sim_arr_list, axis=0)
+    sim_arr = sim_arr.mean(axis=0)
+    title = "Dev vs. SlimPajama"
+    sim_pairs = [
+        ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+        ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
+    ]
+    heatmap(
+        sim_arr,
+        sim_pairs[1],
+        sim_pairs[0],
+        "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_baseline_gate_load/cos_sim_avg.png",
+        title,
+    )
