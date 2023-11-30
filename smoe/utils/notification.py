@@ -87,7 +87,7 @@ def wechat_sender(
     msg_template = {
         "msgtype": "text",
         "text": {
-            "content": f"{msg_prefix}",
+            "content": "",
             "mentioned_list": user_mentions,
             "mentioned_mobile_list": user_mentions_mobile,
         },
@@ -120,7 +120,9 @@ def wechat_sender(
                     "Starting date: %s" % start_time.strftime(DATE_FORMAT),
                 ]
 
-                msg_template["text"]["content"] = "\n".join(contents)
+                msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                    contents
+                )
                 logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
                 if webhook_url:
                     requests.post(webhook_url, json=msg_template)
@@ -150,7 +152,9 @@ def wechat_sender(
                             % "ERROR - Couldn't str the returned value."
                         )
 
-                    msg_template["text"]["content"] = "\n".join(contents)
+                    msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                        contents
+                    )
                     logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
                     if webhook_url:
                         requests.post(webhook_url, json=msg_template)
@@ -174,7 +178,9 @@ def wechat_sender(
                     "%s" % traceback.format_exc(),
                 ]
 
-                msg_template["text"]["content"] = "\n".join(contents)
+                msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                    contents
+                )
                 logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
                 if webhook_url:
                     requests.post(webhook_url, json=msg_template)

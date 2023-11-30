@@ -18,7 +18,7 @@ def main(
     model_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus/outputs/cpt-llama2_random_scale4_112gpus-2220221/checkpoint-13600/",
     result_dir="/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_baseline_gate_load/",
 ):
-    bsz = 8
+    bsz = 4
     # model_dir = "/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-16Select4-688Neurons-Share"
     # model_dir = "/mnt/petrelfs/zhutong/smoe/outputs/cpt-7b-4_16_noisygate-gate_stage1-2090437/checkpoint-4000"
     # model_dir = "/mnt/petrelfs/zhutong/smoe/outputs/cpt-7b-4_16_noisygate-gate_stage2-2105807/checkpoint-4000"
@@ -31,9 +31,9 @@ def main(
         "en_book": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/en_book.jsonl",
         "en_arxiv": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/en_arxiv.jsonl",
         "arc_challenge": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/arc_challenge.jsonl",
-        "gsm8k": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/gsm8k.jsonl",
+        "gsm8k": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/gsm8k.jsonl",  # 37998 tokens
         "hellaswag": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/hellaswag.jsonl",
-        "mmlu": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/mmlu.jsonl",
+        "mmlu": "/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/mmlu.jsonl",  # 23720 tokens
     }
     # result_dir = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_gradient_share_gate_load/stage1_trained_more/"
 
@@ -63,6 +63,7 @@ def main(
             num_batch = 20
         else:
             num_batch = 9999999999999999
+        num_batch = 1
         for batch_idx, batch in enumerate(tqdm(loader, desc=name)):
             if batch_idx >= num_batch:
                 break
@@ -99,7 +100,15 @@ def heatmap(
 
     for i in range(shape[0]):
         for j in range(shape[1]):
-            ax.text(j, i, f"{arr[i, j]:.1%}", ha="center", va="center", color="black")
+            text = ax.text(
+                j,
+                i,
+                f"{arr[i, j]:.1%}",
+                ha="center",
+                va="center",
+                color="black",
+                fontsize=6,
+            )
     ax.set_xticks(range(len(xlabels)))
     ax.set_yticks(range(len(ylabels)))
     ax.set_xticklabels(xlabels, rotation=45, ha="right")
@@ -118,11 +127,11 @@ def calc_sim(
 ):
     # title = "SlimPajama"
     # sim_pairs = [["wiki", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"], ["wiki", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"]]
-    title = "Dev vs. SlimPajama"
-    sim_pairs = [
-        ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
-        ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
-    ]
+    # title = "Dev vs. SlimPajama"
+    # sim_pairs = [
+    #     ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+    #     ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
+    # ]
     # title = "Dev vs. Dev"
     # sim_pairs = [
     #     ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
@@ -130,6 +139,35 @@ def calc_sim(
     # ]
     # title = "test"
     # sim_pairs = [["wiki", "github"], ["wiki", "github"]]
+    title = f"Routing Similarity Layer {layer_idx}"
+    sim_pairs = [
+        [
+            "arc_challenge",
+            "gsm8k",
+            "hellaswag",
+            "mmlu",
+            "en_wikipedia",
+            "github",
+            "en_stack",
+            "en_cc",
+            "en_c4",
+            "en_book",
+            "en_arxiv",
+        ],
+        [
+            "arc_challenge",
+            "gsm8k",
+            "hellaswag",
+            "mmlu",
+            "en_wikipedia",
+            "github",
+            "en_stack",
+            "en_cc",
+            "en_c4",
+            "en_book",
+            "en_arxiv",
+        ],
+    ]
 
     folder = Path(gate_load_folder)
     name2arr = {}
@@ -166,24 +204,96 @@ def calc_sim(
     return sim_arr
 
 
-if __name__ == "__main__":
-    # main()
+def gate_load_vis():
+    model_dir = "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data/outputs/cpt-llama2_random_scale4_112gpus_dynamic_data-2326233/checkpoint-5440"
+    result_dir = "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_sheared_sampling_fluency_80B_gate_load/"
+    main(
+        # w/ fluency filtering, 85b
+        model_dir=model_dir,
+        result_dir=result_dir,
+    )
 
     sim_arr_list = []
     for layer_idx in range(32):
-        sim_arr = calc_sim(layer_idx=layer_idx)
+        sim_arr = calc_sim(
+            gate_load_folder=result_dir,
+            layer_idx=layer_idx,
+        )
         sim_arr_list.append(sim_arr)
     sim_arr = np.stack(sim_arr_list, axis=0)
     sim_arr = sim_arr.mean(axis=0)
-    title = "Dev vs. SlimPajama"
+    # title = "Dev vs. SlimPajama"
+    # sim_pairs = [
+    #     ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
+    #     ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
+    # ]
+    title = "Routing Similarity"
     sim_pairs = [
-        ["arc_challenge", "gsm8k", "hellaswag", "mmlu"],
-        ["en_wikipedia", "github", "en_stack", "en_cc", "en_c4", "en_book", "en_arxiv"],
+        [
+            "arc_challenge",
+            "gsm8k",
+            "hellaswag",
+            "mmlu",
+            "en_wikipedia",
+            "github",
+            "en_stack",
+            "en_cc",
+            "en_c4",
+            "en_book",
+            "en_arxiv",
+        ],
+        [
+            "arc_challenge",
+            "gsm8k",
+            "hellaswag",
+            "mmlu",
+            "en_wikipedia",
+            "github",
+            "en_stack",
+            "en_cc",
+            "en_c4",
+            "en_book",
+            "en_arxiv",
+        ],
     ]
     heatmap(
         sim_arr,
         sim_pairs[1],
         sim_pairs[0],
-        "/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_baseline_gate_load/cos_sim_avg.png",
+        f"{result_dir}/cos_sim_avg.png",
         title,
     )
+
+
+def gate_load_vis_from_cache(name, cache_filepath, result_dir, minmax: bool = False):
+    gate_load_sum = np.load(cache_filepath)
+    if minmax:
+        gate_load_sum = (gate_load_sum - gate_load_sum.min()) / (
+            gate_load_sum.max() - gate_load_sum.min()
+        )
+    for layer_idx in range(gate_load_sum.shape[0]):
+        visualize_expert_load_heatmap(
+            gate_load_sum[layer_idx],
+            layer_idx,
+            name,
+            shape=(4, 4),
+            save_dir=str(result_dir),
+            save_fig=True,
+        )
+
+
+if __name__ == "__main__":
+    main(
+        model_dir="/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_scale4_112gpus_dynamic_data/outputs/cpt-llama2_random_scale4_112gpus_dynamic_data-2326233/checkpoint-6120",
+        result_dir="/mnt/petrelfs/zhutong/smoe/results/llama2_7B_random_split_sheared_sampling_fluency_90B_gate_load/",
+    )
+
+    # gate_load_vis()
+
+    # for name in ["gsm8k", "mmlu"]:
+    #     gate_load_vis_from_cache(
+    #         name,
+    #         f"results/llama2_7B_random_split_sheared_sampling_fluency_85B_gate_load/{name}_gate_load.npy",
+    #         f"results/llama2_7B_random_split_sheared_sampling_fluency_85B_gate_load/{name}",
+    #         minmax=True,
+    #     )
