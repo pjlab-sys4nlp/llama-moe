@@ -4,9 +4,9 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size=llama_13B
 
-num_experts=8                         #  8  16
-metric=l2_norm                        #  l1_norm l2_norm plain
-template=layers.{}.mlp.up_proj.weight #  gate_proj  up_proj
+num_experts=16                        #  8  16
+metric=l1_norm                        #  l1_norm l2_norm plain
+proj_type=up_proj #  gate_proj  up_proj
 threshold=1
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
@@ -25,7 +25,7 @@ for specify_layer in {0..39}; do
     --model_path ${model_path} \
     --save_path ${save_path} \
     --specify_layer ${specify_layer} \
-    --template ${template} \
+    --template layers.{}.mlp.${proj_type}.weight \
     --num_experts ${num_experts} \
     --threshold ${threshold} \
     --metric ${metric} \
@@ -38,7 +38,7 @@ wait
 
 gpmetis_run=/mnt/petrelfs/share_data/quxiaoye/metis_for_graph_split/bin/gpmetis
 template1=layers.
-template2=.mlp.up_proj.weight
+template2=.mlp.${proj_type}.weight
 
 for layer in {0..39}; do
   OMP_NUM_THREADS=8 srun --partition=MoE --job-name=split --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
@@ -46,6 +46,7 @@ for layer in {0..39}; do
   sleep 0.7
 done
 wait
+
 # STEP3
 
 template3=.part.${num_experts}
@@ -57,4 +58,5 @@ for layer in {0..39}; do
   sleep 0.7
 done
 wait
+
 chmod -R 755 ${save_path} >/dev/null 2>&1
