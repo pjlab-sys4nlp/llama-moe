@@ -25,7 +25,7 @@ def torch_load_template_file(path, template, layer):
 
 def torch_load_template_score_file(path, template, layer):
     score_list = []
-    for expert_folder_name in os.listdir(path):
+    for expert_folder_name in sorted(os.listdir(path)):
         score_file = os.path.join(path, expert_folder_name, template.format(layer))
         score = torch.load(score_file, map_location="cpu")
         score_list.append(score)

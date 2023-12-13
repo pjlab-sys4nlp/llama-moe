@@ -52,7 +52,7 @@ source ~/anaconda3/bin/activate llama-moe
 
   model_type="llama_moe_residual"
   tokenizer_path=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
-  dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
+  dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
   validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
 
   lr=3e-4
@@ -61,7 +61,7 @@ source ~/anaconda3/bin/activate llama-moe
   per_device_eval_batch_size=8
   gradient_accumulation_steps=4
   block_size=4096
-  num_tokens="1*10^11"
+  num_tokens="2*10^11"
   seed=1227
   deepspeed_config_file=conf/deepspeed/bf16_zero1_default.json
 
@@ -77,7 +77,7 @@ source ~/anaconda3/bin/activate llama-moe
   echo "#tokens/batch: $tokens_per_batch"
 
   data_cache=resources/cache
-  output_dir=outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+  output_dir=/mnt/petrelfs/share_data/quxiaoye/runs/residual_2_2_14_scale2_112gpus/
   mkdir -p $output_dir
   echo "output_dir: $output_dir"
   scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
@@ -127,7 +127,7 @@ source ~/anaconda3/bin/activate llama-moe
     --max_steps ${max_steps} \
     --max_train_samples ${max_train_samples} \
     --save_strategy steps \
-    --save_total_limit 1 \
+    --save_total_limit 2 \
     --save_steps 1000 \
     --dataloader_num_workers 0 \
     --dataloader_pin_memory True \

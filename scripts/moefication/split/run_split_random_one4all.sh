@@ -2,13 +2,13 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_13B"
+#  open_llama_7b
+llama_size="open_llama_7b"
 
 data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 save_path=${data_path}/moefication_results/split
 
-# 所有可能的结果组合
 gpus=0
 cpus=8
 for num_experts in 4 8 16 32; do
@@ -18,8 +18,8 @@ for num_experts in 4 8 16 32; do
       --model_path ${model_path} \
       --save_path ${save_path} \
       --template layers.{}.mlp.${proj_type}.weight \
-      --num_experts ${num_experts} & # 并行运行下一命令
-    sleep 0.7                        # 等待0.5s
+      --num_experts ${num_experts} &
+    sleep 0.7
   done
 done
 
