@@ -26,6 +26,7 @@ def convert_llama_model(
     num_selects,
     score_scale_factor=None,
     use_default_gate=False,
+    gate_type="mlp",  # "linear"
 ):
     """
     LlamaMoEModel
@@ -63,7 +64,7 @@ def convert_llama_model(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
-    config_llama_moe.gates = "mlp"
+    config_llama_moe.gates = gate_type
     config_llama_moe.score_scale_factor = (
         1.0 if score_scale_factor is None else score_scale_factor
     )
@@ -91,7 +92,7 @@ def convert_llama_model(
                     model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_default_gate and gate_type == "mlp":
             model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
@@ -123,6 +124,7 @@ def convert_llama_model_for_causal_lm(
     num_selects,
     score_scale_factor=None,
     use_default_gate=False,
+    gate_type="mlp",  # "linear"
 ):
     """
     LlamaMoEForCausalLM
@@ -160,7 +162,7 @@ def convert_llama_model_for_causal_lm(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
-    config_llama_moe.gates = "mlp"
+    config_llama_moe.gates = gate_type
     config_llama_moe.score_scale_factor = (
         1.0 if score_scale_factor is not None else score_scale_factor
     )
@@ -188,7 +190,7 @@ def convert_llama_model_for_causal_lm(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_default_gate and gate_type == "mlp":
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
@@ -220,6 +222,7 @@ def convert_llama_model_for_sequence_classification(
     num_selects,
     score_scale_factor=None,
     use_default_gate=False,
+    gate_type="mlp",  # "linear"
 ):
     """
     LlamaMoEForSequenceClassification
@@ -257,7 +260,7 @@ def convert_llama_model_for_sequence_classification(
     config_llama_moe.num_experts = num_experts
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
-    config_llama_moe.gates = "mlp"
+    config_llama_moe.gates = gate_type
     config_llama_moe.score_scale_factor = (
         1.0 if score_scale_factor is not None else score_scale_factor
     )
@@ -285,7 +288,7 @@ def convert_llama_model_for_sequence_classification(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_default_gate and gate_type == "mlp":
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)

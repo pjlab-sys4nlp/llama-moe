@@ -71,7 +71,7 @@ source ~/anaconda3/bin/activate smoe
     # tokenizer_path="/mnt/petrelfs/share_data/quxiaoye/models/llama_3B"
 
     # dataset_dir=/mnt/petrelfs/share_data/quxiaoye/pretrain_LLAMA_all_data_processed
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed/
+    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama_processed
     # dataset_dir=/mnt/petrelfs/zhutong/smoe/resources/slimpajama_samples_openllama3B_tokenized
     validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized/
 

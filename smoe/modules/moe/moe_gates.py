@@ -232,7 +232,6 @@ class TopKBalancedNoisyGate(BaseGate):
 
         self.gate_network_type = gate_network
         self.gate_network = get_gate_network(gate_network, input_size, num_experts)
-        # self.gate_network = get_gate_network("linear", input_size, num_experts)
 
         self.use_softmax = use_softmax
         self.softmax = nn.Softmax(1)
@@ -286,7 +285,6 @@ class TopKBalancedNoisyGate(BaseGate):
         logits_gate = self.gate_network(x)  # gate计算出的权重
         if self.training and self.add_noise:
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
-            # noise_mm = torch.mm(x, self.weight_noise)  # 噪声矩阵计算结果
             noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
             logits = logits_gate + logits_noise  # 最终权重
@@ -323,7 +321,7 @@ class TopKBalancedNoisyGate(BaseGate):
                 load = prob.sum(0)
             else:
                 load = (scores_filtered > 0).sum(0)
-                if not self.warned:
+                if not self.add_noise and not self.warned:
                     warnings.warn('Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
                                   'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.')
                     self.warned = True
@@ -436,7 +434,7 @@ class SwitchBalancedGate(BaseGate):
         add_noise=True,
     ):
         super(SwitchBalancedGate, self).__init__()
-        assert num_selects in [1, 2]
+        assert num_selects in (1, 2)
         self.input_size = input_size
         self.num_experts = num_experts
         self.num_selects = num_selects

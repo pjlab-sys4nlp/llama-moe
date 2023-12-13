@@ -2,7 +2,8 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama2_7B"
+#  open_llama_7b
+llama_size="open_llama_7b"
 
 num_experts=8       #  8  16
 proj_type=gate_proj #  gate_proj  up_proj

@@ -2,15 +2,16 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B"
+#  open_llama_7b
+llama_size="llama2_7B"
 
-num_experts=16                   #  8  16
-num_selects=4                   #  2  4
+num_experts=16                   #  4  8  16  32
+num_selects=4                    #  1  2  4  8
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
-split_type=Random                #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+split_type=Clustering-l2         #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
 proj_type=up_proj                #  gate_proj  up_proj
 
-score_scale_factor=16.0 #  1.0  2.0  4.0  8.0  16.0
+score_scale_factor=4.0 #  1.0  2.0  4.0  8.0  16.0
 score_scale_factor_file_path=""
 #score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_dense
 
@@ -23,7 +24,7 @@ split_file_path=${data_path}/moefication_results/split/${llama_size}-${num_exper
 
 if [ ${use_default_gate} = "True" ]; then
   select_file_path=""
-  save_path=${data_path}/models/${convert_type}/${split_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}
+  save_path=${data_path}/models/${convert_type}/${split_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}-Scale${score_scale_factor}
 else
   select_file_path=${data_path}/moefication_results/select/${split_type}/${llama_size}-${num_experts}Expert-Select-MLP-${select_type}
   save_path=${data_path}/models/${convert_type}/${split_type}-${select_type}/${llama_size}-${num_experts}Select${num_selects}-${proj_type}
