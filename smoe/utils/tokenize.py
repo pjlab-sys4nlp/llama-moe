@@ -123,7 +123,7 @@ def tokenize_jsonl():
         )
 
         tokenized_ds.to_json(output_filepath, lines=True, num_proc=args.num_proc)
-        prepare_meta(output_filepath)
+        # prepare_meta(output_filepath)
 
     if input_path.is_dir():
         input_files = list(input_path.glob(f"*.{args.format}"))

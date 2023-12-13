@@ -300,6 +300,8 @@ def visualize_expert_load_heatmap(
     if save_dir_path.is_file():
         raise ValueError(f"{save_dir} is a file, not a directory")
     save_dir_path.mkdir(exist_ok=True, parents=True)
+    # path = save_dir_path / Path(f"{dataset_name}_Layer{layer_idx}.pdf")
+    # print(layer_idx, path)
     path = save_dir_path / Path(f"{dataset_name}_Layer{layer_idx}.png")
 
     data = load_sum.reshape(*shape)
@@ -308,6 +310,7 @@ def visualize_expert_load_heatmap(
     fig = plt.figure()
     ax = fig.add_subplot(111)
     im = ax.imshow(data, cmap=cmap, interpolation="nearest")
+    # im = ax.imshow(data, cmap=cmap, interpolation="nearest", vmin=3500, vmax=4500)
 
     for i in range(shape[0]):
         for j in range(shape[1]):
@@ -319,7 +322,8 @@ def visualize_expert_load_heatmap(
     fig.tight_layout()
     if save_fig:
         fig.savefig(str(path), dpi=320, bbox_inches="tight")
-        compress_png_image(str(path), print_info=False)
+        if path.suffix == ".png":
+            compress_png_image(str(path), print_info=False)
     return fig
 
 
