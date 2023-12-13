@@ -13,7 +13,7 @@ expert_size=1376
 # 688 1376 2752 5504 11008
 # 864 1728 3456 6912 13824
 
-score_scale_factor_residual=4.0 #  4.0  8.0  12.0  16.0
+score_scale_factor_residual=1.0 #  4.0  8.0  12.0  16.0
 score_scale_factor=4.0          #  4.0  8.0  12.0  16.0
 
 convert_type=LlamaMoEResidualForCausalLM #  LlamaMoEResidualModel  LlamaMoEResidualForCausalLM  LlamaMoEResidualForSequenceClassification
