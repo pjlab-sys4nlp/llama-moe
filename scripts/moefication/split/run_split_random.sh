@@ -3,7 +3,8 @@
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 #  open_llama_7b
-llama_size="open_llama_7b"
+#  Mistral-7B-v0.1
+llama_size="Mistral-7B-v0.1"
 
 num_experts=8 #  8  16
 

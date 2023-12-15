@@ -14,9 +14,8 @@ from smoe.utils.model_operation.modify_llama_moe_model import (
     llama_moe_with_hidden_states_recording,
 )
 from smoe.utils.seed import set_seed
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 from smoe.utils.visualization.visualize import (
-    visualize_expert_load_barv,
     visualize_expert_load_heatmap,
 )
 

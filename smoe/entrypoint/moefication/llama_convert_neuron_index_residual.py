@@ -1,16 +1,11 @@
 import argparse
 
-from smoe.models.llama_moe_residual.modeling_llama_moe_residual import (
-    LlamaMoEResidualForCausalLM,
-    LlamaMoEResidualForSequenceClassification,
-    LlamaMoEResidualModel,
-)
 from smoe.utils.moefication.convert_llama_moe_neuron_index_residual import (
     convert_llama_model_for_causal_lm_neuron_index_residual,
     convert_llama_model_for_sequence_classification_neuron_index_residual,
     convert_llama_model_neuron_index_residual,
 )
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 # fmt: off
 if __name__ == "__main__":

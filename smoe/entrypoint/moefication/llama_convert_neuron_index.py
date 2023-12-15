@@ -1,17 +1,12 @@
 import argparse
 import os
 
-from smoe.models.llama_moe.modeling_llama_moe import (
-    LlamaMoEForCausalLM,
-    LlamaMoEForSequenceClassification,
-    LlamaMoEModel,
-)
 from smoe.utils.moefication.convert_llama_moe_neuron_index import (
     convert_llama_model_for_causal_lm_neuron_index,
     convert_llama_model_for_sequence_classification_neuron_index,
     convert_llama_model_neuron_index,
 )
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 # fmt: off
 if __name__ == "__main__":

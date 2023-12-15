@@ -14,7 +14,7 @@ from smoe.utils.model_operation.change_llama_moe_forward import (
     forward_topk_balanced_noisy_gate_with_fixed_expert_selection,
     forward_topk_balanced_noisy_gate_with_hidden_states_recording,
     forward_topk_balanced_noisy_gate_with_random_expert_selection,
-    forward_universal_calculator_with_scaled_gate_score,
+    forward_universal_calculator_with_scaled_gate_score, forward_topk_balanced_noisy_gate_with_selected_pair_recording,
 )
 
 
@@ -45,7 +45,7 @@ def llama_moe_with_fixed_expert_selection(model):
 
 
 def llama_moe_with_hidden_states_scale_recording_early_stop(
-    model, early_stop_layer=None
+        model, early_stop_layer=None
 ):
     """
     记录所有moe decoder layer中MLP的输出值大小规模，与相应的残差大小规模
@@ -120,6 +120,20 @@ def llama_moe_with_hidden_states_recording(model, device):
         layer.mlp.gate.importance_loss_sum = torch.zeros((1,), device=device)
         layer.mlp.gate.load_sum = torch.zeros((model.config.num_experts,), device=device)
         layer.mlp.gate.load_loss_sum = torch.zeros((1,), device=device)
+
+    return model
+    # fmt: on
+
+
+def llama_moe_with_expert_load_pair_recording(model):
+    # fmt: off
+    assert isinstance(model, LlamaMoEModel)
+
+    for layer_idx, layer in enumerate(model.layers):  # locate block by the name template
+        assert isinstance(layer.mlp.gate, TopKBalancedNoisyGate)
+
+        layer.mlp.gate.load_record = []
+        layer.mlp.gate.forward = types.MethodType(forward_topk_balanced_noisy_gate_with_selected_pair_recording, layer.mlp.gate)  # change forward function TopKBalancedNoisyGate
 
     return model
     # fmt: on

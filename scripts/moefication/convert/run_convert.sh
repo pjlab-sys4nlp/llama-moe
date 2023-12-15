@@ -5,10 +5,10 @@
 #  open_llama_7b
 llama_size="llama2_7B"
 
-num_experts=16                   #  4  8  16  32
-num_selects=4                    #  1  2  4  8
+num_experts=8                    #  4  8  16  32
+num_selects=2                    #  1  2  4  8
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
-split_type=Clustering-l2         #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
+split_type=Random                #  Graph-l1_norm  Graph-l2_norm  Clustering-l2  Clustering-cos  Random
 proj_type=up_proj                #  gate_proj  up_proj
 
 score_scale_factor=4.0 #  1.0  2.0  4.0  8.0  16.0
