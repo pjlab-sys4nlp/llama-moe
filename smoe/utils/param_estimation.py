@@ -117,6 +117,8 @@ if __name__ == "__main__":
     print("7B 2/16", res_7B)
     res_7B = estimate_moe_param(32000, 4096, 32, 11008, 16, 1)
     print("7B 1/16", res_7B)
+    res_7B = estimate_moe_param(32000, 2560, 32, 11008, 8, 2)
+    print("7B-2560", res_7B)
 
     # 13B
     res_13B = estimate_moe_param(32000, 5120, 40, 13824, 16, 4)
