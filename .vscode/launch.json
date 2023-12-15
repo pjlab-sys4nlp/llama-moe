@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "tokenize",
+            "type": "python",
+            "request": "launch",
+            "module": "smoe.utils.tokenize",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Remote Attach",
             "type": "python",
             "request": "attach",

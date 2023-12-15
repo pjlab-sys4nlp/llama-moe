@@ -36,6 +36,8 @@ from smoe.models.llama_moe_residual import (
     LlamaMoEResidualConfig,
     LlamaMoEResidualForCausalLM,
 )
+from smoe.models.mixtral.configuration_mixtral import MixtralConfig
+from smoe.models.mixtral.modeling_mixtral import MixtralForCausalLM
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
@@ -51,6 +53,7 @@ MODEL_MAP = {
     "llama": LlamaForCausalLM,
     "llama_moe": LlamaMoEForCausalLM,
     "llama_moe_residual": LlamaMoEResidualForCausalLM,
+    "mixtral": MixtralForCausalLM,
 }
 
 CONFIG_MAPPING.update(
@@ -58,6 +61,7 @@ CONFIG_MAPPING.update(
         "llama": LlamaConfig,
         "llama_moe": LlamaMoEConfig,
         "llama_moe_residual": LlamaMoEResidualConfig,
+        "mixtral": MixtralConfig,
     }
 )
 
@@ -276,6 +280,7 @@ def main():
         # model.half()
         # model.to(torch_dtype)
 
+        # TODO (tzhu): add flash-attn for mixtral
         model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM = (
             ModelClass.from_pretrained(
                 model_args.model_name_or_path,
