@@ -69,7 +69,7 @@ CONFIG_MAPPING.update(
 logger = logging.getLogger(__name__)
 
 
-@wechat_sender(msg_prefix="CPT Training")
+# @wechat_sender(msg_prefix="CPT Training")
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -157,6 +157,8 @@ def main():
         or model_args.model_type == "llama_moe_residual"
     ):
         ConfigClass = LlamaMoEResidualConfig
+    elif model_args.config_name == "mixtral" or model_args.model_type == "mixtral":
+        ConfigClass = MixtralConfig
 
     if model_args.config_name:
         config = ConfigClass.from_pretrained(model_args.config_name, **config_kwargs)
@@ -178,6 +180,10 @@ def main():
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
         config.num_hidden_layers = 2
+
+    if model_args.model_type == "mixtral" or model_args.model_name_or_path == "mixtral":
+        config.num_experts_per_tok = model_args.num_selects
+        config.output_router_logits = True
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
@@ -280,8 +286,10 @@ def main():
         # model.half()
         # model.to(torch_dtype)
 
-        # TODO (tzhu): add flash-attn for mixtral
-        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM = (
+        if isinstance(config, MixtralConfig):
+            config._attn_implementation = "flash_attention_2"
+
+        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM | MixtralForCausalLM = (
             ModelClass.from_pretrained(
                 model_args.model_name_or_path,
                 from_tf=bool(".ckpt" in model_args.model_name_or_path),

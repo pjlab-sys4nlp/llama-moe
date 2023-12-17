@@ -21,7 +21,10 @@
 import inspect
 import math
 import warnings
-from typing import List, Optional, Tuple, Union
+import importlib
+from dataclasses import dataclass
+from packaging import version
+from typing import List, Optional, Tuple, Union, Callable
 
 import torch
 import torch.nn.functional as F
@@ -30,19 +33,16 @@ from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import (
-    MoeCausalLMOutputWithPast,
-    MoeModelOutputWithPast,
+    ModelOutput,
     SequenceClassifierOutputWithPast,
 )
 from transformers.modeling_utils import PreTrainedModel
-from transformers.pytorch_utils import is_torch_greater_or_equal_than_1_13
 from transformers.utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
-    is_flash_attn_2_available,
-    is_flash_attn_greater_or_equal_2_10,
     logging,
     replace_return_docstrings,
+    is_torch_available,
 )
 from transformers.utils.import_utils import is_torch_fx_available
 
@@ -52,6 +52,183 @@ from smoe.utils.modeling_attn_mask_utils import (
 )
 
 from .configuration_mixtral import MixtralConfig
+
+logger = logging.get_logger(__name__)
+
+_CONFIG_FOR_DOC = "MixtralConfig"
+
+
+parsed_torch_version_base = version.parse(version.parse(torch.__version__).base_version)
+is_torch_greater_or_equal_than_1_13 = parsed_torch_version_base >= version.parse("1.13")
+
+
+def _is_package_available(
+    pkg_name: str, return_version: bool = False
+) -> Union[Tuple[bool, str], bool]:
+    # Check we're not importing a "pkg_name" directory somewhere but the actual library by trying to grab the version
+    package_exists = importlib.util.find_spec(pkg_name) is not None
+    package_version = "N/A"
+    if package_exists:
+        try:
+            package_version = importlib.metadata.version(pkg_name)
+            package_exists = True
+        except importlib.metadata.PackageNotFoundError:
+            package_exists = False
+        logger.debug(f"Detected {pkg_name} version {package_version}")
+    if return_version:
+        return package_exists, package_version
+    else:
+        return package_exists
+
+
+def is_flash_attn_2_available():
+    if not is_torch_available():
+        return False
+
+    if not _is_package_available("flash_attn"):
+        return False
+
+    # Let's add an extra check to see if cuda is available
+    import torch
+
+    if not torch.cuda.is_available():
+        return False
+
+    if torch.version.cuda:
+        return version.parse(importlib.metadata.version("flash_attn")) >= version.parse(
+            "2.1.0"
+        )
+    elif torch.version.hip:
+        # TODO: Bump the requirement to 2.1.0 once released in https://github.com/ROCmSoftwarePlatform/flash-attention
+        return version.parse(importlib.metadata.version("flash_attn")) >= version.parse(
+            "2.0.4"
+        )
+    else:
+        return False
+
+
+def is_flash_attn_greater_or_equal_2_10():
+    if not _is_package_available("flash_attn"):
+        return False
+
+    return version.parse(importlib.metadata.version("flash_attn")) >= version.parse(
+        "2.1.0"
+    )
+
+
+def is_flash_attn_available():
+    logger.warning(
+        "Using `is_flash_attn_available` is deprecated and will be removed in v4.38. "
+        "Please use `is_flash_attn_2_available` instead."
+    )
+    return is_flash_attn_2_available()
+
+
+@dataclass
+class MoeCausalLMOutputWithPast(ModelOutput):
+    """
+    Base class for causal language model (or autoregressive) with mixture of experts outputs.
+
+    Args:
+        loss (`torch.FloatTensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Language modeling loss (for next-token prediction).
+
+        logits (`torch.FloatTensor` of shape `(batch_size, sequence_length, config.vocab_size)`):
+            Prediction scores of the language modeling head (scores for each vocabulary token before SoftMax).
+
+        aux_loss (`torch.FloatTensor`, *optional*, returned when `labels` is provided):
+            aux_loss for the sparse modules.
+
+        router_logits (`tuple(torch.FloatTensor)`, *optional*, returned when `output_router_probs=True` and `config.add_router_probs=True` is passed or when `config.output_router_probs=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, sequence_length, num_experts)`.
+
+            Raw router logtis (post-softmax) that are computed by MoE routers, these terms are used to compute the auxiliary
+            loss for Mixture of Experts models.
+
+        past_key_values (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `tuple(torch.FloatTensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`)
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks) that can be used (see
+            `past_key_values` input) to speed up sequential decoding.
+        hidden_states (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[torch.FloatTensor] = None
+    aux_loss: Optional[torch.FloatTensor] = None
+    logits: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    router_logits: Optional[Tuple[torch.FloatTensor]] = None
+
+    @property
+    def balance_loss(self):
+        return self.aux_loss
+
+    @property
+    def num_dropped_tokens(self):
+        return [torch.tensor(-1)] * 32
+
+    @property
+    def gate_load(self):
+        return [torch.tensor(-1)] * 32
+
+    @property
+    def gate_importance(self):
+        return [torch.tensor(-1)] * 32
+
+
+@dataclass
+class MoeModelOutputWithPast(ModelOutput):
+    """
+    Base class for model's outputs, with potential hidden states and attentions.
+
+    Args:
+        last_hidden_state (`torch.FloatTensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        past_key_values (`tuple(tuple(torch.FloatTensor))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            Tuple of `tuple(torch.FloatTensor)` of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and optionally if
+            `config.is_encoder_decoder=True` 2 additional tensors of shape `(batch_size, num_heads,
+            encoder_sequence_length, embed_size_per_head)`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and optionally if
+            `config.is_encoder_decoder=True` in the cross-attention blocks) that can be used (see `past_key_values`
+            input) to speed up sequential decoding.
+        hidden_states (`tuple(torch.FloatTensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `torch.FloatTensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(torch.FloatTensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+        router_logits (`tuple(torch.FloatTensor)`, *optional*, returned when `output_router_probs=True` and `config.add_router_probs=True` is passed or when `config.output_router_probs=True`):
+            Tuple of `torch.FloatTensor` (one for each layer) of shape `(batch_size, sequence_length, num_experts)`.
+
+            Raw router logtis (post-softmax) that are computed by MoE routers, these terms are used to compute the auxiliary
+            loss for Mixture of Experts models.
+    """
+
+    last_hidden_state: torch.FloatTensor = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
+    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    router_logits: Optional[Tuple[torch.FloatTensor]] = None
 
 
 if is_flash_attn_2_available():
@@ -69,11 +246,6 @@ if is_torch_fx_available():
         import torch.fx
 
     _prepare_4d_causal_attention_mask = torch.fx.wrap(_prepare_4d_causal_attention_mask)
-
-
-logger = logging.get_logger(__name__)
-
-_CONFIG_FOR_DOC = "MixtralConfig"
 
 
 def load_balancing_loss_func(
@@ -789,6 +961,7 @@ class MixtralSparseMoeBlock(nn.Module):
         self.ffn_dim = config.intermediate_size
         self.num_experts = config.num_local_experts
         self.top_k = config.num_experts_per_tok
+        self.score_scale_factor = config.score_scale_factor
 
         # gating
         self.gate = nn.Linear(self.hidden_dim, self.num_experts, bias=False)
@@ -843,6 +1016,7 @@ class MixtralSparseMoeBlock(nn.Module):
             current_hidden_states = (
                 expert_layer(current_state)
                 * routing_weights[top_x_list, idx_list, None]
+                * self.score_scale_factor
             )
 
             # However `index_add_` only support torch tensors for indexing so we'll use
@@ -1211,8 +1385,16 @@ class MixtralModel(MixtralPreTrainedModel):
                 all_hidden_states += (hidden_states,)
 
             if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
-                    decoder_layer.__call__,
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        # None for past_key_value
+                        return module(*inputs)
+
+                    return custom_forward
+
+                layer_outputs: tuple = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(decoder_layer),
                     hidden_states,
                     attention_mask,
                     position_ids,
@@ -1221,6 +1403,17 @@ class MixtralModel(MixtralPreTrainedModel):
                     output_router_logits,
                     use_cache,
                 )
+
+                # layer_outputs = self._gradient_checkpointing_func(
+                #     decoder_layer.__call__,
+                #     hidden_states,
+                #     attention_mask,
+                #     position_ids,
+                #     past_key_values,
+                #     output_attentions,
+                #     output_router_logits,
+                #     use_cache,
+                # )
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
@@ -1309,6 +1502,10 @@ class MixtralForCausalLM(MixtralPreTrainedModel):
 
     def get_decoder(self):
         return self.model
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, MixtralModel):
+            module.gradient_checkpointing = value
 
     @add_start_docstrings_to_model_forward(MIXTRAL_INPUTS_DOCSTRING)
     @replace_return_docstrings(

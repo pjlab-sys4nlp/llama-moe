@@ -183,7 +183,7 @@ class MixtralConfig(PretrainedConfig):
         self.output_router_logits = output_router_logits
         self.router_aux_loss_coef = router_aux_loss_coef
 
-        self.scale_factor = kwargs.pop("scale_factor", 1.0)
+        self.score_scale_factor = kwargs.pop("score_scale_factor", 4.0)
         # Attention implementation to use, if relevant.
         self._attn_implementation_internal = kwargs.pop("attn_implementation", None)
 

@@ -1,15 +1,15 @@
 #!/usr/bin/bash
 
-#SBATCH --job-name=mxitral_random_split_112gpus_8_2
-#SBATCH --output=/mnt/petrelfs/share_data/zhutong/runs/mxitral_random_split_112gpus_8_2/%x-%j.log
-#SBATCH --error=/mnt/petrelfs/share_data/zhutong/runs/mxitral_random_split_112gpus_8_2/%x-%j.log
+#SBATCH --job-name=mixtral_random_split_112gpus_8_2
+#SBATCH --output=/mnt/petrelfs/share_data/zhutong/runs/mixtral_random_split_112gpus_8_2/%x-%j.log
+#SBATCH --error=/mnt/petrelfs/share_data/zhutong/runs/mixtral_random_split_112gpus_8_2/%x-%j.log
 
 #SBATCH --partition=MoE_T
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=26
 #SBATCH --mem=0
 
-#SBATCH --nodes=2
+#SBATCH --nodes=14
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
 
@@ -18,8 +18,8 @@
 source ~/anaconda3/bin/activate smoe
 
 {
-    num_nodes=2        # should match with --nodes
-    num_gpu_per_node=8 # should match with --gres
+    num_nodes=14          # should match with --nodes
+    num_gpu_per_node=8   # should match with --gres
 
     # #cpu/#num_gpu_per_node
     export OMP_NUM_THREADS=32
@@ -33,8 +33,8 @@ source ~/anaconda3/bin/activate smoe
     comment="mistral 7B, random 2/8, sheared llama data portion"
     pretrained_model=/mnt/hwfile/share_data/zhutong/models/Mixtral-8x7B-v0.1-Random-8Select2
     tokenizer_path=/mnt/hwfile/share_data/zhutong/models/Mixtral-8x7B-v0.1-Random-8Select2
-    dataset_dir=/mnt/petrelfs/share_data/quxiaoye/SlimPajama-fluency-processed-agg
-    validation_dir=/mnt/petrelfs/share_data/quxiaoye/data/llama1_7B_val_set_tokenized
+    dataset_dir=/mnt/petrelfs/share_data/zhutong/data/slimpajama_fluency_mistral
+    validation_dir=/mnt/petrelfs/share_data/zhutong/data/mixtral_val_set_tokenized
 
     lr=2e-4
     final_lr_portion=0.1
@@ -68,7 +68,7 @@ source ~/anaconda3/bin/activate smoe
     echo "eval interval (tokens): $eval_tokens, steps: $eval_steps"
 
     data_cache=resources/cache
-    base_dir="/mnt/petrelfs/share_data/zhutong/runs/mxitral_random_split_112gpus_8_2"
+    base_dir="/mnt/petrelfs/share_data/zhutong/runs/mixtral_random_split_112gpus_8_2"
     output_dir=$base_dir/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
     mkdir -p $output_dir
     echo "output_dir: $output_dir"
@@ -86,7 +86,7 @@ source ~/anaconda3/bin/activate smoe
     head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
     echo "Node: $head_node"
     echo "Node IP: $head_node_ip"
-    echo "Node list: $SLURM_JOB_NODELIS"
+    echo "Node list: $nodes"
 
     srun torchrun \
     --nnodes ${num_nodes} \
@@ -94,7 +94,7 @@ source ~/anaconda3/bin/activate smoe
     --node_rank $SLURM_NODEID \
     --rdzv_id $RANDOM \
     --rdzv_backend c10d \
-    --rdzv_endpoint $head_node:29518 \
+    --rdzv_endpoint $head_node:29519 \
     smoe/entrypoint/cpt/cpt_fpt.py \
         --prob_map "sheared_llama" \
         --num_selects ${num_selects} \

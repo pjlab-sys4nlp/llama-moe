@@ -127,30 +127,56 @@ def wechat_sender(
                 if webhook_url:
                     requests.post(webhook_url, json=msg_template)
 
-            try:
-                value = func(*args, **kwargs)
+                try:
+                    value = func(*args, **kwargs)
 
-                if master_process:
+                    if master_process:
+                        end_time = datetime.datetime.now()
+                        elapsed_time = end_time - start_time
+                        contents = [
+                            "Your training is complete 🎉",
+                            "Machine name: %s" % host_name,
+                            "Main call: %s" % func_name,
+                            f"Job {get_slurm_job_name()}",
+                            "Starting date: %s" % start_time.strftime(DATE_FORMAT),
+                            "End date: %s" % end_time.strftime(DATE_FORMAT),
+                            "Training duration: %s" % str(elapsed_time),
+                        ]
+
+                        try:
+                            str_value = str(value)
+                            contents.append("Main call returned value: %s" % str_value)
+                        except Exception:
+                            contents.append(
+                                "Main call returned value: %s"
+                                % "ERROR - Couldn't str the returned value."
+                            )
+
+                        msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                            contents
+                        )
+                        logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
+                        if webhook_url:
+                            requests.post(webhook_url, json=msg_template)
+
+                    return value
+
+                except Exception as ex:
                     end_time = datetime.datetime.now()
                     elapsed_time = end_time - start_time
                     contents = [
-                        "Your training is complete 🎉",
+                        "Your training has crashed ☠️",
                         "Machine name: %s" % host_name,
                         "Main call: %s" % func_name,
                         f"Job {get_slurm_job_name()}",
                         "Starting date: %s" % start_time.strftime(DATE_FORMAT),
-                        "End date: %s" % end_time.strftime(DATE_FORMAT),
-                        "Training duration: %s" % str(elapsed_time),
+                        "Crash date: %s" % end_time.strftime(DATE_FORMAT),
+                        "Crashed training duration: %s\n\n" % str(elapsed_time),
+                        "Here's the error:",
+                        "%s\n\n" % ex,
+                        "Traceback:",
+                        "%s" % traceback.format_exc(),
                     ]
-
-                    try:
-                        str_value = str(value)
-                        contents.append("Main call returned value: %s" % str_value)
-                    except Exception:
-                        contents.append(
-                            "Main call returned value: %s"
-                            % "ERROR - Couldn't str the returned value."
-                        )
 
                     msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
                         contents
@@ -159,33 +185,7 @@ def wechat_sender(
                     if webhook_url:
                         requests.post(webhook_url, json=msg_template)
 
-                return value
-
-            except Exception as ex:
-                end_time = datetime.datetime.now()
-                elapsed_time = end_time - start_time
-                contents = [
-                    "Your training has crashed ☠️",
-                    "Machine name: %s" % host_name,
-                    "Main call: %s" % func_name,
-                    f"Job {get_slurm_job_name()}",
-                    "Starting date: %s" % start_time.strftime(DATE_FORMAT),
-                    "Crash date: %s" % end_time.strftime(DATE_FORMAT),
-                    "Crashed training duration: %s\n\n" % str(elapsed_time),
-                    "Here's the error:",
-                    "%s\n\n" % ex,
-                    "Traceback:",
-                    "%s" % traceback.format_exc(),
-                ]
-
-                msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
-                    contents
-                )
-                logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
-                if webhook_url:
-                    requests.post(webhook_url, json=msg_template)
-
-                raise ex
+                    raise ex
 
         return wrapper_sender
 
