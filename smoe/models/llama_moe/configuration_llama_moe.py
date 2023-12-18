@@ -30,7 +30,10 @@ class LlamaMoEConfig(PretrainedConfig):
         eos_token_id=2,
         pretraining_tp=1,
         tie_word_embeddings=False,
+        rope_theta=10000.0,
         rope_scaling=None,
+        attention_bias=False,
+        attention_dropout=0.0,
         #### -------- moe expert configs -------- ####
         num_experts=16,
         num_selects=4,
@@ -66,8 +69,11 @@ class LlamaMoEConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
         self.pretraining_tp = pretraining_tp
         self.use_cache = use_cache
+        self.rope_theta = rope_theta
         self.rope_scaling = rope_scaling
         self._rope_scaling_validation()
+        self.attention_bias = attention_bias
+        self.attention_dropout = attention_dropout
 
         self.num_experts = num_experts
         self.num_selects = num_selects

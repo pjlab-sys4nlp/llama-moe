@@ -67,7 +67,7 @@ class MoECausalLMOutputWithPast(CausalLMOutputWithPast):
 
 class LlamaMoEDecoderLayer(LlamaDecoderLayer):
     def __init__(self, config: LlamaMoEConfig, layer_index):
-        super().__init__(config)
+        super().__init__(config) # layer_index
 
         gating_config = {
             # all gates

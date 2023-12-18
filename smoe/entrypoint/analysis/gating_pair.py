@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 from pathlib import Path
 
 import torch
@@ -20,7 +21,9 @@ def main(args):
     }
     print(f"eval types: {list(eval_dataset.keys())}")
     eval_dataset = ConcatDataset(eval_dataset.values())
+    eval_dataset = [{key: torch.tensor(value) for key, value in data.items()} for data in eval_dataset]
     print(f"{len(eval_dataset)}")
+    print(eval_dataset[0])
 
     model = LlamaMoEForCausalLM.from_pretrained(args.model_path)
     model.model = llama_moe_with_expert_load_pair_recording(model.model)
@@ -32,8 +35,8 @@ def main(args):
     model.eval()
     with torch.no_grad():
         for i, batch in tqdm(enumerate(dataloader)):
+            sys.stderr.flush()
             move_tensors_to_device(batch, "cuda")
-            print(batch)
             model(**batch)
             if i >= 100:
                 break
