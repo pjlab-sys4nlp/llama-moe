@@ -25,7 +25,15 @@ if __name__ == "__main__":
     #     "/mnt/petrelfs/share_data/quxiaoye/SlimPajama-fluency-processed/c4_split_fluency/",
     #     "/mnt/petrelfs/share_data/quxiaoye/SlimPajama-fluency-processed-agg/en_c4/"
     # )
-    for domain in ["en_book", "en_c4", "en_cc", "en_arxiv", "en_wikipedia", "en_stack", "github"]:
+    for domain in [
+        "en_book",
+        "en_c4",
+        "en_cc",
+        "en_arxiv",
+        "en_wikipedia",
+        "en_stack",
+        "github",
+    ]:
         copy_files(
             f"/mnt/petrelfs/share_data/zhutong/data/slimpajama_fluency_mistral_middle_parts/{domain}",
             f"/mnt/petrelfs/share_data/zhutong/data/slimpajama_fluency_mistral/{domain}",

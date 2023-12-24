@@ -1,14 +1,12 @@
 import re
-import time
 import subprocess
+import time
 from pathlib import Path
 
+from check_killed import get_jobstate
 from loguru import logger
 
 from smoe.utils.notification import send_to_wechat
-
-from check_killed import get_jobstate
-
 
 logger.add("logs/queue_submit.log")
 
@@ -40,36 +38,36 @@ def get_jobid(filepath):
 if __name__ == "__main__":
     task_list = [
         # CANCELLED+
-        ('en_stack', '000028'),
-        ('en_wikipedia', '000004'),
-        ('en_wikipedia', '000006'),
-        ('en_wikipedia', '000009'),
-        ('github', '000024'),
-        ('github', '000029'),
-        ('en_wikipedia', '000010'),
-        ('en_wikipedia', '000012'),
-        ('en_wikipedia', '000024'),
-        ('en_wikipedia', '000026'),
-        ('en_wikipedia', '000029'),
-        ('github', '000004'),
-        ('en_wikipedia', '000000'),
-        ('en_wikipedia', '000002'),
-        ('github', '000014'),
-        ('github', '000016'),
-        ('github', '000019'),
-        ('github', '000020'),
-        ('github', '000022'),
+        ("en_stack", "000028"),
+        ("en_wikipedia", "000004"),
+        ("en_wikipedia", "000006"),
+        ("en_wikipedia", "000009"),
+        ("github", "000024"),
+        ("github", "000029"),
+        ("en_wikipedia", "000010"),
+        ("en_wikipedia", "000012"),
+        ("en_wikipedia", "000024"),
+        ("en_wikipedia", "000026"),
+        ("en_wikipedia", "000029"),
+        ("github", "000004"),
+        ("en_wikipedia", "000000"),
+        ("en_wikipedia", "000002"),
+        ("github", "000014"),
+        ("github", "000016"),
+        ("github", "000019"),
+        ("github", "000020"),
+        ("github", "000022"),
         # error = 10,
-        ('github', '000011'),
-        ('github', '000013'),
-        ('github', '000027'),
-        ('github', '000007'),
-        ('github', '000008'),
-        ('github', '000010'),
-        ('github', '000012'),
-        ('github', '000026'),
-        ('github', '000006'),
-        ('github', '000009'),
+        ("github", "000011"),
+        ("github", "000013"),
+        ("github", "000027"),
+        ("github", "000007"),
+        ("github", "000008"),
+        ("github", "000010"),
+        ("github", "000012"),
+        ("github", "000026"),
+        ("github", "000006"),
+        ("github", "000009"),
         # un-processed,
         ("en_cc", "000000"),
         ("en_cc", "000001"),

@@ -1,23 +1,44 @@
 import torch
 
-def move_tensors_to_device(input_dict, device):
-    """
-    Move all tensors in the input dictionary to the specified device.
 
-    Args:
-    - input_dict (dict): Dictionary containing tensors.
-    - device (str or torch.device): Target device, e.g., 'cpu' or 'cuda:0'.
+def move_tensors_to_device(input, device):
+    if isinstance(input, dict):
+        for key, value in input.items():
+            if isinstance(value, torch.Tensor):
+                input[key] = value.to(device)
+        return input
 
-    Returns:
-    - dict: New dictionary with all tensors moved to the target device.
-    """
-    for key, value in input_dict.items():
-        if isinstance(value, torch.Tensor):
-            input_dict[key] = value.to(device)
-        else:
-            input_dict[key] = value
+    elif isinstance(input, list):
+        for i in range(len(input)):
+            if isinstance(input[i], torch.Tensor):
+                input[i] = input[i].to(device)
+        return input
 
-    return input_dict
+    elif isinstance(input, torch.Tensor):
+        return input.to(device)
+
+    else:
+        raise TypeError(input)
+
+
+def tensor2numbers(input):
+    if isinstance(input, dict):
+        for key, value in input.items():
+            if isinstance(value, torch.Tensor):
+                input[key] = value.tolist()
+        return input
+
+    elif isinstance(input, list):
+        for i in range(len(input)):
+            if isinstance(input[i], torch.Tensor):
+                input[i] = input[i].tolist()
+        return input
+
+    elif isinstance(input, torch.Tensor):
+        return input.tolist()
+
+    else:
+        raise TypeError(input)
 
 
 def turn_last_true_mask_to_false(mask, true_mask_cnt=None):
@@ -25,7 +46,7 @@ def turn_last_true_mask_to_false(mask, true_mask_cnt=None):
     # mask: shape(batch_size, seq_len)
     if true_mask_cnt is None:
         true_mask_cnt = torch.sum(mask, dim=1).unsqueeze(1)
-    turn_position_indices = (mask.cumsum(dim=1) == true_mask_cnt)
+    turn_position_indices = mask.cumsum(dim=1) == true_mask_cnt
     converted_mask = mask.clone()
     converted_mask[turn_position_indices] = False
     return converted_mask
@@ -34,7 +55,7 @@ def turn_last_true_mask_to_false(mask, true_mask_cnt=None):
 def turn_first_true_mask_to_false(mask):
     """Turn the first true value to false for each row in a mask matrix."""
     # mask: shape(batch_size, seq_len)
-    turn_position_indices = (mask.cumsum(dim=1) == 1)
+    turn_position_indices = mask.cumsum(dim=1) == 1
     converted_mask = mask.clone()
     converted_mask[turn_position_indices] = False
     return converted_mask
@@ -47,3 +68,14 @@ def last_true_position(mask):
     last_true_mask = (mask.cumsum(dim=1) == true_mask_cnt) & mask
     last_true_position = last_true_mask.nonzero()[:, 1].unsqueeze(1)
     return last_true_position
+
+
+def pass_kernel_function(tensor, criterion):
+    if criterion == "plain":
+        return tensor
+    elif criterion == "l1_norm":
+        return torch.abs(tensor)
+    elif criterion == "l2_norm":
+        return tensor * tensor
+    else:
+        raise NotImplementedError

@@ -18,38 +18,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ PyTorch Mixtral model."""
+import importlib
 import inspect
 import math
 import warnings
-import importlib
 from dataclasses import dataclass
-from packaging import version
-from typing import List, Optional, Tuple, Union, Callable
+from typing import Callable, List, Optional, Tuple, Union
 
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
+from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from transformers.activations import ACT2FN
-from transformers.modeling_outputs import (
-    ModelOutput,
-    SequenceClassifierOutputWithPast,
-)
+from transformers.modeling_outputs import ModelOutput, SequenceClassifierOutputWithPast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import (
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
+    is_torch_available,
     logging,
     replace_return_docstrings,
-    is_torch_available,
 )
 from transformers.utils.import_utils import is_torch_fx_available
 
 from smoe.utils.cache_utils import Cache, DynamicCache
-from smoe.utils.modeling_attn_mask_utils import (
-    _prepare_4d_causal_attention_mask,
-)
+from smoe.utils.modeling_attn_mask_utils import _prepare_4d_causal_attention_mask
 
 from .configuration_mixtral import MixtralConfig
 

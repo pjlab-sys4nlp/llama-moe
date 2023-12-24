@@ -28,7 +28,7 @@ Remember to change the following variables:
 ```shell
 num_experts="" # number of experts in each MoE layer
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 save_path="" # path to save the indices sets
 ```
 
@@ -47,7 +47,7 @@ Remember to change the following variables:
 ```shell
 num_experts="" # number of experts in each MoE layer
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 save_path="" # path to save the indices sets
 
 metric="" # metric for clustering, choices: `l2` `cos`
@@ -73,7 +73,7 @@ Remember to change the following variables:
 ```shell
 num_experts="" # number of experts in each MoE layer
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 save_path="" # path to save the indices sets
 
 metric="" # metric to measure the sparsity, choices: `l1_norm` `l2_norm` `plain`
@@ -82,7 +82,7 @@ proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 
 
 
-#### Gradient Split 
+#### Gradient Split
 
 Before performing gradient-based splitting (Eq. 8 in the technical report), you need to prepare a bunch of pretraining data and group them into different clusters by running:
 
@@ -101,7 +101,7 @@ Remember to change the following variables:
 ```shell
 dataset_dir="" # path to clustered data
 pretrained_model="" # path to the LLaMA checkpoint
-tokenizer_path="" # path to the LLaMA tokenizer 
+tokenizer_path="" # path to the LLaMA tokenizer
 save_path="" # path to save the indices sets
 
 accumulate_level="" # should be set to `sample`
@@ -111,7 +111,7 @@ importance_type="" # should be set to `feature_change`
 
 
 
-##### Neuron Independent 
+##### Neuron Independent
 
 > This part is not included in our technical report.
 
@@ -128,7 +128,7 @@ expert_num="" # number of experts in each MoE layer
 expert_size="" # intermediate neurons in each expert
 share_neurons="False" ######### SET AS FLASE TO BE NEURON-INDEPENDENT #########
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 score_file_path="" # path to the score files generated above
 save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
@@ -154,7 +154,7 @@ expert_num="" # number of experts in each MoE layer
 expert_size="" # intermediate neurons in each expert
 share_neurons="True" ######### SET AS TRUE TO BE INNER-SHARING #########
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 score_file_path="" # path to the score files generated above
 save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
@@ -181,7 +181,7 @@ expert_num_residual="" # number of residual experts
 expert_size="" # intermediate neurons in each expert
 share_neurons="" # Whether to share neurons in non-residual experts
 
-model_path="" # path to the LLaMA checkpoint 
+model_path="" # path to the LLaMA checkpoint
 score_file_path="" # path to the score files generated above
 save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
@@ -239,8 +239,3 @@ bash ./scripts/moefication/convert/run_convert_gradient_residual.sh
         -- entrypoint
             -- moefication
 ```
-
-
-
-
-

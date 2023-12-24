@@ -1,5 +1,5 @@
-import time
 import subprocess
+import time
 
 from smoe.utils.notification import send_to_wechat
 
@@ -7,7 +7,9 @@ from smoe.utils.notification import send_to_wechat
 def check_sme_pending():
     # run sme | grep "normal PD" | wc -l, if the returned value is 0, then send a notification
     cmd = "squeue --me | grep 'normal PD' | wc -l"
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
     for line in p.stdout.readlines():
         line = line.decode("utf-8")
         if int(line) == 0:
@@ -19,7 +21,9 @@ def check_sme_pending():
 def check_sme_running():
     # run sme | grep "normal  R" | wc -l, if the returned value is 0, then send a notification
     cmd = "squeue --me | grep 'normal  R' | wc -l"
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
     for line in p.stdout.readlines():
         line = line.decode("utf-8")
         if int(line) == 0:

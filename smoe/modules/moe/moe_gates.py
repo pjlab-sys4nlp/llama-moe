@@ -351,6 +351,7 @@ class TopKBalancedNoisyGate(BaseGate):
         }
 
     def forward_return_scores(self, x):
+        """先计算所有专家的权重值"""
         logits_gate = self.gate_network(x)  # gate计算出的权重
         if self.training and self.add_noise:
             noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
@@ -358,7 +359,7 @@ class TopKBalancedNoisyGate(BaseGate):
             logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
             logits = logits_gate + logits_noise  # 最终权重
         else:
-            logits = logits_gate  # 最终权重
+            logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
 
         """计算各个专家的分数scores"""
         scores = self.softmax(logits) if self.use_softmax else logits
@@ -393,8 +394,10 @@ class TopKBalancedNoisyGate(BaseGate):
                 load = prob.sum(0)
             else:
                 load = (scores_filtered > 0).sum(0)
-                warnings.warn("Gradient-trackable implementation for load calculation is only available when \"add_noise=True\". "
-                              "Training without noise will block the gradient from load path and lead to inconsistency in optimization objective.")
+                if not self.add_noise and not self.warned:
+                    warnings.warn('Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
+                                  'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.')
+                    self.warned = True
         else:
             load = (scores_filtered > 0).sum(0)
 
@@ -403,7 +406,7 @@ class TopKBalancedNoisyGate(BaseGate):
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
         else:
-            balance_loss = None
+            balance_loss = torch.tensor(0.0, device=x.device)
 
         return {
             "scores": scores,

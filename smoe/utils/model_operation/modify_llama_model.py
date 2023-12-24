@@ -1,6 +1,7 @@
 import os
 import types
 
+from torch import nn
 from transformers.models.llama.modeling_llama import (
     LlamaDecoderLayer,
     LlamaMLP,
@@ -13,6 +14,19 @@ from smoe.utils.model_operation.change_llama_forward import (
     forward_llama_mlp_with_feature_dumping,
     forward_llama_model_with_padding_mask,
 )
+
+
+def llama_with_relu_activation(model):
+    """使用 ReGLU 激活的LLaMA"""
+    # fmt: off
+    assert isinstance(model, LlamaModel)
+
+    for layer_idx, layer in enumerate(model.layers):  # locate block by the name template
+        assert isinstance(layer, LlamaDecoderLayer)
+        layer.mlp.act_fn = nn.ReLU()
+
+    return model
+    # fmt: on
 
 
 def llama_with_hidden_states_scale_recording(model):

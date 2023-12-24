@@ -10,13 +10,13 @@ from smoe.utils.io import torch_load_template_file
 
 
 def convert(
-        model_path,
-        moe_config_path,
-        split_index_path,
-        save_path,
-        num_experts,
-        num_selects,
-        template,
+    model_path,
+    moe_config_path,
+    split_index_path,
+    save_path,
+    num_experts,
+    num_selects,
+    template,
 ):
     """load model"""
     print("Loading model...", flush=True)
@@ -83,14 +83,26 @@ def convert(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default="/home/data/models/llama-transformers/7B")
-    parser.add_argument('--moe_config_path', type=str, default="/home/data/models/llama-transformers/7B")
-    parser.add_argument('--split_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering")
-    parser.add_argument('--save_path', type=str, default="/home/data/models/llama-moe-transformers/7B/")
-    parser.add_argument('--template', type=str, default="layers.{}.mlp.up_proj.weight")
+    parser.add_argument(
+        "--model_path", type=str, default="/home/data/models/llama-transformers/7B"
+    )
+    parser.add_argument(
+        "--moe_config_path", type=str, default="/home/data/models/llama-transformers/7B"
+    )
+    parser.add_argument(
+        "--split_file_path",
+        type=str,
+        default="/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering",
+    )
+    parser.add_argument(
+        "--save_path", type=str, default="/home/data/models/llama-moe-transformers/7B/"
+    )
+    parser.add_argument("--template", type=str, default="layers.{}.mlp.up_proj.weight")
 
-    parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
-    parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
+    parser.add_argument("--num_experts", type=int, default=8, help="number of experts")
+    parser.add_argument(
+        "--num_selects", type=int, default=2, help="number of selected experts"
+    )
 
     args = parser.parse_args()
     print(args, "\n")
@@ -102,7 +114,7 @@ if __name__ == "__main__":
         args.save_path,
         args.num_experts,
         args.num_selects,
-        args.template
+        args.template,
     )
 
     print("Done.")

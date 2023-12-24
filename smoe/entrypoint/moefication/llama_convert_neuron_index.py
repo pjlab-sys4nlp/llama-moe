@@ -23,10 +23,10 @@ if __name__ == "__main__":
     parser.add_argument('--score_scale_factor_file_path', type=str, default=None, help='file storing the layer-wise scale factors, this will override the argument "score_scale_factor"')
 
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
-    parser.add_argument('--use_default_gate', type=str, default="False")
+    parser.add_argument('--use_random_gate', type=str, default="False")
 
     args = parser.parse_args()
-    args.use_default_gate = str2bool(args.use_default_gate)
+    args.use_random_gate = str2bool(args.use_random_gate)
     print(args, "\n")
 
     if args.score_scale_factor_file_path is not None and args.score_scale_factor_file_path != "":
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate
         )
     elif args.convert_type == "LlamaMoEForCausalLM":
         convert_llama_model_for_causal_lm_neuron_index(
@@ -59,7 +59,7 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate
         )
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         convert_llama_model_for_sequence_classification_neuron_index(
@@ -71,7 +71,7 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate
         )
     else:
         raise ValueError
