@@ -1,1 +1,2 @@
 docs/imgs/title-favicon.png filter=lfs diff=lfs merge=lfs -text
+docs/imgs/MoE-Routing.gif filter=lfs diff=lfs merge=lfs -text
