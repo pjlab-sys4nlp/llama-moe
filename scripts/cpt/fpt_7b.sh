@@ -30,26 +30,26 @@ source ~/anaconda3/bin/activate llama-moe
   #  export CUDA_LAUNCH_BLOCKING=1
 
   ##############################################################
-  ############### LLAMA 7B Moefication 16Experts ###############
+  ############### LLAMA 7B 16Experts ###############
   #  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Random/llama_7B-16Select16-up_proj
 
-  #  comment="llama 7B, moefication random split, 4/16, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 1.0, reset experts, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, softmax, scale factor 1.0, reset experts, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, softmax, scale factor 4.0, GPU num 1, per-device bs 64, lr 1e-4"
 
-  #  comment="llama 7B, moefication random split, 4/16, softmax, scale factor 4.0, random gate, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 4/16, softmax, scale factor 4.0, random gate, GPU num 1, per-device bs 64, lr 1e-4"
 
-  #  comment="llama 7B, moefication random split, 12/16, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 12/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
-  #  comment="llama 7B, moefication random split, 12/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 12/16, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 12/16, softmax, scale factor 1.0, GPU num 1, per-device bs 64, lr 1e-4"
+  #  comment="llama 7B, random split, 12/16, softmax, scale factor 16.0, GPU num 1, per-device bs 64, lr 1e-4"
 
-  #  comment="llama 7B, moefication random split, 16/16, softmax, scale factor 16.0, GPU num 2, lr 1e-4"
+  #  comment="llama 7B, random split, 16/16, softmax, scale factor 16.0, GPU num 2, lr 1e-4"
 
   ##############################################################
   ######## LLAMA 2 7B 16 Experts all kinds of ablations ########
-  #  comment="llama 2 7B, moefication gradient 4/16 | soft 16.0 | GPU num 16, per-device bs 32, lr 3e-4"
+  #  comment="llama 2 7B, gradient 4/16 | soft 16.0 | GPU num 16, per-device bs 32, lr 3e-4"
   #  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-16Select4-688Neurons
 
   #  comment="llama 2 7B, share gradient 4/16 | soft 1.0 | GPU num 16, per-device bs 32, lr 3e-4"

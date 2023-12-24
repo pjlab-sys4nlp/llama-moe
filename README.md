@@ -4,7 +4,7 @@
   <span style="color:red">📢 <strong><i>A SMALLER AFFORDABLE MoE MODEL FOR EVERYONE!!</i></strong></span>
   <div>
     <a href="https://huggingface.co/llama-moe" target="_blank">🤗 Model Weights</a> | <a href="#" target="_blank">📃 Technical Report</a> | <a href="#quick-start">🚀 Quick Start</a><br />
-    <a href="docs/Installation.md">⚙️ Installation Guide</a> | <a href="#expert-construction">🚧 Expert Construction</a> | <a href="#continual-pretraining">🚅 Continual Pre-training</a> | <a href="#evaluation">💎 Evaluation</a>
+    <a href="#installation">⚙️ Installation Guide</a> | <a href="#expert-construction">🚧 Expert Construction</a> | <a href="#continual-pretraining">🚅 Continual Pre-training</a> | <a href="#evaluation">💎 Evaluation</a>
   </div>
 </div>
 
@@ -19,7 +19,7 @@ We build LLaMA-MoE with the following two steps:
 
 <h2 id="features">🔥 Features</h2>
 
-1. **Lightweight Models**: The total number of model parameters is only 6.7B, which is friendly for deployment and research usage.
+1. **Lightweight Models**: The number of activated model parameters is only 3.0~3.5B, which is friendly for deployment and research usage.
 2. **Multiple Expert Construction Methods**:
    1. Neuron-Independent: Random, Clustering, Co-activation Graph, Gradient ([Zhang et al., 2022](http://arxiv.org/abs/2110.01786), [Zuo et al., 2022](http://arxiv.org/abs/2204.07675))
    2. Neuron-Sharing: Inner, Inter (residual)
@@ -42,6 +42,8 @@ We build LLaMA-MoE with the following two steps:
 <h2 id="quick-start">🚀 QuickStart</h2>
 
 ```python
+# python>=3.10
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
@@ -59,6 +61,26 @@ pred = model.generate(**inputs, max_length=50, temperature=0.0)
 print(tokenizer.decode(pred.cpu()[0], skip_special_tokens=True))
 # Suzhou is famous of its beautiful gardens. The most famous one is the Humble Administrator's Garden. It is a classical Chinese garden with a history of more than 600 years. The garden is divided into three
 ```
+
+<h2 id="installation">⚙️ Installation</h2>
+
+1. Prepare conda environment: `conda create -n smoe python=3.11` (If your environment name is not `smoe`, you may need to change environment in launching scripts)
+2. Add correct environment variables in `~/.bashrc` (`gcc` is set to newer version for installing `flash-attn`). e.g.:
+    ```bash
+    export PATH=/mnt/petrelfs/share/cuda-11.8/bin:$PATH
+    export LD_LIBRARY_PATH=/mnt/petrelfs/share/cuda-11.8/lib64:$LD_LIBRARY_PATH
+    export PATH=/mnt/petrelfs/share/gcc-10.1.0/bin:$PATH
+    export LD_LIBRARY_PATH=/mnt/petrelfs/share/gcc-10.1.0/lib64:$LD_LIBRARY_PATH
+    ```
+3. Take the variables into effect: `source ~/.bashrc`
+4. Install PyTorch (CUDA-11.8): `pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
+5. Install dependencies: `pip install -r requirements.txt`
+6. Install `flash-attn`: `pip install flash-attn==2.0.1 --no-build-isolation`. You may need to follow the [flash-attn installation instructions](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features) to avoid some errors.
+7. Install the latest Git: `conda install git`
+8. Clone the repo: `git clone git@github.com:pjlab-sys4nlp/llama-moe.git` (If you don't setup the ssh key to GitHub, you may not able to clone through ssh. Check the [docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) about it.)
+9. Change current directory: `cd llama-moe`
+10. Install `smoe` in [editable mode](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-e): `pip install -e .[dev]`
+11. Setup `pre-commit` hooks: `pre-commit install`
 
 <h2 id="performance">📊 Model Performance</h2>
 
@@ -83,13 +105,13 @@ print(tokenizer.decode(pred.cpu()[0], skip_special_tokens=True))
 <h2 id="expert-construction">🚧 Expert Construction</h2>
 
 - Neuron-Independent
-  - Independent<sub>Random</sub>: `bash ./scripts/moefication/split/run_split_random.sh`
-  - Independent<sub>Clustering</sub>: `bash ./scripts/moefication/split/run_split_clustering.sh`
+  - Independent<sub>Random</sub>: `bash ./scripts/expert_construction/split/run_split_random.sh`
+  - Independent<sub>Clustering</sub>: `bash ./scripts/expert_construction/split/run_split_clustering.sh`
 - Neuron-Sharing
-  - Sharing<sub>Inner</sub>: `bash ./scripts/moefication/split/run_split_gradient.sh`
-  - Sharing<sub>Inter</sub>: `bash ./scripts/moefication/split/run_split_gradient_residual.sh`
+  - Sharing<sub>Inner</sub>: `bash ./scripts/expert_construction/split/run_split_gradient.sh`
+  - Sharing<sub>Inter</sub>: `bash ./scripts/expert_construction/split/run_split_gradient_residual.sh`
 
-For more information, please refer to [Expert Construction docs](docs/moefication/README.md).
+For more information, please refer to [Expert Construction docs](docs/expert_construction/README.md).
 
 <h2 id="continual-pretraining">🚅 Continual Pre-training</h2>
 
