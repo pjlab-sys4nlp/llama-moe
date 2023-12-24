@@ -58,7 +58,7 @@ model_type="llama"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 ```
 
-For LLaMA with MoEfication, use the following settings:
+For LLaMA-MoE, use the following settings:
 ```bash
 model_type="llama_moe"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
