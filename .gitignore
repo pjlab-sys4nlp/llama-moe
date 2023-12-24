@@ -173,3 +173,4 @@ smoe/utils/gpu_diag.py
 /logs/
 /logs-cpt/
 /tensorboard/
+models/
