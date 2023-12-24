@@ -37,3 +37,5 @@ Pillow==9.4.0
 numpy==1.25.0
 opencv-python==4.8.1.78
 pynvml==11.5.0
+PyYaml==6.0.1
+pandas<2.1.0

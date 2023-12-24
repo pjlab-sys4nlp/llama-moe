@@ -1,6 +1,38 @@
 # 🚅 Training Guide
 
-## ⚙️ Configuration Instructions
+## 🗞️ Executive Scripts
+
+| Description               | Path                                                                                   |
+| :------------------------ | :------------------------------------------------------------------------------------- |
+| LLaMA-MoE 2/16 Experts    | `scripts/cpt/16_2/baseline_112gpus_sheared_llama_portion_fluency_sf8.sh`               |
+| LLaMA-MoE 4/16 Experts    | `scripts/cpt/dynamic_data_selection/baseline_112gpus_sheared_llama_portion_fluency.sh` |
+| Dynamic<sub>Sheared</sub> | `scripts/cpt/dynamic_data_selection/sheared_llama_112gpus.sh`                          |
+
+## 🌴 Other Arguments in Executive Scripts
+
+| Argument Name                         | Description                                                                                                                                        |
+| :------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--dynamic_data_selection`            | For different dynamic data sampling strategies, choose one from: `sheared_llama` or `none` (static). Default: `none`                               |
+| `--moe_calculator_score_scale_factor` | Scale factor to multiply after hidden states are procesed by experts. Should be $\frac{\text{\#total experts}}{\text{\#selected}}$. Default: `4.0` |
+| `--num_selects`                       | The number of selected experts. Default: `4`                                                                                                       |
+| `--gate_balance_loss_weight`          | The weight of the balance loss for the gate. Default: `1e-2`                                                                                       |
+
+## 📋 Checklist before Starting an Experiment
+
+- [ ] balance loss weight
+- [ ] scale factor
+- [ ] learning rate
+- [ ] warmup steps
+- [ ] evaluation steps
+- [ ] logging steps
+- [ ] global batch size
+- [ ] number of selected experts
+- [ ] pretrained model
+- [ ] data path
+- [ ] GPUs
+- [ ] comment
+
+## ⚙️ Configuration Instructions for Slurm Users
 
 For `scripts/cpt/lora.sh` and `scripts/cpt/fpt.sh` files, we could run an experiment via `sbatch`. e.g. `sbatch scripts/cpt/lora.sh` .
 
@@ -36,12 +68,6 @@ llama1-7b 16 select 4: 3.49b params
 
 llama1-13b total params: 13,015,864,320 - total mlp params:  8,493,465,600
 
-| total experts | selected | dropped params | added gate params |  total params |
-| ------------: | -------: | -------------: | ----------------: | ------------: |
-|            16 |        8 |  4,246,732,800 |         3,287,040 | 8,772,418,560 |
-|            16 |        4 |  6,370,099,200 |         3,287,040 | 6,649,052,160 |
-|            16 |        2 |  7,431,782,400 |         3,287,040 | 5,587,368,960 |
-
 ## 🧮 Estimation of Training Speed and Tokens
 
 For convenient estimation of the model training speed, we provide some useful information at the very beginning of log files:
@@ -64,7 +90,7 @@ Based on the above information, the expected time could be calculated.
 
 The tensorboard `logging_dir` could be found at `outputs/<job-name>-<job-id>/runs/<logging-dir>`.
 
-For example, if my job name is `cpt-moe-fpt-bs16-48gpus` in the sbatch file, the tensorboard could be started from that by: `tensorboard --logdir outputs/cpt-moe-fpt-bs16-48gpus-1535835/runs/Jul31_14-12-00_SH-IDCA1404-10-140-54-100` .
+For example, if my job name is `cpt-moe-fpt-bs16-48gpus` in the sbatch file, the tensorboard could be started from that by: `tensorboard --logdir outputs/cpt-moe-fpt-bs16-48gpus-1535835/runs/Jul31_14-12-00` .
 
 For multiple tasks with different logging directories, you could run the following command:
 
@@ -75,20 +101,5 @@ $ tensorboard --logdir_spec short_name:dir1,short_name2:dir2 --port 8001
 Here, the `short_name` is an abbreviation for your task, and the port number could be changed manually if there's a port conflict. e.g.
 
 ```bash
-$ tensorboard --logdir_spec moe_from_scratch:outputs/cpt-llama-moe-scratch-lora-bs16-1476932/runs/Jul26_21-53-42_SH-IDCA1404-10-140-54-121,moe_lora:outputs/cpt-llama-lora-bs16-1476918/runs/Jul26_21-31-09_SH-IDCA1404-10-140-54-122 --port 8001
+$ tensorboard --logdir_spec moe_from_scratch:outputs/cpt-llama-moe-scratch-lora-bs16-1476932/runs/Jul26_21-53-42,moe_lora:outputs/cpt-llama-lora-bs16-1476918/runs/Jul26_21-31-09 --port 8001
 ```
-
-## 📋 Checklist before Starting an Experiment
-
-- [ ] balance loss weight
-- [ ] scale factor
-- [ ] learning rate
-- [ ] warmup steps
-- [ ] evaluation steps
-- [ ] logging steps
-- [ ] global batch size
-- [ ] number of selected experts
-- [ ] pretrained model
-- [ ] data path
-- [ ] GPUs
-- [ ] comment

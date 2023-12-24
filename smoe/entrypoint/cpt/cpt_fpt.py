@@ -36,6 +36,8 @@ from smoe.models.llama_moe_residual import (
     LlamaMoEResidualConfig,
     LlamaMoEResidualForCausalLM,
 )
+from smoe.models.mixtral.configuration_mixtral import MixtralConfig
+from smoe.models.mixtral.modeling_mixtral import MixtralForCausalLM
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
@@ -51,6 +53,7 @@ MODEL_MAP = {
     "llama": LlamaForCausalLM,
     "llama_moe": LlamaMoEForCausalLM,
     "llama_moe_residual": LlamaMoEResidualForCausalLM,
+    "mixtral": MixtralForCausalLM,
 }
 
 CONFIG_MAPPING.update(
@@ -58,6 +61,7 @@ CONFIG_MAPPING.update(
         "llama": LlamaConfig,
         "llama_moe": LlamaMoEConfig,
         "llama_moe_residual": LlamaMoEResidualConfig,
+        "mixtral": MixtralConfig,
     }
 )
 
@@ -65,7 +69,7 @@ CONFIG_MAPPING.update(
 logger = logging.getLogger(__name__)
 
 
-@wechat_sender()
+# @wechat_sender(msg_prefix="CPT Training")
 def main():
     model_args, data_args, training_args = parse_args(
         ModelArguments, DataArguments, EnhancedTrainingArguments
@@ -143,6 +147,7 @@ def main():
         "num_selects": model_args.num_selects,
         "gate_network": model_args.gate_network_type,
         "score_scale_factor": model_args.moe_calculator_score_scale_factor,
+        "gate_balance_loss_weight": model_args.gate_balance_loss_weight,
     }
     ConfigClass = AutoConfig
     if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":
@@ -152,6 +157,8 @@ def main():
         or model_args.model_type == "llama_moe_residual"
     ):
         ConfigClass = LlamaMoEResidualConfig
+    elif model_args.config_name == "mixtral" or model_args.model_type == "mixtral":
+        ConfigClass = MixtralConfig
 
     if model_args.config_name:
         config = ConfigClass.from_pretrained(model_args.config_name, **config_kwargs)
@@ -173,6 +180,10 @@ def main():
     # zhutong: this is for debug usage only
     if training_args.debug_mode:
         config.num_hidden_layers = 2
+
+    if model_args.model_type == "mixtral" or model_args.model_name_or_path == "mixtral":
+        config.num_experts_per_tok = model_args.num_selects
+        config.output_router_logits = True
 
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
@@ -275,7 +286,10 @@ def main():
         # model.half()
         # model.to(torch_dtype)
 
-        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM = (
+        if isinstance(config, MixtralConfig):
+            config._attn_implementation = "flash_attention_2"
+
+        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM | MixtralForCausalLM = (
             ModelClass.from_pretrained(
                 model_args.model_name_or_path,
                 from_tf=bool(".ckpt" in model_args.model_name_or_path),

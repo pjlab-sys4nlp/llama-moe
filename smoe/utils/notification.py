@@ -23,10 +23,37 @@ def get_slurm_job_name():
     return f"{job_name}-{job_id}"
 
 
+def send_to_wechat(
+    msg: str,
+    webhook_url: str = None,
+    user_mentions: list[str] = None,
+    user_mentions_mobile: list[str] = None,
+):
+    if not webhook_url:
+        webhook_url = os.environ.get("WECHAT_ROBOT_WEBHOOK")
+    if not user_mentions:
+        env_user_mentions = os.environ.get("WECHAT_ROBOT_MENTIONS", "")
+        user_mentions = env_user_mentions.split(",")
+    if not user_mentions_mobile:
+        env_user_mentions_mobile = os.environ.get("WECHAT_ROBOT_MENTIONS_MOBILE", "")
+        user_mentions_mobile = env_user_mentions_mobile.split(",")
+
+    msg_template = {
+        "msgtype": "text",
+        "text": {
+            "content": msg,
+            "mentioned_list": user_mentions,
+            "mentioned_mobile_list": user_mentions_mobile,
+        },
+    }
+    requests.post(webhook_url, json=msg_template)
+
+
 def wechat_sender(
     webhook_url: str = None,
     user_mentions: list[str] = [],
     user_mentions_mobile: list[str] = [],
+    msg_prefix: str = "",
 ):
     """
     WeChat Work sender wrapper: execute func, send a WeChat Work notification with the end status
@@ -93,66 +120,72 @@ def wechat_sender(
                     "Starting date: %s" % start_time.strftime(DATE_FORMAT),
                 ]
 
-                msg_template["text"]["content"] = "\n".join(contents)
+                msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                    contents
+                )
                 logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
                 if webhook_url:
                     requests.post(webhook_url, json=msg_template)
 
-            try:
-                value = func(*args, **kwargs)
+                try:
+                    value = func(*args, **kwargs)
 
-                if master_process:
+                    if master_process:
+                        end_time = datetime.datetime.now()
+                        elapsed_time = end_time - start_time
+                        contents = [
+                            "Your training is complete 🎉",
+                            "Machine name: %s" % host_name,
+                            "Main call: %s" % func_name,
+                            f"Job {get_slurm_job_name()}",
+                            "Starting date: %s" % start_time.strftime(DATE_FORMAT),
+                            "End date: %s" % end_time.strftime(DATE_FORMAT),
+                            "Training duration: %s" % str(elapsed_time),
+                        ]
+
+                        try:
+                            str_value = str(value)
+                            contents.append("Main call returned value: %s" % str_value)
+                        except Exception:
+                            contents.append(
+                                "Main call returned value: %s"
+                                % "ERROR - Couldn't str the returned value."
+                            )
+
+                        msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                            contents
+                        )
+                        logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
+                        if webhook_url:
+                            requests.post(webhook_url, json=msg_template)
+
+                    return value
+
+                except Exception as ex:
                     end_time = datetime.datetime.now()
                     elapsed_time = end_time - start_time
                     contents = [
-                        "Your training is complete 🎉",
+                        "Your training has crashed ☠️",
                         "Machine name: %s" % host_name,
                         "Main call: %s" % func_name,
                         f"Job {get_slurm_job_name()}",
                         "Starting date: %s" % start_time.strftime(DATE_FORMAT),
-                        "End date: %s" % end_time.strftime(DATE_FORMAT),
-                        "Training duration: %s" % str(elapsed_time),
+                        "Crash date: %s" % end_time.strftime(DATE_FORMAT),
+                        "Crashed training duration: %s\n\n" % str(elapsed_time),
+                        "Here's the error:",
+                        "%s\n\n" % ex,
+                        "Traceback:",
+                        "%s" % traceback.format_exc(),
                     ]
 
-                    try:
-                        str_value = str(value)
-                        contents.append("Main call returned value: %s" % str_value)
-                    except Exception:
-                        contents.append(
-                            "Main call returned value: %s"
-                            % "ERROR - Couldn't str the returned value."
-                        )
-
-                    msg_template["text"]["content"] = "\n".join(contents)
+                    msg_template["text"]["content"] = f"{msg_prefix}\n" + "\n".join(
+                        contents
+                    )
                     logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
                     if webhook_url:
                         requests.post(webhook_url, json=msg_template)
 
-                return value
-
-            except Exception as ex:
-                end_time = datetime.datetime.now()
-                elapsed_time = end_time - start_time
-                contents = [
-                    "Your training has crashed ☠️",
-                    "Machine name: %s" % host_name,
-                    "Main call: %s" % func_name,
-                    f"Job {get_slurm_job_name()}",
-                    "Starting date: %s" % start_time.strftime(DATE_FORMAT),
-                    "Crash date: %s" % end_time.strftime(DATE_FORMAT),
-                    "Crashed training duration: %s\n\n" % str(elapsed_time),
-                    "Here's the error:",
-                    "%s\n\n" % ex,
-                    "Traceback:",
-                    "%s" % traceback.format_exc(),
-                ]
-
-                msg_template["text"]["content"] = "\n".join(contents)
-                logger.info(f"{json.dumps(msg_template, ensure_ascii=False)}")
-                if webhook_url:
-                    requests.post(webhook_url, json=msg_template)
-
-                raise ex
+                    raise ex
 
         return wrapper_sender
 
