@@ -1,10 +1,9 @@
 import itertools
 
-import numpy as np
 import torch
 
-from smoe.utils.list_operation import chunk_list
 from smoe.utils.moefication.expert_split import LayerSplit
+from smoe.utils.operations.operation_list import chunk_list
 from smoe.utils.visualization.visualize import visualize_expert_neuron_overlap
 
 

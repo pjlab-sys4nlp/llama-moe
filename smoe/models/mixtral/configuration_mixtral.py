@@ -15,12 +15,11 @@
 """ Mixtral model configuration"""
 
 import copy
-from typing import Dict, Any
+from typing import Any, Dict
 
 from transformers import __version__
 from transformers.configuration_utils import PretrainedConfig
 from transformers.utils import logging
-
 
 logger = logging.get_logger(__name__)
 
@@ -38,11 +37,20 @@ def recursive_diff_dict(dict_a, dict_b, config_obj=None):
     default = config_obj.__class__().to_dict() if config_obj is not None else {}
     for key, value in dict_a.items():
         obj_value = getattr(config_obj, str(key), None)
-        if isinstance(obj_value, PretrainedConfig) and key in dict_b and isinstance(dict_b[key], dict):
+        if (
+            isinstance(obj_value, PretrainedConfig)
+            and key in dict_b
+            and isinstance(dict_b[key], dict)
+        ):
             diff_value = recursive_diff_dict(value, dict_b[key], config_obj=obj_value)
             if len(diff_value) > 0:
                 diff[key] = diff_value
-        elif key not in dict_b or value != dict_b[key] or key not in default or value != default[key]:
+        elif (
+            key not in dict_b
+            or value != dict_b[key]
+            or key not in default
+            or value != default[key]
+        ):
             diff[key] = value
     return diff
 
@@ -267,7 +275,9 @@ class MixtralConfig(PretrainedConfig):
         default_config_dict = PretrainedConfig().to_dict()
 
         # get class specific config dict
-        class_config_dict = self.__class__().to_dict() if not self.is_composition else {}
+        class_config_dict = (
+            self.__class__().to_dict() if not self.is_composition else {}
+        )
 
         serializable_config_dict = {}
 
@@ -279,7 +289,9 @@ class MixtralConfig(PretrainedConfig):
                 and isinstance(class_config_dict[key], dict)
             ):
                 # For nested configs we need to clean the diff recursively
-                diff = recursive_diff_dict(value, class_config_dict[key], config_obj=getattr(self, key, None))
+                diff = recursive_diff_dict(
+                    value, class_config_dict[key], config_obj=getattr(self, key, None)
+                )
                 if "model_type" in value:
                     # Needs to be set even if it's not in the diff
                     diff["model_type"] = value["model_type"]

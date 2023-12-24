@@ -29,6 +29,4 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=prune-convert --mpi=pmi2 --gre
   --num_experts 1 \
   --num_selects 1 \
   --convert_type ${convert_type} \
-  --use_default_gate True
-
-chmod -R 755 ${save_path} >/dev/null 2>&1
+  --use_random_gate True

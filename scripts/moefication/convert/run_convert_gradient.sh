@@ -47,7 +47,7 @@ if [ ${share_neurons} = "True" ]; then
     --score_scale_factor ${score_scale_factor} \
     --score_scale_factor_file_path "${score_scale_factor_file_path}" \
     --convert_type ${convert_type} \
-    --use_default_gate True
+    --use_random_gate True
 else
   OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.moefication.llama_convert \
@@ -61,7 +61,5 @@ else
     --score_scale_factor ${score_scale_factor} \
     --score_scale_factor_file_path "${score_scale_factor_file_path}" \
     --convert_type ${convert_type} \
-    --use_default_gate True
+    --use_random_gate True
 fi
-
-chmod -R 755 ${save_path} >/dev/null 2>&1

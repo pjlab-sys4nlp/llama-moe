@@ -25,8 +25,10 @@ def convert_llama_model(
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_default_gate=False,
+    use_random_gate=False,
     gate_type="mlp",  # "linear"
+    use_softmax=True,
+    multiply_gate_scores=True,
 ):
     """
     LlamaMoEModel
@@ -54,7 +56,7 @@ def convert_llama_model(
         this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -65,9 +67,11 @@ def convert_llama_model(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = gate_type
+    config_llama_moe.gate_use_softmax = use_softmax
     config_llama_moe.score_scale_factor = (
         1.0 if score_scale_factor is None else score_scale_factor
     )
+    config_llama_moe.multiply_gate_scores = multiply_gate_scores
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -92,9 +96,9 @@ def convert_llama_model(
                     model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate and gate_type == "mlp":
-            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        if not use_random_gate and gate_type == "mlp":
+            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu()
+            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu()
         model_llama_moe_state_dict["layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
     # fmt: on
 
@@ -123,8 +127,10 @@ def convert_llama_model_for_causal_lm(
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_default_gate=False,
+    use_random_gate=False,
     gate_type="mlp",  # "linear"
+    use_softmax=True,
+    multiply_gate_scores=True,
 ):
     """
     LlamaMoEForCausalLM
@@ -152,7 +158,7 @@ def convert_llama_model_for_causal_lm(
         this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -163,9 +169,11 @@ def convert_llama_model_for_causal_lm(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = gate_type
+    config_llama_moe.gate_use_softmax = use_softmax
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
+    config_llama_moe.multiply_gate_scores = multiply_gate_scores
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -190,9 +198,9 @@ def convert_llama_model_for_causal_lm(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate and gate_type == "mlp":
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        if not use_random_gate and gate_type == "mlp":
+            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu()
+            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
     # fmt: on
 
@@ -221,8 +229,10 @@ def convert_llama_model_for_sequence_classification(
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_default_gate=False,
+    use_random_gate=False,
     gate_type="mlp",  # "linear"
+    use_softmax=True,
+    multiply_gate_scores=True,
 ):
     """
     LlamaMoEForSequenceClassification
@@ -250,7 +260,7 @@ def convert_llama_model_for_sequence_classification(
         this_layer_size_expert = [this_layer_size_expert[j] for j in range(num_experts)]
         size_experts.append(this_layer_size_expert)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -261,9 +271,11 @@ def convert_llama_model_for_sequence_classification(
     config_llama_moe.num_selects = num_selects
     config_llama_moe.size_experts = size_experts
     config_llama_moe.gates = gate_type
+    config_llama_moe.gate_use_softmax = use_softmax
     config_llama_moe.score_scale_factor = (
-        1.0 if score_scale_factor is not None else score_scale_factor
+        1.0 if score_scale_factor is None else score_scale_factor
     )
+    config_llama_moe.multiply_gate_scores = multiply_gate_scores
 
     """initialize moe model"""
     print("Initializing llama-moe model...")
@@ -288,9 +300,9 @@ def convert_llama_model_for_sequence_classification(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_indices[layer_index] == expert_index].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate and gate_type == "mlp":
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
+        if not use_random_gate and gate_type == "mlp":
+            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu()
+            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
     # fmt: on
 
@@ -319,7 +331,7 @@ if __name__ == "__main__":
     num_experts = 8
     num_selects = 2
     score_scale_factor = 8.0
-    use_default_gate = False
+    use_random_gate = False
 
     convert_llama_model(
         llama_model_path,
@@ -330,7 +342,7 @@ if __name__ == "__main__":
         num_experts,
         num_selects,
         score_scale_factor=score_scale_factor,
-        use_default_gate=use_default_gate,
+        use_random_gate=use_random_gate,
     )
 
     # load test

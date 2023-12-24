@@ -1,12 +1,14 @@
 import re
 import subprocess
+from collections import Counter, defaultdict
 from pathlib import Path
-from collections import defaultdict, Counter
 
 
 def get_jobstate(job_id):
     cmd = f"sacct -j {job_id} -o state -n"
-    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
     ret = p.stdout.read().decode("utf8").strip()
     return ret
 
@@ -47,7 +49,12 @@ def check_result(filepath):
     obj = re.search(r"Tokenization Progress:\s*100%\s*\|.*\|\s*(\d+)/(\d+)", content)
     if obj is not None:
         progress, total = obj.groups()
-        if progress == total and progress is not None and total is not None and jobstate != "COMPLETED":
+        if (
+            progress == total
+            and progress is not None
+            and total is not None
+            and jobstate != "COMPLETED"
+        ):
             print(f"DEAD_COMPLETED: {data_type}/{part_id} - job: {job_id}")
             return "DEAD_COMPLETED"
 

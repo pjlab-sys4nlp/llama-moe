@@ -6,7 +6,7 @@ from transformers import LlamaConfig
 
 from smoe.utils.io import delete_file_or_dir, torch_load_template_score_file
 from smoe.utils.moefication.expert_split_residual import GradientSplitResidual
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 if __name__ == "__main__":
     # fmt: off

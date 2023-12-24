@@ -2,26 +2,23 @@ import argparse
 import os
 import pickle
 import random
-import types
+import sys
 
 import torch
 import torch.distributed as dist
 from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaTokenizer
-from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.collate_fn import tensor_dict_cat_collator
 from smoe.data.datasets_moefication import CommonDataset, LineByLineJsonlTextDataset
-from smoe.utils.model_operation.change_llama_forward import (
-    forward_llama_decoder_with_padding_mask,
-    forward_llama_mlp_with_feature_dumping,
-    forward_llama_model_with_padding_mask,
+from smoe.utils.model_operation.modify_llama_model import (
+    llama_with_feature_dumping,
+    llama_with_relu_activation,
 )
-from smoe.utils.model_operation.modify_llama_model import llama_with_feature_dumping
+
 
 # fmt: off
-
 def get_max_available_num(all_datasets, dataset_weight):
     """
     Get the maximum number of samples for each dataset.
@@ -135,6 +132,7 @@ if __name__ == "__main__":
     """load model"""
     print("Loading llama model...")
     model = LlamaForCausalLM.from_pretrained(args.model_path).model
+    # model = llama_with_relu_activation(model)
     model = llama_with_feature_dumping(model, args.local_rank, args.save_path, args.template, save_interval=args.save_interval)
     model.half()
     num_layers = model.config.num_hidden_layers
@@ -158,6 +156,7 @@ if __name__ == "__main__":
     model.eval()
     process_bar2 = tqdm(range(len(train_loader)), desc="forward step", position=0, leave=True)
     for train_step in process_bar2:
+        sys.stderr.flush()
         train_sampler.set_epoch(train_step)
         train_batch = next(iter_train)
         for key in train_batch.keys():

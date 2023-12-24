@@ -4,11 +4,11 @@ import os
 import warnings
 
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer
 
-from smoe.utils.list_operation import split_list_with_yield
+from smoe.utils.operations.operation_list import split_list_with_yield
 
 """for hidden feature generation"""
 

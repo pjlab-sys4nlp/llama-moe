@@ -30,9 +30,8 @@ for retain_percent in 99 98 95 90 80 75 70 60 50 40 30 25 20 13 10 06 05; do
     --num_experts 1 \
     --num_selects 1 \
     --convert_type ${convert_type} \
-    --use_default_gate True &
+    --use_random_gate True &
   sleep 1
 done
 
 wait
-chmod -R 755 ${save_path} >/dev/null 2>&1

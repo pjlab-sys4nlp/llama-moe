@@ -7,7 +7,7 @@ from transformers import LlamaConfig
 
 from smoe.utils.io import torch_load_template_score_file
 from smoe.utils.moefication.prune_llama import GradientPrune
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 if __name__ == "__main__":
     # fmt: off
