@@ -19,7 +19,7 @@ We build LLaMA-MoE with the following two steps:
 
 <h2 id="features">🔥 Features</h2>
 
-1. **Lightweight Models**: The total number of model parameters is only 6.7B, which is easy for deployment and research usage.
+1. **Lightweight Models**: The total number of model parameters is only 6.7B, which is friendly for deployment and research usage.
 2. **Multiple Expert Construction Methods**:
    1. Neuron-Independent: Random, Clustering, Co-activation Graph, Gradient ([Zhang et al., 2022](http://arxiv.org/abs/2110.01786), [Zuo et al., 2022](http://arxiv.org/abs/2204.07675))
    2. Neuron-Sharing: Inner, Inter (residual)
