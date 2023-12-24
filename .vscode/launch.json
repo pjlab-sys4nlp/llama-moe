@@ -16,7 +16,7 @@
             "type": "python",
             "request": "attach",
             "connect": {
-                "host": "SH-IDCA1404-10-140-54-12",
+                "host": "x.x.x.x",
                 "port": 5678
             },
             "pathMappings": [

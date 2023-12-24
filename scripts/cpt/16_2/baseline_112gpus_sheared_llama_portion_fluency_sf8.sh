@@ -12,7 +12,6 @@
 #SBATCH --nodes=14
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
-#SBATCH -x SH-IDCA1404-10-140-54-36,SH-IDCA1404-10-140-54-24
 
 # reserved spot
 

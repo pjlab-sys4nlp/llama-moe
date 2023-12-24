@@ -12,7 +12,6 @@
 #SBATCH --nodes=3
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
-#SBATCH -w SH-IDCA1404-10-140-54-11,SH-IDCA1404-10-140-54-36
 
 export OMP_NUM_THREADS=4
 

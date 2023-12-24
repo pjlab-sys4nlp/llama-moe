@@ -90,7 +90,7 @@ Based on the above information, the expected time could be calculated.
 
 The tensorboard `logging_dir` could be found at `outputs/<job-name>-<job-id>/runs/<logging-dir>`.
 
-For example, if my job name is `cpt-moe-fpt-bs16-48gpus` in the sbatch file, the tensorboard could be started from that by: `tensorboard --logdir outputs/cpt-moe-fpt-bs16-48gpus-1535835/runs/Jul31_14-12-00_SH-IDCA1404-10-140-54-100` .
+For example, if my job name is `cpt-moe-fpt-bs16-48gpus` in the sbatch file, the tensorboard could be started from that by: `tensorboard --logdir outputs/cpt-moe-fpt-bs16-48gpus-1535835/runs/Jul31_14-12-00` .
 
 For multiple tasks with different logging directories, you could run the following command:
 
@@ -101,5 +101,5 @@ $ tensorboard --logdir_spec short_name:dir1,short_name2:dir2 --port 8001
 Here, the `short_name` is an abbreviation for your task, and the port number could be changed manually if there's a port conflict. e.g.
 
 ```bash
-$ tensorboard --logdir_spec moe_from_scratch:outputs/cpt-llama-moe-scratch-lora-bs16-1476932/runs/Jul26_21-53-42_SH-IDCA1404-10-140-54-121,moe_lora:outputs/cpt-llama-lora-bs16-1476918/runs/Jul26_21-31-09_SH-IDCA1404-10-140-54-122 --port 8001
+$ tensorboard --logdir_spec moe_from_scratch:outputs/cpt-llama-moe-scratch-lora-bs16-1476932/runs/Jul26_21-53-42,moe_lora:outputs/cpt-llama-lora-bs16-1476918/runs/Jul26_21-31-09 --port 8001
 ```

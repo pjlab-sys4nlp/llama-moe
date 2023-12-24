@@ -8,7 +8,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116
 
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
