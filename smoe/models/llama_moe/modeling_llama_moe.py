@@ -29,18 +29,6 @@ _CONFIG_FOR_DOC = "LlamaMoEConfig"
 
 
 @dataclass
-class MoEDecoderLayerOutput(ModelOutput):
-    # zhutong: do not change the order of these fields!!
-    hidden_states: Optional[torch.FloatTensor] = None
-    balance_loss: Optional[float] = None
-    num_dropped_tokens: Optional[torch.Tensor] = None
-    gate_load: Optional[list[torch.Tensor]] = None
-    gate_importance: Optional[list[torch.Tensor]] = None
-    self_attn_weights: Optional[torch.FloatTensor] = None
-    present_key_value: Optional[torch.FloatTensor] = None
-
-
-@dataclass
 class BaseMoEModelOutputWithPast(ModelOutput):
     """
     Args:
@@ -121,7 +109,7 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
         past_key_value=None,
         output_attentions=False,
         use_cache=False,
-    ) -> MoEDecoderLayerOutput:
+    ) -> tuple:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -153,12 +141,6 @@ class LlamaMoEDecoderLayer(LlamaDecoderLayer):
             outputs += (self_attn_weights,)
         if use_cache:
             outputs += (present_key_value,)
-
-        for i, _o in enumerate(outputs):
-            if not isinstance(_o, torch.Tensor):
-                raise RuntimeError(
-                    f"outputs[{i}]({type(_o)}) should be torch.Tensor to support grad ckpt"
-                )
 
         return outputs
 
@@ -357,21 +339,20 @@ class LlamaMoEModel(LlamaModel, LlamaMoEPreTrainedModel):
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                 )
-            layer_outputs = MoEDecoderLayerOutput(*layer_outputs)
 
-            hidden_states = layer_outputs.hidden_states
-            if layer_outputs.balance_loss is not None:
-                balance_loss += layer_outputs.balance_loss
+            hidden_states = layer_outputs[0]
+            if layer_outputs[1] is not None:
+                balance_loss += layer_outputs[1]
 
             if use_cache:
-                next_decoder_cache += (layer_outputs.present_key_value,)
+                next_decoder_cache += (layer_outputs[6 if output_attentions else 5],)
 
             if output_attentions:
-                all_self_attns += (layer_outputs.self_attn_weights,)
+                all_self_attns += (layer_outputs[5],)
 
-            num_dropped_tokens += (layer_outputs.num_dropped_tokens,)
-            gate_load += (layer_outputs.gate_load,)
-            gate_importance += (layer_outputs.gate_importance,)
+            num_dropped_tokens += (layer_outputs[2],)
+            gate_load += (layer_outputs[3],)
+            gate_importance += (layer_outputs[4],)
 
         hidden_states = self.norm(hidden_states)
 

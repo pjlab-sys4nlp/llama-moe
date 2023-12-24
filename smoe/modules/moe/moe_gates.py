@@ -295,7 +295,8 @@ class TopKBalancedNoisyGate(BaseGate):
         top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # 选择并排序前k+1个权重
         top_k_logits = top_logits[:, :self.num_selects]
         top_k_indices = top_indices[:, :self.num_selects]
-        top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
+        top_k_scores = self.softmax(top_k_logits.to(torch.float32)) if self.use_softmax else top_k_logits
+        top_k_scores = top_k_scores.to(logits.dtype)
 
         """计算importance"""
         zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)

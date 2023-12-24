@@ -152,6 +152,12 @@ class ModelArguments:
     num_selects: int = field(
         default=4, metadata={"help": "The number of experts to be selected"}
     )
+    gate_balance_loss_weight: float = field(
+        default=1e-2,
+        metadata={
+            "help": "The weight of the balance loss for the gate, should be a float"
+        },
+    )
 
     def __post_init__(self):
         if self.config_overrides is not None and (

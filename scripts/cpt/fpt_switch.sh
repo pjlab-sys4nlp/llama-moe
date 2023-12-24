@@ -10,7 +10,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0
-#SBATCH -x SH-IDCA1404-10-140-54-116,SH-IDCA1404-10-140-54-15
 
 #SBATCH --nodes=7
 #SBATCH --gres=gpu:8
@@ -127,6 +126,3 @@ export LOGLEVEL=INFO
             --report_to none \
             --log_level info
 }
-
-# srun -p MoE -n1 -N1 -w SH-IDCA1404-10-140-54-43 scontrol listpids
-# srun -p MoE -n1 -N1 -w SH-IDCA1404-10-140-54-43 py-spy dump --pid 118340

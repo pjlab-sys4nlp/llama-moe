@@ -138,24 +138,64 @@ def test_weighted_streaming_loader():
     print(type(loader))
     print(loader.sampler, type(loader.sampler))
 
-    # for batch_idx, batch in enumerate(loader):
-    #     if batch_idx == 0:
-    #         print(f"RANK {ac.process_index}/{ac.num_processes} - {batch}")
-    #     if num_test_case <= 0:
-    #         break
-    #     assert len(batch["input_ids"]) == bsz
-    #     # print(
-    #     #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
-    #     # )
-    #     # assert sum(loader.dataset.consumed_tokens.values()) == (batch_idx + 1) * block_size
-    #     print(loader.dataset.prob_map)
-    #     num_test_case -= 1
-    #     lm_datasets.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
-    #     # loader.dataset.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
-    #     print(loader.dataset.prob_map)
-    # # print(
-    # #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
-    # # )
+    for batch_idx, batch in enumerate(loader):
+        if batch_idx == 0:
+            print(f"RANK {ac.process_index}/{ac.num_processes} - {batch}")
+        if num_test_case <= 0:
+            break
+        assert len(batch["input_ids"]) == bsz
+        # print(
+        #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+        # )
+        # assert sum(loader.dataset.consumed_tokens.values()) == (batch_idx + 1) * block_size
+        print(loader.dataset.prob_map)
+        num_test_case -= 1
+        lm_datasets.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
+        # loader.dataset.update_existed_prob_map({"en_cc": 0.5, "en_c4": 0.5})
+        print(loader.dataset.prob_map)
+    # print(
+    #     f"RANK {ac.process_index}/{ac.num_processes} - {loader.dataset.consumed_tokens} SUM: {sum(loader.dataset.consumed_tokens.values())}, Expected: {(batch_idx + 1) * bsz * block_size}"
+    # )
+
+
+def test_linked_dataset():
+    from accelerate import Accelerator
+
+    from smoe.data.dynamic_selection import AVERAGE_SLIMPAJAMA_DATA_PORTION
+
+    ac = Accelerator()
+
+    # folder_path = "/mnt/petrelfs/share_data/quxiaoye/SlimPajama-no-ad-processed"
+    folder_path = "/mnt/petrelfs/share_data/quxiaoye/SlimPajama-fluency-processed-agg"
+
+    num_test_case = 20000
+    block_size = 2048
+    bsz = 1
+
+    lm_datasets = SubDirWeightedPackedJsonlDataset(
+        folder_path,
+        prob_map=AVERAGE_SLIMPAJAMA_DATA_PORTION,
+        seed=1227,
+        block_size=block_size,
+    )
+    loader = DataLoader(
+        lm_datasets,
+        batch_size=bsz,
+        num_workers=0,
+        collate_fn=fault_tolerance_data_collator,
+        pin_memory=False,
+    )
+    loader = ac.prepare_data_loader(loader)
+    print(type(loader))
+    print(loader.sampler, type(loader.sampler))
+
+    for batch_idx, batch in enumerate(loader):
+        if batch_idx == 0:
+            print(f"RANK {ac.process_index}/{ac.num_processes} - {batch}")
+        if num_test_case <= 0:
+            break
+        assert len(batch["input_ids"]) == bsz
+        num_test_case -= 1
 
 
 def test_skip_tokens():
@@ -166,4 +206,5 @@ if __name__ == "__main__":
     # test_jsonl_dataset()
     # test_subdir_weighted_pack_with_type()
     # test_weighted_streaming()
-    test_weighted_streaming_loader()
+    # test_weighted_streaming_loader()
+    test_linked_dataset()

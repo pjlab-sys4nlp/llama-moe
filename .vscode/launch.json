@@ -5,11 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "tokenize",
+            "type": "python",
+            "request": "launch",
+            "module": "smoe.utils.tokenize",
+            "justMyCode": true
+        },
+        {
             "name": "Python: Remote Attach",
             "type": "python",
             "request": "attach",
             "connect": {
-                "host": "SH-IDCA1404-10-140-54-123",
+                "host": "x.x.x.x",
                 "port": 5678
             },
             "pathMappings": [

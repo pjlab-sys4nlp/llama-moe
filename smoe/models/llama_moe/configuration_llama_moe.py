@@ -1,11 +1,4 @@
-""" LLaMA model configuration"""
-
 from transformers.configuration_utils import PretrainedConfig
-from transformers.utils import logging
-
-logger = logging.get_logger(__name__)
-
-LLAMA_PRETRAINED_CONFIG_ARCHIVE_MAP = {}
 
 
 class LlamaMoEConfig(PretrainedConfig):
@@ -34,11 +27,11 @@ class LlamaMoEConfig(PretrainedConfig):
         rope_scaling=None,
         attention_bias=False,
         attention_dropout=0.0,
-        #### -------- moe expert configs -------- ####
+        # -------- moe expert configs --------
         num_experts=16,
         num_selects=4,
         size_experts=None,
-        #### -------- moe gate configs -------- ####
+        # -------- moe gate configs --------
         gate_type="TopKBalancedNoisyGate",
         gate_network="mlp",
         gate_use_softmax=True,
@@ -47,7 +40,7 @@ class LlamaMoEConfig(PretrainedConfig):
         gate_add_noise=True,
         # TopKBalancedNoisyGate
         gate_noise_epsilon=1e-2,
-        #### -------- moe calculator configs -------- ####
+        # -------- moe calculator configs --------
         calculator_type="UniversalCalculator",
         multiply_gate_scores=True,
         score_scale_factor=1.0,

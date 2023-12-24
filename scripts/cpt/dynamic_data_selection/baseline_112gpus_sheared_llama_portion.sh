@@ -12,7 +12,6 @@
 #SBATCH --nodes=14
 #SBATCH --gres=gpu:8
 #SBATCH --quotatype=reserved
-#SBATCH -x SH-IDCA1404-10-140-54-36
 
 # reserved spot
 
@@ -79,9 +78,11 @@ source ~/anaconda3/bin/activate smoe
     echo "global batch size: $global_bs"
     tokens_per_batch=$(echo "$global_bs * $block_size" | bc)
     echo "#tokens/batch: $tokens_per_batch"
-    warmup_steps=$(echo "$warmup_tokens / ($tokens_per_batch)" | bc)
+    # warmup_steps=$(echo "$warmup_tokens / ($tokens_per_batch)" | bc)
+    warmup_steps=100
     echo "warmup tokens: $warmup_tokens, warmup steps: $warmup_steps"
-    eval_steps=$(echo "$eval_tokens / ($tokens_per_batch)" | bc)
+    # eval_steps=$(echo "$eval_tokens / ($tokens_per_batch)" | bc)
+    eval_steps=340
     echo "eval interval (tokens): $eval_tokens, steps: $eval_steps"
 
     data_cache=resources/cache
@@ -92,7 +93,7 @@ source ~/anaconda3/bin/activate smoe
     scontrol write batch_script $SLURM_JOBID $output_dir/sbatch.sh
     git diff > $output_dir/diff.patch
     env > $output_dir/env
-    echo $comment > $output_dir/comment.txt
+    echo -e "Job ID: ${SLURM_JOB_ID}\n\nGit commit: $(git log -1 --oneline)\n\nGit branch: $(git branch | grep "*")\n\nComment: ${comment}" > $output_dir/comment.txt
     echo "$SLURM_JOB_ID" > $base_dir/latest.jobid
     ln -snf $output_dir $base_dir/latest.dir
     ln -snf $(scontrol show job $SLURM_JOB_ID | grep "StdOut=" | cut -d '=' -f 2) $base_dir/latest.log
@@ -136,7 +137,7 @@ source ~/anaconda3/bin/activate smoe
         --learning_rate ${lr} \
         --weight_decay 0.1 \
         --max_grad_norm 1.0 \
-        --warmup_steps 100 \
+        --warmup_steps ${warmup_steps} \
         --max_steps ${max_steps} \
         --max_train_samples ${max_train_samples} \
         --save_strategy steps \

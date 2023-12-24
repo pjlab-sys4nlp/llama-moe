@@ -13,7 +13,21 @@ from smoe.utils.vars import META_SUFFIX
 
 def get_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-s",
+        "--src_tokenizer",
+        required=False,
+        default=None,
+        help="source tokenizer filepath",
+    )
     parser.add_argument("-t", "--tokenizer", required=True, help="tokenizer filepath")
+    parser.add_argument(
+        "-c",
+        "--content_column",
+        required=False,
+        default="content",
+        help="content column name",
+    )
     parser.add_argument(
         "-i", "--input", required=True, help="filepath or dir with jsonl to tokenize"
     )
@@ -37,21 +51,21 @@ def get_parser():
     return args
 
 
-def load_jsonlines(filepath):
+def load_jsonlines(filepath, content_column: str = "content"):
     data = []
     with open(filepath, "r", encoding="utf8") as fin:
         for line in tqdm(fin, desc="Loading"):
             ins = json.loads(line)
-            if "content" in ins:
-                data.append({"content": ins["content"]})
+            if content_column in ins:
+                data.append({content_column: ins[content_column]})
     return data
 
 
-def load_txt(filepath):
+def load_txt(filepath, content_column: str = "content"):
     data = []
     with open(filepath, "r", encoding="utf8") as fin:
         for line in tqdm(fin, desc="Loading"):
-            data.append({"content": line.strip()})
+            data.append({content_column: line.strip()})
     return data
 
 
@@ -85,6 +99,12 @@ def prepare_meta(jsonl_filepath: str):
 def tokenize_jsonl():
     args = get_parser()
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, use_fast=args.use_fast)
+    if args.src_tokenizer is not None:
+        src_tokenizer = AutoTokenizer.from_pretrained(
+            args.src_tokenizer, use_fast=args.use_fast
+        )
+    else:
+        src_tokenizer = None
 
     input_path = Path(args.input)
     output_path = Path(args.output)
@@ -100,20 +120,27 @@ def tokenize_jsonl():
 
     def _tokenize_and_dump(input_filepath, output_filepath):
         if args.format == "jsonl":
-            data = load_jsonlines(input_filepath)
+            data = load_jsonlines(input_filepath, content_column=args.content_column)
         elif args.format == "txt":
-            data = load_txt(input_filepath)
+            data = load_txt(input_filepath, content_column=args.content_column)
         else:
             raise ValueError(f"{args.format} format not supported")
 
         ds = Dataset.from_list(data)
         column_names = ds.column_names
-        text_column_name = "content" if "content" in column_names else column_names[0]
+        # text_column_name = "content" if "content" in column_names else column_names[0]
+        # text_column_name = args.content_column
 
         def _tokenization_func(examples):
-            return {"input_ids": tokenizer(examples[text_column_name])["input_ids"]}
+            contents = examples[args.content_column]
+            if src_tokenizer is not None:
+                # decode input_ids to text
+                contents = src_tokenizer.batch_decode(
+                    contents, skip_special_tokens=True
+                )
+            return {"input_ids": tokenizer(contents)["input_ids"]}
 
-        ds = ds.filter(lambda example: text_column_name in example)
+        ds = ds.filter(lambda example: args.content_column in example)
         tokenized_ds = ds.map(
             _tokenization_func,
             batched=True,
@@ -123,7 +150,7 @@ def tokenize_jsonl():
         )
 
         tokenized_ds.to_json(output_filepath, lines=True, num_proc=args.num_proc)
-        prepare_meta(output_filepath)
+        # prepare_meta(output_filepath)
 
     if input_path.is_dir():
         input_files = list(input_path.glob(f"*.{args.format}"))
@@ -163,6 +190,13 @@ def update_meta_without_tokenization(data_dir: str):
 
 
 if __name__ == "__main__":
+    # import sys
+
+    # sys.argv = (
+    #     sys.argv
+    #     + "-s /mnt/petrelfs/share_data/zhutong/models/llama2_7B -t /mnt/petrelfs/share_data/zhutong/models/llama2_7B -i /mnt/petrelfs/share_data/zhutong/slimpajama_fluency_llama/en_arxiv/part-000000-79b0b564.jsonl -o arxiv.jsonl -f jsonl -p 1 --content_column input_ids".split()
+    # )
+
     tokenize_jsonl()
 
     # # uncomment and run: srun -p MoE -c 16 python -m smoe.utils.tokenize

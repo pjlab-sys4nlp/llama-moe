@@ -14,7 +14,7 @@ mkdir -p $logs_dir
 for data_type in $(ls $data_dir)
 do
     log_path=logs/tokenize_${data_type}_32clusters.log
-    nohup srun -p MoE -N1 -n1 --cpus-per-task=32 -x "SH-IDCA1404-10-140-54-[12,18,33,38,41,43,63,70-71,74,83,85]" \
+    nohup srun -p MoE -N1 -n1 --cpus-per-task=32 \
         python -m smoe.utils.tokenize \
             -f jsonl \
             -t $tokenizer_dir \
