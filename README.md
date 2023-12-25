@@ -3,7 +3,7 @@
   <img src="docs/imgs/title-favicon.png" width="200" alt="LLaMA-MoE favicon" style="border-radius: 5%;"><br />
   <span style="color:red">📢 <strong><i>A SMALLER AFFORDABLE MoE MODEL FOR EVERYONE!!</i></strong></span>
   <div>
-    <a href="https://huggingface.co/llama-moe" target="_blank">🤗 Model Weights</a> | <a href="#" target="_blank">📃 Technical Report</a> | <a href="#quick-start">🚀 Quick Start</a><br />
+    <a href="https://huggingface.co/llama-moe" target="_blank">🤗 Model Weights</a> | <a href="docs/LLaMA_MoE.pdf" target="_blank">📃 Technical Report</a> | <a href="#quick-start">🚀 Quick Start</a><br />
     <a href="#installation">⚙️ Installation Guide</a> | <a href="#expert-construction">🚧 Expert Construction</a> | <a href="#continual-pretraining">🚅 Continual Pre-training</a> | <a href="#evaluation">💎 Evaluation</a>
   </div>
 </div>
