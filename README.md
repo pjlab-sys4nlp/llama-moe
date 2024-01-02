@@ -155,12 +155,12 @@ python -m smoe.utils.tokenize \
 <h2 id="citation">📑 Citation</h2>
 
 ```bibtex
-@article{llama-moe-2023,
+@misc{llama-moe-2023,
   title={LLaMA-MoE: Building Mixture-of-Experts from LLaMA with Continual Pre-training},
   author={LLaMA-MoE Team},
-  journal={arXiv preprint arXiv:},
-  url={https://arxiv.org/abs/},
-  year={2023}
+  year={2023},
+  month={Dec},
+  url={https://github.com/pjlab-sys4nlp/llama-moe}
 }
 ```
 
