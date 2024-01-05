@@ -15,7 +15,7 @@ The conversion from LLaMA to LLaMA-MoE consists of two steps:
 
 ### Split
 
-#### Random Split (Neuron-Independent)
+#### 1. Random Split (Neuron-Independent)
 
 To randomly split the intermediate neurons in FFNs, you can run:
 
@@ -34,7 +34,7 @@ save_path="" # path to save the indices sets
 
 
 
-#### Clustering Split (Neuron-Independent)
+#### 2. Clustering Split (Neuron-Independent)
 
 To split the intermediate neurons in FFNs by k-means clustering, you can run:
 
@@ -56,15 +56,19 @@ proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 
 
 
-#### Co-activation Graph Split (Neuron-Independent)
+#### 3. Co-activation Graph Split (Neuron-Independent)
 
 > This part is not included in our technical report.
+>
+> We don’t recommend running this method due to its complexity.
 
 We also implenmented the co-activation graph based method in [MoEfication](https://arxiv.org/abs/2110.01786) here.
 
 You need to install [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download) first. Then you can run to following script to perform splitting:
 
 ```shell
+bash ./scripts/moefication/get_hidden_features/run_prepare_datasets.sh
+bash ./scripts/moefication/get_hidden_features/run_get_hidden_features.sh
 bash ./scripts/moefication/split/run_split_graph.sh
 ```
 
@@ -77,12 +81,12 @@ model_path="" # path to the LLaMA checkpoint
 save_path="" # path to save the indices sets
 
 metric="" # metric to measure the sparsity, choices: `l1_norm` `l2_norm` `plain`
-proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
+proj_type="" # outputs to use for constructing co-activation graph, should be set to `up_proj`
 ```
 
 
 
-#### Gradient Split
+#### 4. Gradient Split
 
 Before performing gradient-based splitting (Eq. 8 in the technical report), you need to prepare a bunch of pretraining data and group them into different clusters by running:
 
@@ -109,9 +113,36 @@ kernel="" # should be set to `l1_norm`
 importance_type="" # should be set to `feature_change`
 ```
 
+After that, the importance vector files will be saved to the `save_path` with the following file structure: 
+
+```shell
+# this is an example with 16 data clusters
+--Gradient16
+	-- llama2_7B-Gradients-l1_norm-sample-feature_change
+        -- 0
+            layers.0.mlp.gate_proj.weight.change # importance on the output of gate_proj
+            layers.0.mlp.up_proj.weight.change # importance on the output of (up_proj * gate_proj)
+            layers.1.mlp.gate_proj.weight.change
+            layers.1.mlp.up_proj.weight.change
+            ...
+        -- 1
+            layers.0.mlp.gate_proj.weight.change
+            layers.0.mlp.up_proj.weight.change
+            layers.1.mlp.gate_proj.weight.change
+            layers.1.mlp.up_proj.weight.change
+            ...
+        ...
+		-- 15
+            layers.0.mlp.gate_proj.weight.change
+            layers.0.mlp.up_proj.weight.change
+            layers.1.mlp.gate_proj.weight.change
+            layers.1.mlp.up_proj.weight.change
+            ...
+```
 
 
-##### Neuron Independent
+
+##### 4.1 Neuron Independent
 
 > This part is not included in our technical report.
 
@@ -134,12 +165,12 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
+proj_type="" # importance vector to use, should be set to `up_proj`
 ```
 
 
 
-##### Inner-Sharing
+##### 4.2 Inner-Sharing
 
 Here we use the same entrance as the **Neuron Independent** strategy above for gradient split.
 
@@ -160,12 +191,12 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
+proj_type="" # importance vector to use, should be set to `up_proj`
 ```
 
 
 
-##### Inter-Sharing (Residual MoE)
+##### 4.3 Inter-Sharing (Residual MoE)
 
 You can run the following script to perform inter-sharing split:
 
@@ -187,7 +218,7 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
+proj_type="" # importance vector to use, should be set to `up_proj`
 ```
 
 
@@ -226,14 +257,14 @@ bash ./scripts/moefication/convert/run_convert_gradient_residual.sh
 
 ## File Structure
 
-```
+```shell
 --smoe
 	-- scripts
         -- moefication
             -- convert
-            -- get_hidden_features (deprecated)
-            -- prune (deprecated)
-            -- select (deprecated)
+            -- get_hidden_features (deprecated, will be removed later)
+            -- prune (deprecated, will be removed later)
+            -- select (deprecated, will be removed later)
             -- split
     -- smoe
         -- entrypoint
