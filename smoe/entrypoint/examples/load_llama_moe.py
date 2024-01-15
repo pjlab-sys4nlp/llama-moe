@@ -19,40 +19,38 @@ def main(args):
     print("Loading model...")
 
     if args.model_type == "LlamaMoEModel":
-        model_llama_moe = LlamaMoEModel.from_pretrained(args.model_path)
+        model = LlamaMoEModel.from_pretrained(args.model_path)
     elif args.model_type == "LlamaMoEForCausalLM":
-        model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.model_path)
+        model = LlamaMoEForCausalLM.from_pretrained(args.model_path)
     elif args.model_type == "LlamaMoEForSequenceClassification":
-        model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(
-            args.model_path
-        )
+        model = LlamaMoEForSequenceClassification.from_pretrained(args.model_path)
     else:
         raise ValueError
 
-    model_llama_moe.config.use_cache = False
+    model.config.use_cache = False
 
     # set moe configs
-    model_llama_moe.set_moe_num_selects(1)  # 修改专家的选择数量
+    model.set_moe_num_selects(1)  # 修改专家的选择数量
 
     # set gate configs
-    model_llama_moe.set_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
-    model_llama_moe.set_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
-    model_llama_moe.set_moe_gate_balance_loss_weight(0.02)  # 修改平衡loss的权重
-    model_llama_moe.set_moe_gate_add_noise(True)  # 修改是否在训练时添加随机噪声到门控输出
-    if model_llama_moe.config.gate_type == "TopKBalancedNoisyGate":
-        model_llama_moe.set_moe_gate_noise_epsilon(0.02)  # 修改噪声的大小
+    model.set_moe_gate_use_softmax(True)  # 修改是否使用Softmax对门控输出进行激活
+    model.set_moe_gate_use_balance(True)  # 修改是否在训练时使用loss平衡专家选择的样本数量
+    model.set_moe_gate_balance_loss_weight(0.02)  # 修改平衡loss的权重
+    model.set_moe_gate_add_noise(True)  # 修改是否在训练时添加随机噪声到门控输出
+    if model.config.gate_type == "TopKBalancedNoisyGate":
+        model.set_moe_gate_noise_epsilon(0.02)  # 修改噪声的大小
 
     # set calculator configs
-    model_llama_moe.set_moe_calculator_multiply_gate_scores(True)  # 修改是否对专家输出加权
-    model_llama_moe.set_moe_calculator_score_scale_factor(16.0)  # 修改专家输出的权重放缩倍数
-    if model_llama_moe.config.calculator_type == "SwitchDropTokenCalculator":
-        model_llama_moe.set_moe_calculator_drop_tokens(True)  # 重新设置是否丢弃超出专家容量的token
-        model_llama_moe.set_moe_calculator_dropped_padding("input")
-        model_llama_moe.set_moe_calculator_capacity_factor(1.25)
+    model.set_moe_calculator_multiply_gate_scores(True)  # 修改是否对专家输出加权
+    model.set_moe_calculator_score_scale_factor(16.0)  # 修改专家输出的权重放缩倍数
+    if model.config.calculator_type == "SwitchDropTokenCalculator":
+        model.set_moe_calculator_drop_tokens(True)  # 重新设置是否丢弃超出专家容量的token
+        model.set_moe_calculator_dropped_padding("input")
+        model.set_moe_calculator_capacity_factor(1.25)
 
     # reset
-    model_llama_moe.reset_gate_network()  # 重新随机初始化门控网络
-    model_llama_moe.reset_experts()  # 重新初始化专家参数
+    model.reset_gate_network()  # 重新随机初始化门控网络
+    model.reset_experts()  # 重新初始化专家参数
 
     """prepare data"""
     sentence_list = [
@@ -70,9 +68,17 @@ def main(args):
 
     """forward test"""
     print("Forwarding inputs...")
-    model_llama_moe.to(device)
+    model.half()
+    model.to(device)
     tokens.to(device)
-    result = model_llama_moe(**tokens)  # noqa: F841
+    result = model.generate(**tokens, repetition_penalty=2.0, max_length=256)
+    print(result)
+
+    for i in range(result.shape[0]):
+        print(result[i])
+        decoded_text = tokenizer.decode(result[i], skip_special_tokens=True)
+        print(decoded_text)
+
     print("Done!")
 
 

@@ -1,4 +1,5 @@
 import os
+import sys
 
 import numpy as np
 import torch
@@ -78,38 +79,41 @@ class MLPGate(BaseGate):
             # m.bias.data[:] = 0
         # fmt: on
 
+    @torch.no_grad()
     def calculate_scores(self, hidden_outputs, expert_masks, use_softmax=False):
         # fmt: off
-        with torch.no_grad():
-            if self.select_criterion == "plain":
-                scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的输出总值，shape(batch_size, expert_num)
-                scores = torch.abs(scores)
+        if self.select_criterion == "plain":
+            scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的输出总值，shape(batch_size, expert_num)
+            scores = torch.abs(scores)
 
-            elif self.select_criterion == "positive":
-                hidden_outputs_mask = (hidden_outputs < 0)  # 选出输出值小于0的神经元，标记其为死神经元
-                hidden_outputs[hidden_outputs_mask] = 0  # 死神经元的输出置零
-                scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
+        elif self.select_criterion == "positive":
+            hidden_outputs_mask = (hidden_outputs < 0)  # 选出输出值小于0的神经元，标记其为死神经元
+            hidden_outputs[hidden_outputs_mask] = 0  # 死神经元的输出置零
+            scores = torch.matmul(hidden_outputs, expert_masks)  # 各个专家所对应神经元的正向激活程度总值，shape(batch_size, expert_num)
 
-            elif self.select_criterion == "l1_norm":
-                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+        elif self.select_criterion == "l1_norm":
+            # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
 
-                hidden_outputs_l1 = pass_kernel_function(hidden_outputs, criterion="l1_norm")  # 输出值L1范数
-                # hidden_outputs_mask = (hidden_outputs_l1 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
-                # hidden_outputs_l1[hidden_outputs_mask] = 0  # 死神经元的输出置零
-                scores = torch.matmul(hidden_outputs_l1, expert_masks)  # 各个专家所对应神经元的输出值L1范数总值，shape(batch_size, expert_num)
+            hidden_outputs_l1 = pass_kernel_function(hidden_outputs, criterion="l1_norm")  # 输出值L1范数
+            # hidden_outputs_mask = (hidden_outputs_l1 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+            # hidden_outputs_l1[hidden_outputs_mask] = 0  # 死神经元的输出置零
+            scores = torch.matmul(hidden_outputs_l1, expert_masks)  # 各个专家所对应神经元的输出值L1范数总值，shape(batch_size, expert_num)
 
-            elif self.select_criterion == "l2_norm":
-                # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
+        elif self.select_criterion == "l2_norm":
+            # threshold = 0.001 if self.criterion_config is None else self.criterion_config["threshold"]
 
-                hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
-                # hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
-                # hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
-                scores = torch.matmul(hidden_outputs_l2, expert_masks)  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
+            hidden_outputs_l2 = pass_kernel_function(hidden_outputs, criterion="l2_norm")  # 输出值L2范数
+            # hidden_outputs_mask = (hidden_outputs_l2 <= threshold)  # 选出输出值L2范数小于等于给定阈值的神经元，标记其为死神经元
+            # hidden_outputs_l2[hidden_outputs_mask] = 0  # 死神经元的输出置零
+            scores = torch.matmul(hidden_outputs_l2, expert_masks)  # 各个专家所对应神经元的输出值L2范数总值，shape(batch_size, expert_num)
 
-            if use_softmax:
-                scores = nn.Softmax(1)(scores)
-            else:
-                scores /= scores.max()  # 归一化
+        if use_softmax:
+            scores = nn.Softmax(1)(scores)
+        else:
+            # scores /= scores.max()  # 归一化
+            topk_scores, topk_indices = torch.topk(scores, self.config.num_selects, dim=1)
+            scores = torch.zeros((scores.shape[0], self.config.num_experts), device=scores.device)
+            scores.scatter_(1, topk_indices, 1.0)
 
         return scores
         # fmt: on
@@ -119,7 +123,7 @@ class MLPGate(BaseGate):
         device,
         batch_size=1024,
         train_epochs=100,
-        lr=0.01,
+        lr=0.1,
         accumulate_steps=1,
         use_balance=False,
         add_noise=False,
@@ -158,7 +162,7 @@ class MLPGate(BaseGate):
 
         optimizer = torch.optim.AdamW(self.mlp_model.parameters(), lr=lr)
         # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, train_epochs)
-        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.85, threshold=0.03, patience=5)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.9, threshold=0.05, patience=10, min_lr=lr * 0.01)
 
         if use_softmax:
             loss_function = torch.nn.KLDivLoss(reduction="batchmean")
@@ -182,7 +186,7 @@ class MLPGate(BaseGate):
             "acc": [],
             "epochs": []
         }
-        self.save_loss = 1000000
+        self.save_loss = float("inf")
         self.save_acc = 0
         self.save_epoch = -1
 
@@ -204,6 +208,7 @@ class MLPGate(BaseGate):
             iter_train = iter(self.train_loader)
             process_bar2 = tqdm(range(len(self.train_loader)), desc="training step", leave=False)
             for train_step in process_bar2:
+                sys.stderr.flush()
                 if train_step >= len(self.train_loader):
                     break
                 train_loss_this_step = []
@@ -234,6 +239,7 @@ class MLPGate(BaseGate):
                         loss = loss_function(torch.log(pred.view(-1)), scores.view(-1))  # KL损失
                     else:
                         loss = loss_function(pred.view(-1), scores.view(-1))  # BCE损失
+
                     loss += gate_loss
                     loss.backward()
 

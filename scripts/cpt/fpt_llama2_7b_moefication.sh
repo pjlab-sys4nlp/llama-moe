@@ -97,6 +97,7 @@ source ~/anaconda3/bin/activate smoe
     echo "Node IP: $head_node_ip"
 
         # --resume_from_checkpoint "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2145594/checkpoint-680/" \
+        # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2182257/checkpoint-4080/ \
     srun torchrun \
     --nnodes ${num_nodes} \
     --nproc_per_node ${num_gpu_per_node} \
@@ -105,7 +106,6 @@ source ~/anaconda3/bin/activate smoe
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
     smoe/entrypoint/cpt/cpt_fpt.py \
-        --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2182257/checkpoint-4080/ \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \
         --model_type ${model_type} \

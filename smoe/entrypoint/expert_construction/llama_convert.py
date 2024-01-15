@@ -1,17 +1,12 @@
 import argparse
 import os
 
-from smoe.models.llama_moe.modeling_llama_moe import (
-    LlamaMoEForCausalLM,
-    LlamaMoEForSequenceClassification,
-    LlamaMoEModel,
-)
 from smoe.utils.expert_construction.convert_llama_moe import (
     convert_llama_model,
     convert_llama_model_for_causal_lm,
     convert_llama_model_for_sequence_classification,
 )
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 # fmt: off
 if __name__ == "__main__":
@@ -24,14 +19,21 @@ if __name__ == "__main__":
 
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
+
+    parser.add_argument('--use_random_gate', type=str, default="False")
+    parser.add_argument('--gate_type', type=str, default="mlp", choices=["mlp", "linear"])
+    parser.add_argument('--use_softmax', type=str, default='True')
+    parser.add_argument('--multiply_gate_scores', type=str, default='True')
+
     parser.add_argument('--score_scale_factor', type=float, default=1.0, help='scale factor for experts in all layers')
     parser.add_argument('--score_scale_factor_file_path', type=str, default=None, help='file storing the layer-wise scale factors, this will override the argument "score_scale_factor"')
 
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
-    parser.add_argument('--use_default_gate', type=str, default="False")
 
     args = parser.parse_args()
-    args.use_default_gate = str2bool(args.use_default_gate)
+    args.use_softmax = str2bool(args.use_softmax)
+    args.multiply_gate_scores = str2bool(args.multiply_gate_scores)
+    args.use_random_gate = str2bool(args.use_random_gate)
     print(args, "\n")
 
     if args.score_scale_factor_file_path is not None and args.score_scale_factor_file_path != "":
@@ -50,7 +52,10 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate,
+            gate_type=args.gate_type,
+            use_softmax=args.use_softmax,
+            multiply_gate_scores=args.multiply_gate_scores,
         )
     elif args.convert_type == "LlamaMoEForCausalLM":
         convert_llama_model_for_causal_lm(
@@ -62,7 +67,10 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate,
+            gate_type=args.gate_type,
+            use_softmax=args.use_softmax,
+            multiply_gate_scores=args.multiply_gate_scores,
         )
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         convert_llama_model_for_sequence_classification(
@@ -74,7 +82,10 @@ if __name__ == "__main__":
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_default_gate=args.use_default_gate
+            use_random_gate=args.use_random_gate,
+            gate_type=args.gate_type,
+            use_softmax=args.use_softmax,
+            multiply_gate_scores=args.multiply_gate_scores,
         )
     else:
         raise ValueError

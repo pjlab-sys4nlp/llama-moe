@@ -26,7 +26,7 @@ def convert_llama_model_neuron_index_residual(
     num_selects,
     score_scale_factor=None,
     score_scale_factor_residual=None,
-    use_default_gate=False,
+    use_random_gate=False,
 ):
     """
     LlamaMoEResidualModel
@@ -74,7 +74,7 @@ def convert_llama_model_neuron_index_residual(
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -135,7 +135,7 @@ def convert_llama_model_neuron_index_residual(
                     model_llama_moe_state_dict["layers.{}.mlp.residual_block.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[residual_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_random_gate:
             model_llama_moe_state_dict["layers.{}.mlp.moe_layer.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["layers.{}.mlp.moe_layer.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["layers.{}.mlp.moe_layer.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
@@ -168,7 +168,7 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
     num_selects,
     score_scale_factor=None,
     score_scale_factor_residual=None,
-    use_default_gate=False,
+    use_random_gate=False,
 ):
     """
     LlamaMoEResidualForCausalLM
@@ -216,7 +216,7 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -279,7 +279,7 @@ def convert_llama_model_for_causal_lm_neuron_index_residual(
                     model_llama_moe_state_dict["model.layers.{}.mlp.residual_block.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[residual_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_random_gate:
             model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
@@ -312,7 +312,7 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
     num_selects,
     score_scale_factor=None,
     score_scale_factor_residual=None,
-    use_default_gate=False,
+    use_random_gate=False,
 ):
     """
     LlamaMoEResidualForSequenceClassification
@@ -360,7 +360,7 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
         size_experts.append(this_layer_size_expert)
         size_experts_residual.append(this_layer_size_expert_residual)
 
-        if not use_default_gate:
+        if not use_random_gate:
             this_layer_gate = torch_load_template_file(select_gate_path, template, i)
             moe_gates.append(this_layer_gate)
 
@@ -420,7 +420,7 @@ def convert_llama_model_for_sequence_classification_neuron_index_residual(
                     model_llama_moe_state_dict["model.layers.{}.mlp.residual_block.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[residual_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_default_gate:
+        if not use_random_gate:
             model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
             model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.moe_layer.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     num_experts_residual = 2
     score_scale_factor = 8.0
     score_scale_factor_residual = 8.0
-    use_default_gate = True
+    use_random_gate = True
 
     convert_llama_model_neuron_index_residual(
         llama_model_path,
@@ -468,7 +468,7 @@ if __name__ == "__main__":
         num_selects,
         score_scale_factor=score_scale_factor,
         score_scale_factor_residual=score_scale_factor_residual,
-        use_default_gate=use_default_gate,
+        use_random_gate=use_random_gate,
     )
 
     # load test

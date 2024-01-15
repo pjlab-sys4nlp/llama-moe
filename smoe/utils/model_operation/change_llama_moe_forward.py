@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 from transformers.utils import logging
 
@@ -598,3 +600,96 @@ def forward_llama_moe_model_with_padding_mask(
         hidden_states=all_hidden_states,
         attentions=all_self_attns,
     )
+
+
+def forward_topk_balanced_noisy_gate_with_selected_pair_recording(self, x):
+    """先计算所有专家的权重值"""
+    logits_gate = self.gate_network(x)  # gate计算出的权重
+    if self.training and self.add_noise:
+        noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
+        noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
+        logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
+        logits = logits_gate + logits_noise  # 最终权重
+    else:
+        logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
+
+    """选出前k个权重，并计算各个专家的分数scores"""
+    top_logits, top_indices = logits.topk(
+        min(self.num_selects + 1, self.num_experts), dim=1
+    )  # 选择并排序前k+1个权重
+    top_k_logits = top_logits[:, : self.num_selects]
+    top_k_indices = top_indices[:, : self.num_selects]
+    top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
+
+    """计算importance"""
+    zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
+    scores_filtered = zeros.scatter(
+        dim=1, index=top_k_indices, src=top_k_scores
+    )  # shape(batch_size, num_experts)
+    importance = scores_filtered.sum(0)  # shape(num_experts)
+
+    """计算load"""
+    # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+    if self.training:
+        if self.add_noise and self.num_selects != self.num_experts:
+            batch_size = top_logits.size(0)
+            m = top_logits.size(1)
+            top_values_flat = top_logits.flatten()
+            threshold_positions_if_in = (
+                torch.arange(batch_size, device=x.device) * m + self.num_selects
+            )
+            threshold_if_in = torch.unsqueeze(
+                torch.gather(top_values_flat, 0, threshold_positions_if_in), 1
+            )
+            is_in = torch.gt(logits_noise, threshold_if_in)
+            threshold_positions_if_out = threshold_positions_if_in - 1
+            threshold_if_out = torch.unsqueeze(
+                torch.gather(top_values_flat, 0, threshold_positions_if_out), 1
+            )
+            # is each value currently in the top k.
+            prob_if_in = self.normal.cdf(
+                (logits_gate - threshold_if_in) / noise_control
+            )
+            prob_if_out = self.normal.cdf(
+                (logits_gate - threshold_if_out) / noise_control
+            )
+            prob = torch.where(is_in, prob_if_in, prob_if_out)
+            load = prob.sum(0)
+        else:
+            load = (scores_filtered > 0).sum(0)
+            if not self.add_noise and not self.warned:
+                warnings.warn(
+                    'Gradient-trackable implementation for load calculation is only available when "add_noise=True". '
+                    'Training without noise will block the gradient from "load" path and lead to inconsistency in optimization objectives.'
+                )
+                self.warned = True
+    else:
+        load = (scores_filtered > 0).sum(0)
+
+    """计算balance loss"""
+    if self.use_balance:
+        balance_loss = self.cv_squared(importance) + self.cv_squared(load)
+        balance_loss *= self.balance_loss_weight
+    else:
+        balance_loss = torch.tensor(-100.0, device=x.device)
+
+    # print("weight", self.gate_network.weight, sep="\n")
+    # print("logits_gate", logits_gate, sep="\n")
+    # print("importance", importance, sep="\n")
+    # print("load", load, sep="\n")
+    # print("balance_loss", balance_loss, sep="\n")
+
+    ###########################################
+    select_pairs = torch.split(top_k_indices, 1, dim=0)
+    for pair in select_pairs:
+        pair_list = pair.tolist()
+        self.load_record.append(pair_list)
+    ###########################################
+
+    return {
+        "topK_indices": top_k_indices,
+        "topK_scores": top_k_scores,
+        "balance_loss": balance_loss,
+        "load": load,
+        "importance": importance,
+    }

@@ -109,6 +109,7 @@ source ~/anaconda3/bin/activate smoe
     echo "Node IP: $head_node_ip"
     echo "Node list: $SLURM_JOB_NODELIS"
 
+        # --resume_from_checkpoint "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_split_112gpus_16_2/outputs/cpt-llama2_random_split_112gpus_16_2_scale_factor_8-2340407/checkpoint-1020/" \
     srun torchrun \
     --nnodes ${num_nodes} \
     --nproc_per_node ${num_gpu_per_node} \
@@ -117,7 +118,6 @@ source ~/anaconda3/bin/activate smoe
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
     smoe/entrypoint/cpt/cpt_fpt.py \
-        --resume_from_checkpoint "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_random_split_112gpus_16_2/outputs/cpt-llama2_random_split_112gpus_16_2_scale_factor_8-2340407/checkpoint-1020/" \
         --prob_map "sheared_llama" \
         --num_selects ${num_selects} \
         --moe_calculator_score_scale_factor ${scale_factor} \

@@ -1,13 +1,12 @@
 import argparse
 import os
 
-import torch
 from tqdm import tqdm
 from transformers import LlamaConfig
 
 from smoe.utils.expert_construction.expert_split import GradientSplit
 from smoe.utils.io import delete_file_or_dir, torch_load_template_score_file
-from smoe.utils.string_operation import str2bool
+from smoe.utils.operations.operation_string import str2bool
 
 if __name__ == "__main__":
     # fmt: off

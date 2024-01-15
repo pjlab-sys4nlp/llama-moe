@@ -113,8 +113,8 @@ export LOGLEVEL=INFO
             --max_tokens ${max_tokens}\
             --torch_compile True \
             --debug_mode \
-            --resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1872010/checkpoint-10
 }
+            # --resume_from_checkpoint outputs/cpt-moe-fpt-test_lr_change-1872010/checkpoint-10
 #SBATCH --job-name=cpt-moe-fpt-test_lr_change
 #改动前：--logging_steps 10 \
 #改动后：--logging_steps 1 \

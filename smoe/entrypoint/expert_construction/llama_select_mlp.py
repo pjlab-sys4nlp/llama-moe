@@ -25,18 +25,24 @@ if __name__ == "__main__":
 
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
     parser.add_argument('--select_criterion', type=str, default='l2_norm', choices=["plain", "positive", "l1_norm", "l2_norm"])
+    parser.add_argument('--mlp_init_criterion', type=str, default='weight', choices=["weight", "random"])
     parser.add_argument('--num_experts', type=int, default=8, help='number of experts')
     parser.add_argument('--num_selects', type=int, default=2, help='number of selected experts')
-    parser.add_argument('--use_softmax', action='store_true')  # MLP Gate输出是否使用softmax激活
+
+    parser.add_argument('--use_balance', type=str, default='False')
+    parser.add_argument('--balance_loss_lambda', type=float, default=0.0)
+    parser.add_argument('--add_noise', type=str, default='False')
+    parser.add_argument('--use_softmax', type=str, default='False')  # MLP Gate输出是否使用softmax激活
 
     parser.add_argument('--data_use_percent', type=float, default=1.0, help="percentage of data file to use")
     parser.add_argument('--train_percent', type=float, default=0.95, help="percentage of training data")
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--lr', type=float, default=0.1)
 
     args = parser.parse_args()
-    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion)
+    args.use_softmax = str2bool(args.use_softmax)
+    args.save_path = os.path.join(args.save_path, os.path.split(args.model_path)[1] + "-" + str(args.num_experts) + "Expert-Select-MLP-" + args.select_criterion+"-" + args.mlp_init_criterion)
     print(args, "\n")
 
     """load model"""
@@ -82,10 +88,10 @@ if __name__ == "__main__":
         # else:
         #     criterion_config = None
 
-        center = MLPGate(args, model, train_loader, valid_loader, expert_indices, layer_idx,
-                         select_criterion=args.select_criterion, criterion_config=None)
-        center.train(device, batch_size=args.batch_size, train_epochs=args.epochs, lr=args.lr, accumulate_steps=1,
-                     use_balance=True, add_noise=False, use_softmax=args.use_softmax, balance_loss_lambda=0.0001)
+        selector = MLPGate(args, model, train_loader, valid_loader, expert_indices, layer_idx,
+                           select_criterion=args.select_criterion, mlp_init_criterion=args.mlp_init_criterion, criterion_config=None)
+        selector.train(device, batch_size=args.batch_size, train_epochs=args.epochs, lr=args.lr, accumulate_steps=1,
+                       use_balance=args.use_balance, add_noise=args.add_noise, use_softmax=args.use_softmax, balance_loss_lambda=args.balance_loss_lambda)
 
     if args.save_visualization_path != "":
         if "gate_proj" in args.template:

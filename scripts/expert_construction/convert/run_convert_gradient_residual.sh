@@ -48,6 +48,4 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --score_scale_factor ${score_scale_factor} \
   --score_scale_factor_residual ${score_scale_factor_residual} \
   --convert_type ${convert_type} \
-  --use_default_gate True
-
-chmod -R 755 ${save_path} >/dev/null 2>&1
+  --use_random_gate True

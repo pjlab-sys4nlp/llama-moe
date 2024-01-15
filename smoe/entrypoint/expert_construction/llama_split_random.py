@@ -2,7 +2,7 @@ import argparse
 import os
 
 from tqdm import tqdm
-from transformers import LlamaConfig
+from transformers import AutoConfig
 
 from smoe.utils.expert_construction.expert_split import RandomSplit
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     print(args, "\n")
 
     print("Loading llama config...")
-    config = LlamaConfig.from_pretrained(args.model_path)
+    config = AutoConfig.from_pretrained(args.model_path)
 
     for i in tqdm(range(config.num_hidden_layers)):
         split = RandomSplit(args, config, args.template, i)
