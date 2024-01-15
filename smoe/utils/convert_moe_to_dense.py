@@ -1,5 +1,5 @@
 """
-Convert MoEfication models back to dense models.
+Convert MoE models back to dense models.
 """
 import json
 import re

@@ -30,17 +30,17 @@ source ~/anaconda3/bin/activate smoe
     #  export CUDA_LAUNCH_BLOCKING=1
 
     ##############################################################
-    ############### LLAMA 7B Moefication 16Experts ###############
+    ############### LLAMA 7B 16Experts ###############
     #  comment="llama 7B residual, gradient, 2 + 2/14 | soft residual 2.0 | soft moe 2.0 | GPU num 1, per-device bs 64, lr 1e-4"
     #  pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEResidualForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama_7B-14Select2-2Residuals-688Neurons-Share
 
     ##############################################################
     ######## LLAMA 2 7B 16 Experts all kinds of ablations ########
-    #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
-    #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
-    #  comment="llama 2 7B, residual 2, moefication gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+    #  comment="llama 2 7B, residual 2, gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+    #  comment="llama 2 7B, residual 2, gradient 2/14 | residual plain soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
+    #  comment="llama 2 7B, residual 2, gradient 2/14 | residual learn soft 8.0, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
     model_type="llama_moe"
-    comment="llama 2 7B, moefication gradient 4/16, per-device bsz 32, lr 2e-4, 112gpus"
+    comment="llama 2 7B, gradient 4/16, per-device bsz 32, lr 2e-4, 112gpus"
     pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/LlamaMoEForCausalLM/Gradient-max-l1_norm-sample-feature_change/llama2_7B-16Select4-688Neurons
 
     #  comment="llama 2 7B, residual 2, share gradient 2/14 | residual hard, moe soft 8.0 | GPU num 16, per-device bs 32, lr 3e-4"
@@ -97,6 +97,7 @@ source ~/anaconda3/bin/activate smoe
     echo "Node IP: $head_node_ip"
 
         # --resume_from_checkpoint "/mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2145594/checkpoint-680/" \
+        # --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2182257/checkpoint-4080/ \
     srun torchrun \
     --nnodes ${num_nodes} \
     --nproc_per_node ${num_gpu_per_node} \
@@ -105,7 +106,6 @@ source ~/anaconda3/bin/activate smoe
     --rdzv_backend c10d \
     --rdzv_endpoint $head_node:29518 \
     smoe/entrypoint/cpt/cpt_fpt.py \
-        --resume_from_checkpoint /mnt/petrelfs/share_data/quxiaoye/runs/llama2_moefication_scale4_112gpus/outputs/cpt-llama2_moefication_scale4_112gpus-2182257/checkpoint-4080/ \
         --deepspeed ${deepspeed_config_file} \
         --model_name_or_path ${pretrained_model} \
         --model_type ${model_type} \

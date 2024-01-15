@@ -1,5 +1,31 @@
 # 🚅 Training Guide
 
+##  Tokenization
+
+Download [SlimPajama](https://www.cerebras.net/blog/slimpajama-a-627b-token-cleaned-and-deduplicated-version-of-redpajama) into `/path_to_data` and put data from different domains into separate folders:
+  - `/path_to_data/en_arxiv`
+  - `/path_to_data/en_book`
+  - `/path_to_data/en_c4`
+  - `/path_to_data/en_cc`
+  - `/path_to_data/en_stack`
+  - `/path_to_data/en_wikipedia`
+  - `/path_to_data/github`
+
+Each file should be end with `*.jsonl` and each line looks like:
+```
+{"id": "id-info", "content": "raw text to be tokenized"}
+```
+
+Run the following command to tokenize the data in each folder:
+
+```bash
+python -m smoe.utils.tokenize \
+  -f jsonl \
+  -t /path_to_tokenizer \
+  -i /path_to_data/en_arxiv \
+  -o /path_to_data_tokenized/en_arxiv
+```
+
 ## 🗞️ Executive Scripts
 
 | Description               | Path                                                                                   |
@@ -58,7 +84,7 @@ model_type="llama"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B
 ```
 
-For LLaMA with MoEfication, use the following settings:
+For LLaMA-MoE, use the following settings:
 ```bash
 model_type="llama_moe"
 pretrained_model=/mnt/petrelfs/share_data/quxiaoye/models/llama_7B_MoE_16Select4-l2_norm
