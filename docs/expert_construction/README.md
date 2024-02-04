@@ -1,4 +1,4 @@
-# MoEfication of LLaMA Model
+# Expert Construction of LLaMA Model
 
 This documentation provides the procedures to convert a LLaMA model to LLaMA-MoE.
 
@@ -20,7 +20,7 @@ The conversion from LLaMA to LLaMA-MoE consists of two steps:
 To randomly split the intermediate neurons in FFNs, you can run:
 
 ```shell
-bash ./scripts/moefication/split/run_split_random.sh
+bash ./scripts/expert_construction/split/run_split_random.sh
 ```
 
 Remember to change the following variables:
@@ -39,7 +39,7 @@ save_path="" # path to save the indices sets
 To split the intermediate neurons in FFNs by k-means clustering, you can run:
 
 ```shell
-bash ./scripts/moefication/split/run_split_clustering.sh
+bash ./scripts/expert_construction/split/run_split_clustering.sh
 ```
 
 Remember to change the following variables:
@@ -67,9 +67,9 @@ We also implenmented the co-activation graph based method in [MoEfication](https
 You need to install [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download) first. Then you can run to following script to perform splitting:
 
 ```shell
-bash ./scripts/moefication/get_hidden_features/run_prepare_datasets.sh
-bash ./scripts/moefication/get_hidden_features/run_get_hidden_features.sh
-bash ./scripts/moefication/split/run_split_graph.sh
+bash ./scripts/expert_construction/get_hidden_features/run_prepare_datasets.sh
+bash ./scripts/expert_construction/get_hidden_features/run_get_hidden_features.sh
+bash ./scripts/expert_construction/split/run_split_graph.sh
 ```
 
 Remember to change the following variables:
@@ -97,7 +97,7 @@ python smoe/entrypoint/text_clustering.py
 Then, you need to run the following script to get the importance vector $v$ for the intermediate neurons in each layer:
 
 ```shell
-bash scripts/moefication/split/run_split_gradient_get_grads.sh
+bash scripts/expert_construction/split/run_split_gradient_get_grads.sh
 ```
 
 Remember to change the following variables:
@@ -149,7 +149,7 @@ After that, the importance vector files will be saved to the `save_path` with th
 You can also split the intermediate neurons in a neuron-independent manner by treating the expert split as a task assignment problem. To perform the split, you can run:
 
 ```shell
-bash ./scripts/moefication/split/run_split_gradient.sh
+bash ./scripts/expert_construction/split/run_split_gradient.sh
 ```
 
 Remember to change the following variables:
@@ -175,7 +175,7 @@ proj_type="" # importance vector to use, should be set to `up_proj`
 Here we use the same entrance as the **Neuron Independent** strategy above for gradient split.
 
 ```shell
-bash ./scripts/moefication/split/run_split_gradient.sh
+bash ./scripts/expert_construction/split/run_split_gradient.sh
 ```
 
 Remember to change the following variables:
@@ -201,7 +201,7 @@ proj_type="" # importance vector to use, should be set to `up_proj`
 You can run the following script to perform inter-sharing split:
 
 ```shell
-bash ./scripts/moefication/split/run_split_gradient_residual.sh
+bash ./scripts/expert_construction/split/run_split_gradient_residual.sh
 ```
 
 Remember to change the following variables:
@@ -230,7 +230,7 @@ proj_type="" # importance vector to use, should be set to `up_proj`
 Run the following script:
 
 ```shell
-bash ./scripts/moefication/convert/run_convert.sh
+bash ./scripts/expert_construction/convert/run_convert.sh
 ```
 
 
@@ -240,7 +240,7 @@ bash ./scripts/moefication/convert/run_convert.sh
 Run the following script:
 
 ```shell
-bash ./scripts/moefication/convert/run_convert_gradient.sh
+bash ./scripts/expert_construction/convert/run_convert_gradient.sh
 ```
 
 
@@ -250,7 +250,7 @@ bash ./scripts/moefication/convert/run_convert_gradient.sh
 Run the following script:
 
 ```shell
-bash ./scripts/moefication/convert/run_convert_gradient_residual.sh
+bash ./scripts/expert_construction/convert/run_convert_gradient_residual.sh
 ```
 
 
@@ -260,7 +260,7 @@ bash ./scripts/moefication/convert/run_convert_gradient_residual.sh
 ```shell
 --smoe
 	-- scripts
-        -- moefication
+        -- expert_construction
             -- convert
             -- get_hidden_features (deprecated, will be removed later)
             -- prune (deprecated, will be removed later)
@@ -268,5 +268,5 @@ bash ./scripts/moefication/convert/run_convert_gradient_residual.sh
             -- split
     -- smoe
         -- entrypoint
-            -- moefication
+            -- expert_construction
 ```
