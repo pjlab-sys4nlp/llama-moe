@@ -4,7 +4,6 @@ import torch
 from transformers.utils import logging
 
 from smoe.models.llama_moe import BaseMoEModelOutputWithPast
-from smoe.models.llama_moe.modeling_llama_moe import MoEDecoderLayerOutput
 from smoe.modules.moe.moe_calculators import CalculatorOutput
 from smoe.modules.moe.moe_layers import MoEMlpOutput
 
@@ -202,15 +201,17 @@ def forward_llama_moe_decoder_with_hidden_states_scale_recording(
 
     hidden_states = residual + mlp_outs.hidden_states
 
-    outputs = MoEDecoderLayerOutput(
-        hidden_states=hidden_states,
-        balance_loss=mlp_outs.balance_loss,
-        self_attn_weights=self_attn_weights if output_attentions else None,
-        present_key_value=present_key_value if use_cache else None,
-        num_dropped_tokens=mlp_outs.num_dropped_tokens,
-        gate_load=mlp_outs.gate_load,
-        gate_importance=mlp_outs.gate_importance,
+    outputs = (
+        hidden_states,
+        mlp_outs.balance_loss,
+        mlp_outs.num_dropped_tokens,
+        mlp_outs.gate_load,
+        mlp_outs.gate_importance,
     )
+    if output_attentions:
+        outputs += (self_attn_weights,)
+    if use_cache:
+        outputs += (present_key_value,)
 
     return outputs
 
@@ -242,20 +243,26 @@ def forward_llama_moe_decoder_with_padding_mask(
     # Fully Connected
     residual = hidden_states
     hidden_states = self.post_attention_layernorm(hidden_states)
+    mlp_outs: MoEMlpOutput = self.mlp(hidden_states)
+
+    # Fully Connected
+    residual = hidden_states
+    hidden_states = self.post_attention_layernorm(hidden_states)
     ###########################################################
     # ----- add padding_mask -----
-    hidden_states, gate_loss = self.mlp(hidden_states, padding_mask)
+    mlp_outs: MoEMlpOutput = self.mlp(hidden_states, padding_mask)
     ###########################################################
-    hidden_states = residual + hidden_states
+    hidden_states = residual + mlp_outs.hidden_states
 
     outputs = (
         hidden_states,
-        gate_loss,
+        mlp_outs.balance_loss,
+        mlp_outs.num_dropped_tokens,
+        mlp_outs.gate_load,
+        mlp_outs.gate_importance,
     )
-
     if output_attentions:
         outputs += (self_attn_weights,)
-
     if use_cache:
         outputs += (present_key_value,)
 
@@ -380,7 +387,7 @@ def forward_llama_moe_model_with_early_stop(
 
                 return custom_forward
 
-            layer_outputs: MoEDecoderLayerOutput = torch.utils.checkpoint.checkpoint(
+            layer_outputs: tuple = torch.utils.checkpoint.checkpoint(
                 create_custom_forward(decoder_layer),
                 hidden_states,
                 attention_mask,
@@ -388,7 +395,7 @@ def forward_llama_moe_model_with_early_stop(
                 None,
             )
         else:
-            layer_outputs: MoEDecoderLayerOutput = decoder_layer(
+            layer_outputs: tuple = decoder_layer(
                 hidden_states,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
@@ -397,19 +404,19 @@ def forward_llama_moe_model_with_early_stop(
                 use_cache=use_cache,
             )
 
-        hidden_states = layer_outputs.hidden_states
-        if layer_outputs.balance_loss is not None:
-            balance_loss += layer_outputs.balance_loss
+        hidden_states = layer_outputs[0]
+        if layer_outputs[1] is not None:
+            balance_loss += layer_outputs[1]
 
         if use_cache:
-            next_decoder_cache += (layer_outputs.present_key_value,)
+            next_decoder_cache += (layer_outputs[6 if output_attentions else 5],)
 
         if output_attentions:
-            all_self_attns += (layer_outputs.self_attn_weights,)
+            all_self_attns += (layer_outputs[5],)
 
-        num_dropped_tokens += (layer_outputs.num_dropped_tokens,)
-        gate_load += (layer_outputs.gate_load,)
-        gate_importance += (layer_outputs.gate_importance,)
+        num_dropped_tokens += (layer_outputs[2],)
+        gate_load += (layer_outputs[3],)
+        gate_importance += (layer_outputs[4],)
 
     hidden_states = self.norm(hidden_states)
 
@@ -519,7 +526,7 @@ def forward_llama_moe_model_with_padding_mask(
     )
 
     hidden_states = inputs_embeds
-    gate_loss = 0.0
+    balance_loss = 0.0
 
     if self.gradient_checkpointing and self.training:
         if use_cache:
@@ -534,6 +541,9 @@ def forward_llama_moe_model_with_padding_mask(
     all_self_attns = () if output_attentions else None
     next_decoder_cache = () if use_cache else None
 
+    num_dropped_tokens = ()
+    gate_load = ()
+    gate_importance = ()
     for idx, decoder_layer in enumerate(self.layers):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
@@ -550,7 +560,7 @@ def forward_llama_moe_model_with_padding_mask(
                 return custom_forward
 
             ###########################################################
-            layer_outputs = torch.utils.checkpoint.checkpoint(
+            layer_outputs: tuple = torch.utils.checkpoint.checkpoint(
                 create_custom_forward(decoder_layer),
                 hidden_states,
                 padding_mask,  # ----- add padding_mask -----
@@ -559,7 +569,7 @@ def forward_llama_moe_model_with_padding_mask(
                 None,
             )
         else:
-            layer_outputs = decoder_layer(
+            layer_outputs: tuple = decoder_layer(
                 hidden_states,
                 padding_mask,  # ----- add padding_mask -----
                 attention_mask=attention_mask,
@@ -572,13 +582,17 @@ def forward_llama_moe_model_with_padding_mask(
 
         hidden_states = layer_outputs[0]
         if layer_outputs[1] is not None:
-            gate_loss += layer_outputs[1]
+            balance_loss += layer_outputs[1]
 
         if use_cache:
-            next_decoder_cache += (layer_outputs[3 if output_attentions else 2],)
+            next_decoder_cache += (layer_outputs[6 if output_attentions else 5],)
 
         if output_attentions:
-            all_self_attns += (layer_outputs[2],)
+            all_self_attns += (layer_outputs[5],)
+
+        num_dropped_tokens += (layer_outputs[2],)
+        gate_load += (layer_outputs[3],)
+        gate_importance += (layer_outputs[4],)
 
     hidden_states = self.norm(hidden_states)
 
@@ -595,10 +609,13 @@ def forward_llama_moe_model_with_padding_mask(
         )
     return BaseMoEModelOutputWithPast(
         last_hidden_state=hidden_states,
-        gate_loss=gate_loss,
+        balance_loss=balance_loss,
         past_key_values=next_cache,
         hidden_states=all_hidden_states,
         attentions=all_self_attns,
+        num_dropped_tokens=num_dropped_tokens,
+        gate_load=gate_load,
+        gate_importance=gate_importance,
     )
 
 
