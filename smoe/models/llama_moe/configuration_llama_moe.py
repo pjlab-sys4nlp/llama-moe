@@ -27,28 +27,20 @@ class LlamaMoEConfig(PretrainedConfig):
         rope_scaling=None,
         attention_bias=False,
         attention_dropout=0.0,
-        # -------- moe expert configs --------
+        # MoE Expert Configs
         num_experts=16,
         num_selects=4,
         size_experts=None,
-        # -------- moe gate configs --------
-        gate_type="TopKBalancedNoisyGate",
+        # MoE Gate Configs
         gate_network="mlp",
         gate_use_softmax=True,
         gate_use_balance=True,
         gate_balance_loss_weight=1e-2,
         gate_add_noise=True,
-        # TopKBalancedNoisyGate
         gate_noise_epsilon=1e-2,
-        # -------- moe calculator configs --------
-        calculator_type="UniversalCalculator",
+        # MoE Calculator Configs
         multiply_gate_scores=True,
         score_scale_factor=1.0,
-        add_weight_norm=False,
-        # SwitchDropTokenCalculator
-        drop_tokens=True,
-        dropped_padding="zero",
-        capacity_factor=1.25,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -72,7 +64,6 @@ class LlamaMoEConfig(PretrainedConfig):
         self.num_selects = num_selects
         self.size_experts = size_experts
 
-        self.gate_type = gate_type
         self.gate_network = gate_network
         self.gate_use_softmax = gate_use_softmax
         self.gate_use_balance = gate_use_balance
@@ -80,13 +71,8 @@ class LlamaMoEConfig(PretrainedConfig):
         self.gate_add_noise = gate_add_noise
         self.gate_noise_epsilon = gate_noise_epsilon
 
-        self.calculator_type = calculator_type
         self.multiply_gate_scores = multiply_gate_scores
         self.score_scale_factor = score_scale_factor
-        self.add_weight_norm = add_weight_norm
-        self.drop_tokens = drop_tokens
-        self.dropped_padding = dropped_padding
-        self.capacity_factor = capacity_factor
 
         # for backward compatibility
         if num_key_value_heads is None:
