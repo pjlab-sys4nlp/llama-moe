@@ -30,14 +30,8 @@ from smoe.data.dynamic_selection import (
 )
 from smoe.data.streaming import CachedJsonlDataset, SubDirWeightedPackedJsonlDataset
 from smoe.metrics.preprocess import logits_argmax
-from smoe.models.llama_moe.configuration_llama_moe import LlamaMoEConfig
-from smoe.models.llama_moe.modeling_llama_moe import LlamaMoEForCausalLM
-from smoe.models.llama_moe_residual import (
-    LlamaMoEResidualConfig,
-    LlamaMoEResidualForCausalLM,
-)
-from smoe.models.mixtral.configuration_mixtral import MixtralConfig
-from smoe.models.mixtral.modeling_mixtral import MixtralForCausalLM
+from smoe.models.configuration_llama_moe import LlamaMoEConfig
+from smoe.models.modeling_llama_moe_hf import LlamaMoEForCausalLM
 from smoe.modules.flash_attn import replace_xformers
 from smoe.trainer.llama_lr_scheduling import LlamaLrSchedulingTrainer
 from smoe.utils.config import (
@@ -46,25 +40,19 @@ from smoe.utils.config import (
     ModelArguments,
     parse_args,
 )
-from smoe.utils.notification import wechat_sender
 from smoe.utils.param import get_trainable_parameters
 
 MODEL_MAP = {
     "llama": LlamaForCausalLM,
     "llama_moe": LlamaMoEForCausalLM,
-    "llama_moe_residual": LlamaMoEResidualForCausalLM,
-    "mixtral": MixtralForCausalLM,
 }
 
 CONFIG_MAPPING.update(
     {
         "llama": LlamaConfig,
         "llama_moe": LlamaMoEConfig,
-        "llama_moe_residual": LlamaMoEResidualConfig,
-        "mixtral": MixtralConfig,
     }
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -149,16 +137,10 @@ def main():
         "score_scale_factor": model_args.moe_calculator_score_scale_factor,
         "gate_balance_loss_weight": model_args.gate_balance_loss_weight,
     }
-    ConfigClass = AutoConfig
     if model_args.config_name == "llama_moe" or model_args.model_type == "llama_moe":
         ConfigClass = LlamaMoEConfig
-    elif (
-        model_args.config_name == "llama_moe_residual"
-        or model_args.model_type == "llama_moe_residual"
-    ):
-        ConfigClass = LlamaMoEResidualConfig
-    elif model_args.config_name == "mixtral" or model_args.model_type == "mixtral":
-        ConfigClass = MixtralConfig
+    else:
+        ConfigClass = AutoConfig
 
     if model_args.config_name:
         config = ConfigClass.from_pretrained(model_args.config_name, **config_kwargs)
@@ -286,10 +268,7 @@ def main():
         # model.half()
         # model.to(torch_dtype)
 
-        if isinstance(config, MixtralConfig):
-            config._attn_implementation = "flash_attention_2"
-
-        model: LlamaForCausalLM | LlamaMoEForCausalLM | LlamaMoEResidualForCausalLM | MixtralForCausalLM = ModelClass.from_pretrained(
+        model: LlamaForCausalLM | LlamaMoEForCausalLM = ModelClass.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,

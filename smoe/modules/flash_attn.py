@@ -1,5 +1,5 @@
 from types import MethodType
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn

@@ -6,19 +6,17 @@ References:
 """
 
 import random
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator
+from typing import Iterator
 
-import numpy as np
 import torch
-from torch.utils.data import Dataset, IterableDataset, get_worker_info
+from torch.utils.data import Dataset, IterableDataset
 
 from smoe.data.aggregation import group_instances
 from smoe.utils.io import load_jsonlines, load_jsonlines_iter
 from smoe.utils.logging import get_logger
-from smoe.utils.random_utils import get_random_string
-from smoe.utils.vars import JSONL_DATASET_CACHE_NAME, META_SUFFIX
+from smoe.utils.operations.operation_string import get_random_string
+from smoe.utils.vars import JSONL_DATASET_CACHE_NAME
 
 logger = get_logger(__file__)
 

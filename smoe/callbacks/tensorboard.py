@@ -5,7 +5,7 @@ import torch
 from transformers import TrainerControl, TrainerState, TrainingArguments
 from transformers.integrations import TensorBoardCallback, rewrite_logs
 
-from smoe.utils.visualization.visualize import get_heatmap_img_grid_for_tb
+from smoe.utils.visualize import get_heatmap_img_grid_for_tb
 
 
 class EnhancedTensorboardCallback(TensorBoardCallback):

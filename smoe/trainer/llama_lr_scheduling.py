@@ -10,18 +10,11 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Union
 
-from packaging import version
-
-# Integrations must be imported before ML frameworks:
-# isort: off
-from transformers.integrations import hp_params, is_fairscale_available
-
-# isort: on
-
 import datasets
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from packaging import version
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
@@ -29,8 +22,10 @@ from torch.utils.data import DataLoader
 from transformers.debug_utils import DebugOption, DebugUnderflowOverflow
 from transformers.deepspeed import deepspeed_init
 from transformers.dependency_versions_check import dep_version_check
-from transformers.modeling_utils import unwrap_model
-from transformers.models.auto.modeling_auto import MODEL_FOR_CAUSAL_LM_MAPPING_NAMES
+
+# Integrations must be imported before ML frameworks:
+# isort: off
+from transformers.integrations import hp_params, is_fairscale_available
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from transformers.trainer import OPTIMIZER_NAME, TRAINER_STATE_NAME, Trainer
 from transformers.trainer_callback import TrainerState
@@ -59,6 +54,8 @@ from smoe.data.dynamic_selection import (
     update_weight_sheared_llama_paper,
 )
 from smoe.utils.config import EnhancedTrainingArguments
+
+# isort: on
 
 if is_apex_available():
     from apex import amp
