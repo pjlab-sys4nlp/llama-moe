@@ -7,6 +7,8 @@
   </div>
   <a href="docs/LLaMA_MoE.pdf" target="_blank"><strong>📃 Technical Report</strong></a>
 </div>
+**Note:** This is the minimal implementation for the training of LLaMA-MoE. For the full version please refer to [here](https://github.com/pjlab-sys4nlp/llama-moe/tree/main).
+
 
 <h2 id="llama-moe">🎉 Introduction</h2>
 
@@ -166,3 +168,4 @@ python -m smoe.utils.tokenize \
 
 <hr>
 <p align="center">LLaMA-MoE Team w/ ❤️</p>
+
