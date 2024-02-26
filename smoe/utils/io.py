@@ -77,6 +77,16 @@ class load_jsonlines_iter:
         self.fin.close()
 
 
+def load_json(filepath):
+    with open(filepath, "r", encoding="utf8") as fin:
+        return json.load(fin)
+
+
+def dump_json(obj, filepath, **kwargs):
+    with open(filepath, "w", encoding="utf8") as fout:
+        json.dump(obj, fout, ensure_ascii=False, **kwargs)
+
+
 def load_jsonlines(filepath):
     data = []
     with open(filepath, "r", encoding="utf8") as fin:
