@@ -3,7 +3,7 @@
   <img src="docs/imgs/title-favicon.png" width="200" alt="LLaMA-MoE favicon" style="border-radius: 5%;"><br />
   <span style="color:red">📢 <strong><i>A SMALLER AFFORDABLE MoE MODEL FOR EVERYONE!!</i></strong></span>
   <div>
-    <a href="https://huggingface.co/llama-moe" target="_blank">🤗 Model Weights</a> | <a href="#quick-start">🚀 Quick Start</a> | <a href="#installation">⚙️ Installation Guide</a> | <a href="#expert-construction">🚧 Expert Construction</a> | <a href="#continual-pretraining">🚅 Continual Pre-training</a> | <a href="#evaluation">💎 Evaluation</a>
+    <a href="https://huggingface.co/llama-moe" target="_blank">🤗 Model Weights</a> | <a href="#quick-start">🚀 Quick Start</a> | <a href="#installation">⚙️ Installation Guide</a> | <a href="#expert-construction">🚧 Expert Construction</a> | <a href="#continual-pretraining">🚅 Continual Pre-training</a> | <a href="#evaluation">💎 Evaluation</a> | <a href="#sft">💬 Supervised Fine-Tuning (SFT)</a>
   </div>
   <a href="docs/LLaMA_MoE.pdf" target="_blank"><strong>📃 Technical Report</strong></a>
 </div>
@@ -84,11 +84,13 @@ print(tokenizer.decode(pred.cpu()[0], skip_special_tokens=True))
 
 <h2 id="performance">📊 Model Performance</h2>
 
-| Model                     | \#Activated Experts | \#Experts | \#Activated Params |                                   Links                                   |
-| :------------------------ | :-----------------: | :-------: | :----------------: | :-----------------------------------------------------------------------: |
-| **LLaMA-MoE-3.0B**        |          2          |    16     |        3.0B        | [[🤗 HF Weights]](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_0B-2_16) |
-| **LLaMA-MoE-3.5B (4/16)** |          4          |    16     |        3.5B        | [[🤗 HF Weights]](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-4_16) |
-| **LLaMA-MoE-3.5B (2/8)**  |          2          |     8     |        3.5B        | [[🤗 HF Weights]](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-2_8)  |
+| Model                     | \#Activated Experts | \#Experts | \#Activated Params |                         Foundation Model                          |                              SFT Model                               |
+| :------------------------ | :-----------------: | :-------: | :----------------: | :---------------------------------------------------------------: | :------------------------------------------------------------------: |
+| **LLaMA-MoE-3.0B**        |          2          |    16     |        3.0B        | [🤗 base](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_0B-2_16) | [🤗 SFT](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_0B-2_16-sft) |
+| **LLaMA-MoE-3.5B (4/16)** |          4          |    16     |        3.5B        | [🤗 base](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-4_16) | [🤗 SFT](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-4_16-sft) |
+| **LLaMA-MoE-3.5B (2/8)**  |          2          |     8     |        3.5B        | [🤗 base](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-2_8)  | [🤗 SFT](https://huggingface.co/llama-moe/LLaMA-MoE-v1-3_5B-2_8-sft)  |
+
+- Foundation models
 
 | Model                                                                                 | Average  |   SciQ   |   PIQA   | WinoGrande |  ARC-e   | ARC-c (25) | HellaSwag (10) |  LogiQA  | BoolQ (32) | LAMBADA  | NQ (32)  | MMLU (5) |
 | :------------------------------------------------------------------------------------ | :------: | :------: | :------: | :--------: | :------: | :--------: | :------------: | :------: | :--------: | :------: | :------: | :------: |
@@ -101,6 +103,15 @@ print(tokenizer.decode(pred.cpu()[0], skip_special_tokens=True))
 | **LLaMA-MoE-3.5B (4/16)**                                                             | **57.7** |   87.6   | **77.9** |    65.5    | **65.6** |  **44.2**  |    **73.3**    |   29.7   |  **75.0**  | **69.5** | **20.3** |   26.8   |
 | **LLaMA-MoE-3.5B (2/8)**                                                              |   57.6   | **88.4** |   77.6   |  **66.7**  |   65.3   |    43.1    |    **73.3**    |   29.6   |    73.9    |   69.4   |   19.8   |   27.0   |
 
+- SFT models
+
+| Model                                  | MMLU  | ARC-c | HellaSeag | TruthfulQA | MT-Bench |
+| :------------------------------------- | :---: | :---: | :-------: | :--------: | :------: |
+| Sheared LLaMA-2.7B ShareGPT            | 28.41 | 41.04 |   71.21   |   47.65    |   3.79   |
+| Sheared LLaMA-2.7B Deita6K (Our Impl.) | 25.24 | 43.69 |   71.70   |   49.00    |   4.06   |
+| LLaMA-MoE-v1-3.0B (2/16)               | 23.61 | 43.43 |   72.28   |   44.24    |   4.15   |
+| LLaMA-MoE-v1-3.5B (4/16)               | 26.49 | 48.29 |   75.10   |   45.91    |   4.60   |
+| LLaMA-MoE-v1-3.5B (2/8)                | 25.53 | 45.99 |   74.95   |   44.39    |   4.72   |
 
 <h2 id="expert-construction">🚧 Expert Construction</h2>
 
@@ -151,6 +162,11 @@ python -m smoe.utils.tokenize \
 
 - For evalution on Natural Questions (NQ), please refer to [opencompass](https://github.com/Spico197/opencompass/tree/main).
 - For other tasks, please refer to [lm-eval-harness](https://github.com/spico197/smoe-eval).
+
+<h2 id="sft">💬 Supervised Fine-Tuning (SFT)</h2>
+
+We provide simple examples of SFT to build chatbots.
+Please refer to [SFT docs](/mnt/petrelfs/zhutong/smoe/docs/supervised_fine_tuning/SFT.md) and `/mnt/petrelfs/zhutong/smoe/scripts/sft` for more details.
 
 <h2 id="citation">📑 Citation</h2>
 
