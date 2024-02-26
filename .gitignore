@@ -168,6 +168,8 @@ outputs/
 /visualization/
 results/
 smoe/utils/gpu_diag.py
+scripts/analysis/gating_*.sh
+smoe/entrypoint/analysis/gating_*.py
 /visualization_change_13B/
 /visualization_change_7B/
 /logs/

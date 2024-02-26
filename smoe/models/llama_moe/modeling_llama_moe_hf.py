@@ -930,35 +930,31 @@ class TopKBalancedNoisyGate(nn.Module):
 
         self.reset_parameters()
 
-    def get_gate_network(self, gate_type, input_size, num_experts):
-        gate_type = gate_type.lower()
+    def get_gate_network(self, gate_network_type, input_size, num_experts):
+        gate_network_type = gate_network_type.lower()
 
-        if gate_type == "linear":
+        if gate_network_type == "linear":
             gate_network = nn.Linear(input_size, num_experts, bias=False)
             nn.init.zeros_(gate_network.weight)
-        elif gate_type == "mlp":
+        elif gate_network_type == "mlp":
             gate_network = torch.nn.Sequential(
                 torch.nn.Linear(input_size, num_experts, bias=False),
                 torch.nn.Tanh(),
                 torch.nn.Linear(num_experts, num_experts, bias=False),
             )
         else:
-            raise ValueError(f"Unexpected gate_type: {gate_type}.")
+            raise ValueError(f"Unexpected gate network type: {gate_network_type}.")
 
         return gate_network
 
     def reset_gate_network(self):
-        if "gate_network_type" not in vars(self):
-            raise KeyError(f"{type(self)} does not have a gate network.")
-        else:
-            self.gate_network = self.get_gate_network(
-                self.gate_network_type, self.input_size, self.num_experts
-            )
+        self.gate_network = self.get_gate_network(
+            self.gate_network_type, self.input_size, self.num_experts
+        )
 
     def reset_parameters(self):
         if self.add_noise:
             nn.init.zeros_(self.weight_noise.weight)
-            # nn.init.zeros_(self.weight_noise)
 
     def cv_squared(self, x, eps=1e-10):
         """The squared coefficient of variation of a sample.
@@ -986,7 +982,7 @@ class TopKBalancedNoisyGate(nn.Module):
 
         top_logits, top_indices = logits.topk(
             min(self.num_selects + 1, self.num_experts), dim=1
-        )  # 选择并排序前k+1个权重
+        )  # select the top (k+1) experts
         top_k_logits = top_logits[:, : self.num_selects]
         top_k_indices = top_indices[:, : self.num_selects]
         top_k_scores = (
@@ -1208,7 +1204,6 @@ class UniversalCalculator(nn.Module):
         experts: LinearGLUExperts,
         multiply_gate_scores=True,
         score_scale_factor=1.0,
-        add_weight_norm: bool = False,
     ):
         super(UniversalCalculator, self).__init__()
         self.experts = experts
@@ -1218,8 +1213,6 @@ class UniversalCalculator(nn.Module):
         self.score_scale_factor = score_scale_factor
         self.num_experts = experts.num_experts
         self.mlp_norm = None
-        if multiply_gate_scores and add_weight_norm:
-            raise NotImplementedError
 
     def reset_experts(self):
         self.experts.reset_parameters()
@@ -1280,95 +1273,7 @@ class UniversalCalculator(nn.Module):
         return CalculatorOutput(hidden_states=y, num_dropped_tokens=torch.tensor(-1.0))
 
 
-class BaseMoELayer(nn.Module):
-    def __init__(self):
-        super(BaseMoELayer, self).__init__()
-
-        self.gate: TopKBalancedNoisyGate
-        self.calculator: UniversalCalculator
-
-    def _create_gate(self, **kwargs):
-        self.gate_type = kwargs.get("gate_type", "TopKBalancedNoisyGate")
-
-        if self.gate_type == "TopKBalancedNoisyGate":  # noisy gate
-            self.gate = TopKBalancedNoisyGate(
-                self.input_size,
-                self.num_experts,
-                self.num_selects,
-                gate_network=kwargs.get("gate_network", "mlp"),
-                use_softmax=kwargs.get("gate_use_softmax", True),
-                use_balance=kwargs.get("gate_use_balance", True),
-                balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
-                add_noise=kwargs.get("gate_add_noise", True),
-                noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
-            )
-        else:
-            raise NotImplementedError
-
-    def _create_calculator(self, experts, **kwargs):
-        self.calculator_type = kwargs.get("calculator_type", "UniversalCalculator")
-
-        if self.calculator_type == "UniversalCalculator":  # top K calculator
-            self.calculator = UniversalCalculator(
-                experts,
-                multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
-                score_scale_factor=kwargs.get("score_scale_factor", 1.0),
-                add_weight_norm=kwargs.get("add_weight_norm", False),
-            )
-        else:
-            raise NotImplementedError
-
-    def forward(self, x, attention_mask=None) -> MoEMlpOutput:
-        original_shape = x.shape[:-1]
-        x = x.reshape(-1, self.input_size)
-        flattened_mask = None
-        if attention_mask is not None and len(attention_mask.shape) == 2:
-            flattened_mask = attention_mask.flatten()
-            flattened_shape = flattened_mask.shape
-            x = x[flattened_mask.bool()]
-
-        gate_outputs: dict = self.gate(x)
-        calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
-
-        y = calc_outs.hidden_states
-        expert2tokens = None
-        if flattened_mask is not None:
-            y = torch.zeros(
-                flattened_shape + (self.output_size,), dtype=x.dtype, device=x.device
-            )  # (batch_size*seq_len, output_size)
-            y[
-                flattened_mask.bool()
-            ] = calc_outs.hidden_states  # (non_padding_num, output_size)
-
-            # # for stats only
-            # expert2tokens = {e: set() for e in range(self.gate.num_experts)}
-            # i = 0
-            # for t, m in enumerate(flattened_mask.tolist()):
-            #     if m:
-            #         selected_experts = gate_outputs["topK_indices"][i].tolist()
-            #         for e in selected_experts:
-            #             expert2tokens[e].add(t)
-            #         i += 1
-
-        y = y.reshape(original_shape + (self.output_size,))
-
-        return MoEMlpOutput(
-            hidden_states=y,
-            balance_loss=gate_outputs.get("balance_loss"),
-            num_dropped_tokens=calc_outs.num_dropped_tokens,
-            gate_load=gate_outputs.get("load", torch.tensor(-1)),
-            gate_importance=gate_outputs.get("importance", torch.tensor(-1)),
-            expert2tokens=expert2tokens,
-        )
-
-    def reset_gate_network(self):
-        self.gate.reset_gate_network()
-
-    def reset_experts(self):
-        self.calculator.reset_experts()
-
-
-class LinearGLUMoELayer(BaseMoELayer):
+class LinearGLUMoELayer(nn.Module):
     def __init__(
         self,
         input_size,
@@ -1392,6 +1297,7 @@ class LinearGLUMoELayer(BaseMoELayer):
         self.size_experts = size_experts
         self.bias = bias
 
+        # expert networks
         experts = LinearGLUExperts(
             input_size,
             hidden_size,
@@ -1402,8 +1308,77 @@ class LinearGLUMoELayer(BaseMoELayer):
             bias=bias,
         )
 
-        self._create_gate(**kwargs)
-        self._create_calculator(experts, **kwargs)
+        # create gate
+        self.gate = TopKBalancedNoisyGate(
+            self.input_size,
+            self.num_experts,
+            self.num_selects,
+            gate_network=kwargs.get("gate_network", "mlp"),
+            use_softmax=kwargs.get("gate_use_softmax", True),
+            use_balance=kwargs.get("gate_use_balance", True),
+            balance_loss_weight=kwargs.get("gate_balance_loss_weight", 1e-2),
+            add_noise=kwargs.get("gate_add_noise", True),
+            noise_epsilon=kwargs.get("gate_noise_epsilon", 1e-2),
+        )
+
+        # create calculator
+        self.calculator = UniversalCalculator(
+            experts,
+            multiply_gate_scores=kwargs.get("multiply_gate_scores", True),
+            score_scale_factor=kwargs.get("score_scale_factor", 1.0),
+        )
+
+    def forward(self, x) -> MoEMlpOutput:
+        original_shape = x.shape[:-1]
+        x = x.reshape(-1, self.input_size)
+        gate_outputs: dict = self.gate(x)
+        calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
+        y = calc_outs.hidden_states
+        y = y.reshape(original_shape + (self.output_size,))
+
+        return MoEMlpOutput(
+            hidden_states=y,
+            balance_loss=gate_outputs.get("balance_loss"),
+            num_dropped_tokens=calc_outs.num_dropped_tokens,
+            gate_load=gate_outputs.get("load", torch.tensor(-1)),
+            gate_importance=gate_outputs.get("importance", torch.tensor(-1)),
+        )
+
+    def set_num_selects(self, num_selects):
+        if num_selects > self.gate.num_experts:
+            raise ValueError(
+                'The value of "num_selects" must satisfy "num_selects <= num_experts"!'
+            )
+        else:
+            self.num_selects = num_selects
+            self.gate.num_selects = num_selects
+
+    def set_gate_use_softmax(self, use_softmax):
+        self.gate.use_softmax = use_softmax
+
+    def set_gate_use_balance(self, use_balance):
+        self.gate.use_balance = use_balance
+
+    def set_gate_balance_loss_weight(self, balance_loss_weight):
+        self.gate.balance_loss_weight = balance_loss_weight
+
+    def set_gate_add_noise(self, add_noise):
+        self.gate.add_noise = add_noise
+
+    def set_gate_noise_epsilon(self, noise_epsilon):
+        self.gate.noise_epsilon = noise_epsilon
+
+    def set_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.calculator.multiply_gate_scores = multiply_gate_scores
+
+    def set_calculator_score_scale_factor(self, score_scale_factor):
+        self.calculator.score_scale_factor = score_scale_factor
+
+    def reset_gate_network(self):
+        self.gate.reset_gate_network()
+
+    def reset_experts(self):
+        self.calculator.reset_experts()
 
 
 class LlamaMoEDecoderLayer(nn.Module):
@@ -1422,30 +1397,20 @@ class LlamaMoEDecoderLayer(nn.Module):
         )
 
         gating_config = {
-            # all gates
-            "gate_type": config.gate_type,
             "gate_network": config.gate_network,
             "gate_use_softmax": config.gate_use_softmax,
             "gate_use_balance": config.gate_use_balance,
             "gate_balance_loss_weight": config.gate_balance_loss_weight,
             "gate_add_noise": config.gate_add_noise,
-            # TopKBalancedNoisyGate
             "gate_noise_epsilon": config.gate_noise_epsilon,
         }
         calculator_config = {
-            # all calculators
-            "calculator_type": config.calculator_type,
             "multiply_gate_scores": config.multiply_gate_scores,
             "score_scale_factor": (
                 config.score_scale_factor[layer_index]
                 if isinstance(config.score_scale_factor, list)
                 else config.score_scale_factor
             ),
-            "add_weight_norm": config.add_weight_norm,
-            # SwitchDropTokenCalculator
-            "drop_tokens": config.drop_tokens,
-            "dropped_padding": config.dropped_padding,
-            "capacity_factor": config.capacity_factor,
         }
 
         self.mlp = LinearGLUMoELayer(
@@ -1508,6 +1473,36 @@ class LlamaMoEDecoderLayer(nn.Module):
             outputs += (present_key_value,)
 
         return outputs
+
+    def set_moe_num_selects(self, num_selects):
+        self.mlp.set_num_selects(num_selects)
+
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.mlp.set_gate_use_softmax(use_softmax)
+
+    def set_moe_gate_use_balance(self, use_balance):
+        self.mlp.set_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        self.mlp.set_gate_balance_loss_weight(balance_loss_weight)
+
+    def set_moe_gate_add_noise(self, add_noise):
+        self.mlp.set_gate_add_noise(add_noise)
+
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        self.mlp.set_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.mlp.set_calculator_multiply_gate_scores(multiply_gate_scores)
+
+    def set_moe_calculator_score_scale_factor(self, score_scale_factor):
+        self.mlp.set_calculator_score_scale_factor(score_scale_factor)
+
+    def reset_gate_network(self):
+        self.mlp.reset_gate_network()
+
+    def reset_experts(self):
+        self.mlp.reset_experts()
 
 
 class LlamaMoEPreTrainedModel(PreTrainedModel):
@@ -1731,6 +1726,45 @@ class LlamaMoEModel(LlamaMoEPreTrainedModel):
             expert2tokens=expert2tokens,
         )
 
+    def set_moe_num_selects(self, num_selects):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_num_selects(num_selects)
+
+    def set_moe_gate_use_softmax(self, use_softmax):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_use_softmax(use_softmax)
+
+    def set_moe_gate_use_balance(self, use_balance):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_balance_loss_weight(balance_loss_weight)
+
+    def set_moe_gate_add_noise(self, add_noise):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_add_noise(add_noise)
+
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        for idx, decoder_layer in enumerate(self.layers):
+            decoder_layer.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
+    def set_moe_calculator_score_scale_factor(
+        self, score_scale_factor, layer_index=None
+    ):
+        if layer_index is None:
+            for idx, decoder_layer in enumerate(self.layers):
+                decoder_layer.set_moe_calculator_score_scale_factor(score_scale_factor)
+        else:
+            self.layers[layer_index].set_moe_calculator_score_scale_factor(
+                score_scale_factor
+            )
+
     def reset_gate_network(self):
         for idx, decoder_layer in enumerate(self.layers):
             decoder_layer.reset_gate_network()
@@ -1922,6 +1956,34 @@ class LlamaMoEForCausalLM(LlamaMoEPreTrainedModel):
                 ),
             )
         return reordered_past
+
+    def set_moe_num_selects(self, num_selects):
+        self.model.set_moe_num_selects(num_selects)
+
+    def set_moe_gate_use_softmax(self, use_softmax):
+        self.model.set_moe_gate_use_softmax(use_softmax)
+
+    def set_moe_gate_use_balance(self, use_balance):
+        self.model.set_moe_gate_use_balance(use_balance)
+
+    def set_moe_gate_balance_loss_weight(self, balance_loss_weight):
+        self.model.set_moe_gate_balance_loss_weight(balance_loss_weight)
+
+    def set_moe_gate_add_noise(self, add_noise):
+        self.model.set_moe_gate_add_noise(add_noise)
+
+    def set_moe_gate_noise_epsilon(self, noise_epsilon):
+        self.model.set_moe_gate_noise_epsilon(noise_epsilon)
+
+    def set_moe_calculator_multiply_gate_scores(self, multiply_gate_scores):
+        self.model.set_moe_calculator_multiply_gate_scores(multiply_gate_scores)
+
+    def set_moe_calculator_score_scale_factor(
+        self, score_scale_factor, layer_index=None
+    ):
+        self.model.set_moe_calculator_score_scale_factor(
+            score_scale_factor, layer_index=layer_index
+        )
 
     def reset_gate_network(self):
         self.model.reset_gate_network()
