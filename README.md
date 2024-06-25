@@ -171,12 +171,12 @@ Please refer to [SFT docs](/mnt/petrelfs/zhutong/smoe/docs/supervised_fine_tunin
 <h2 id="citation">📑 Citation</h2>
 
 ```bibtex
-@misc{llama-moe-2023,
+@article{llama-moe,
   title={LLaMA-MoE: Building Mixture-of-Experts from LLaMA with Continual Pre-training},
-  author={LLaMA-MoE Team},
-  year={2023},
-  month={Dec},
-  url={https://github.com/pjlab-sys4nlp/llama-moe}
+  author={Tong Zhu and Xiaoye Qu and Daize Dong and Jiacheng Ruan and Jingqi Tong and Conghui He and Yu Cheng},
+  journal={arXiv preprint arXiv:2406.16554},
+  year={2024},
+  url={https://arxiv.org/abs/2406.16554},
 }
 ```
 
