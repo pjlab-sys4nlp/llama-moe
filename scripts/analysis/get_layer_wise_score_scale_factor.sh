@@ -18,8 +18,8 @@ save_folder=${llama_size}_moe_trained
 share_path=/mnt/petrelfs/share_data/quxiaoye
 tokenizer_path=${share_path}/models/${llama_size}
 data_path=${share_path}/data/vis_data/head30_shuffled_output/shuffled_20.txt
-target_scale_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-outputs-scale/${save_folder}
-save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/${save_folder}
+target_scale_file_path=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/visualization/mlp-outputs-scale/${save_folder}
+save_path=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/visualization/mlp-layer-wise-scale-factors/${save_folder}
 
 gpus=1
 cpus=16

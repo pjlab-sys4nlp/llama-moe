@@ -2,17 +2,17 @@
 
 #  llama_7B  llama_13B  llama_30B  llama_base
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
-llama_size="llama_7B" ################ 修改修改修改修改 ################
+llama_size="llama_7B"
 
-reinit_gate=False ############## 修改修改修改修改 ##############
-cpt_tokens=100B   ############ 修改修改修改修改 ############
+reinit_gate=False
+cpt_tokens=100B
 batch_size=8
 block_size=2048
 
 share_path=/mnt/petrelfs/share_data/quxiaoye
 tokenizer_path=${share_path}/models/${llama_size}
 
-use_cpu=False ############ 修改修改修改修改 ############
+use_cpu=False
 gpus=1
 cpus=16
 
@@ -64,7 +64,7 @@ model_path=/mnt/petrelfs/share_data/zhutong/models/cpt-moe-fpt-56gpus-bs16_2-zer
 #model_path=${share_path}/models/tzhu_model_bak/random_16select4_moe
 #model_path=${share_path}/models/tzhu_model_bak/cpt-moe-fpt-7b-random-64gpus-bs16_2-zero1default-1708772-checkpoint-8000/ # 35B
 
-save_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/expert-load-${cpt_tokens}
+save_path=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/visualization/expert-load-${cpt_tokens}
 if [ ${reinit_gate} = "True" ]; then
   save_path=${save_path}-Ini
 fi

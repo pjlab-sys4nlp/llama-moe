@@ -13,7 +13,8 @@ from transformers.models.llama.modeling_llama import LlamaMLP
 
 from smoe.data.datasets_moe import ShardDataset
 from smoe.utils.expert_construction.k_means_constrained_cos import KMeansConstrainedCos
-from smoe.utils.kernel_function import pass_kernel_function
+from smoe.utils.io import delete_file_or_dir
+from smoe.utils.operations.operation_tensor import pass_kernel_function
 from smoe.utils.visualization.visualize import visualize_expert_neuron_overlap
 
 
@@ -221,21 +222,11 @@ class GradientSplitGetGrads:
     def _forward_hook_up_proj(self, module, input, output):
         self.up_proj_features[module.layer_index] = input[0].detach()
 
-        # if self.device == "cuda:0" and module.layer_index == 0:
-        #     print("input", len(input), input[0].shape)
-        #     print("up_proj_features", self.up_proj_features[module.layer_index])
-
     def _backward_hook_up_proj(self, module, grad_in, grad_out):
         if module.add_batch_size:
             batch_size = grad_in[0].shape[0]
             self.sample_count += batch_size - 1  # gradient of the last token in the batch is 0
             # print("sample_count:", self.sample_count)
-
-        # if self.device == "cuda:0":
-        #     with torch.cuda.device("cuda:0"):
-        #         print("Used GPU memory (GPU 0): " + str(int(torch.cuda.memory_allocated() / 1024 / 1024)) + " MB")
-        #     print("up", "grad_out", len(grad_out), [grad_out[i].shape if grad_out[i] is not None else None for i in range(len(grad_out))], grad_out, sep='\n')
-        #     print("up", "grad_in", len(grad_in), [grad_in[i].shape if grad_in[i] is not None else None for i in range(len(grad_in))], grad_in, sep='\n')
 
         if self.importance_type == "feature_grad":
             importance_score = grad_in[0].detach()
@@ -251,27 +242,15 @@ class GradientSplitGetGrads:
         else:
             raise NotImplementedError
 
-        # if self.device == "cuda:0" and module.layer_index == 0:
-        #     print("up_proj_scores", self.up_proj_scores[module.layer_index])
-
     def _forward_hook_gate_proj(self, module, input, output):
         self.gate_proj_features[module.layer_index] = output.detach()
 
-        # if self.device == "cuda:0" and module.layer_index == 0:
-        #     print("output", len(output), output.shape)
-        #     print("gate_proj_features", self.gate_proj_features[module.layer_index])
 
     def _backward_hook_gate_proj(self, module, grad_in, grad_out):
         if module.add_batch_size:
             batch_size = grad_out[0].shape[0]
             self.sample_count += batch_size - 1  # gradient of the last token in the batch is 0
             # print("sample_count:", self.sample_count)
-
-        # if self.device == "cuda:0":
-        #     with torch.cuda.device("cuda:0"):
-        #         print("Used GPU memory (GPU 0): " + str(int(torch.cuda.memory_allocated() / 1024 / 1024)) + " MB")
-        #     print("gate", "grad_out", len(grad_out), [grad_out[i].shape if grad_out[i] is not None else None for i in range(len(grad_out))], grad_out, sep='\n')
-        #     print("gate", "grad_in", len(grad_in), [grad_in[i].shape if grad_in[i] is not None else None for i in range(len(grad_in))], grad_in, sep='\n')
 
         if self.importance_type == "feature_grad":
             importance_score = grad_out[0].detach()
@@ -286,9 +265,6 @@ class GradientSplitGetGrads:
             self.gate_proj_scores[module.layer_index] += torch.sum(importance_score, dim=0)
         else:
             raise NotImplementedError
-
-        # if self.device == "cuda:0" and module.layer_index == 0:
-        #     print("gate_proj_scores", self.gate_proj_scores[module.layer_index])
 
     def get_score(self):
         # initialization
@@ -451,8 +427,9 @@ class GradientSplit(LayerSplit):
         else:
             self.split_with_neuron_sharing(expert_num, expert_size, criterion)
 
-    def visualize(self, save_path, share_neurons=False):
-        if share_neurons:  # 必须在share_neuron的情况下才可以可视化
+    def visualize(self, save_path, share_neurons=True):
+        if share_neurons:  # only visualize when `share_neuron`
+            delete_file_or_dir(os.path.join(save_path, "total_neurons.txt"))
             num_experts = len(self.labels)
             expert_size = len(self.labels[0])
 

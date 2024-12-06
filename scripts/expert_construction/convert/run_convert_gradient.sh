@@ -14,8 +14,6 @@ expert_size=1376
 
 score_scale_factor=8.0 #  1.0  2.0  4.0  8.0  16.0
 score_scale_factor_file_path=""
-#score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_dense
-#score_scale_factor_file_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/mlp-layer-wise-scale-factors/llama_13B_moe_trained
 
 convert_type=LlamaMoEForCausalLM #  LlamaMoEModel  LlamaMoEForCausalLM  LlamaMoEForSequenceClassification
 
@@ -39,27 +37,23 @@ if [ ${share_neurons} = "True" ]; then
     python -m smoe.entrypoint.expert_construction.llama_convert_neuron_index \
     --model_path ${model_path} \
     --split_file_path ${split_file_path} \
-    --select_file_path "" \
     --save_path ${save_path} \
     --template layers.{}.mlp.${proj_type}.weight \
     --num_experts ${num_experts} \
     --num_selects ${num_selects} \
     --score_scale_factor ${score_scale_factor} \
     --score_scale_factor_file_path "${score_scale_factor_file_path}" \
-    --convert_type ${convert_type} \
-    --use_random_gate True
+    --convert_type ${convert_type}
 else
   OMP_NUM_THREADS=8 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:${gpus} -n1 --ntasks-per-node=1 -c ${cpus} --kill-on-bad-exit=1 --quotatype=auto \
     python -m smoe.entrypoint.expert_construction.llama_convert \
     --model_path ${model_path} \
     --split_file_path ${split_file_path} \
-    --select_file_path "" \
     --save_path ${save_path} \
     --template layers.{}.mlp.${proj_type}.weight \
     --num_experts ${num_experts} \
     --num_selects ${num_selects} \
     --score_scale_factor ${score_scale_factor} \
     --score_scale_factor_file_path "${score_scale_factor_file_path}" \
-    --convert_type ${convert_type} \
-    --use_random_gate True
+    --convert_type ${convert_type}
 fi

@@ -2,8 +2,8 @@
 
 #SBATCH --job-name=cpt-3b-total-10b
 #SBATCH --partition=MoE
-#SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs-cpt/%x-%j.log
-#SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs-cpt/%x-%j.log
+#SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/logs-cpt/%x-%j.log
+#SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/logs-cpt/%x-%j.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=0

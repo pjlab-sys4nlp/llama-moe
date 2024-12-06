@@ -13,7 +13,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_path', type=str, default="/home/data/models/llama-transformers/7B")
     parser.add_argument('--split_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering")
-    parser.add_argument('--select_file_path', type=str, default="/home/dongdz/workspace/moefication/llama_moe_temp_files/7B-8Expert-Select-MLP")
     parser.add_argument('--save_path', type=str, default="/home/data/models/llama-moe-transformers/7B/")
     parser.add_argument('--template', type=str, default='layers.{}.mlp.gate_proj.weight')
 
@@ -23,10 +22,8 @@ if __name__ == "__main__":
     parser.add_argument('--score_scale_factor_file_path', type=str, default=None, help='file storing the layer-wise scale factors, this will override the argument "score_scale_factor"')
 
     parser.add_argument('--convert_type', type=str, default="LlamaMoEForCausalLM", choices=("LlamaMoEModel", "LlamaMoEForCausalLM", "LlamaMoEForSequenceClassification"))
-    parser.add_argument('--use_random_gate', type=str, default="False")
 
     args = parser.parse_args()
-    args.use_random_gate = str2bool(args.use_random_gate)
     print(args, "\n")
 
     if args.score_scale_factor_file_path is not None and args.score_scale_factor_file_path != "":
@@ -41,49 +38,33 @@ if __name__ == "__main__":
         convert_llama_model_neuron_index(
             args.model_path,
             args.split_file_path,
-            args.select_file_path,
             args.save_path,
             args.template,
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_random_gate=args.use_random_gate
         )
     elif args.convert_type == "LlamaMoEForCausalLM":
         convert_llama_model_for_causal_lm_neuron_index(
             args.model_path,
             args.split_file_path,
-            args.select_file_path,
             args.save_path,
             args.template,
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_random_gate=args.use_random_gate
         )
     elif args.convert_type == "LlamaMoEForSequenceClassification":
         convert_llama_model_for_sequence_classification_neuron_index(
             args.model_path,
             args.split_file_path,
-            args.select_file_path,
             args.save_path,
             args.template,
             args.num_experts,
             args.num_selects,
             score_scale_factor=args.score_scale_factor,
-            use_random_gate=args.use_random_gate
         )
     else:
         raise ValueError
 
-    # load test
-    # print("Loading converted LLaMA-MoE file for test...")
-    # if args.convert_type == "LlamaMoEModel":
-    #     model_llama_moe = LlamaMoEModel.from_pretrained(args.save_path)
-    # elif args.convert_type == "LlamaMoEForCausalLM":
-    #     model_llama_moe = LlamaMoEForCausalLM.from_pretrained(args.save_path)
-    # elif args.convert_type == "LlamaMoEForSequenceClassification":
-    #     model_llama_moe = LlamaMoEForSequenceClassification.from_pretrained(args.save_path)
-    # else:
-    #     raise ValueError
     print("Done.")

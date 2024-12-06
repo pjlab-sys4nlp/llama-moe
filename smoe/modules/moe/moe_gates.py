@@ -1,7 +1,6 @@
 import warnings
 
 import torch
-from deepspeed.moe.sharded_moe import gumbel_rsample
 from torch import nn
 from torch.distributions.normal import Normal
 
@@ -187,6 +186,8 @@ class RandomLearnableGate(BaseGate):
         self.noise_epsilon = noise_epsilon
 
     def forward(self, x):
+        from deepspeed.moe.sharded_moe import gumbel_rsample
+
         logits = self.gate_network(x)  # gate计算出的权重
         gumbel_rsample(logits.shape, device=logits.device).to(
             logits
@@ -225,7 +226,9 @@ class TopKBalancedNoisyGate(BaseGate):
         noise_epsilon=1e-2,
     ):
         super(TopKBalancedNoisyGate, self).__init__()
-        assert num_selects <= num_experts  # 选择数量大于专家数量，报错
+        assert (
+            num_selects <= num_experts
+        )  # Error if the number of selections exceeds the number of experts
         self.input_size = input_size
         self.num_experts = num_experts
         self.num_selects = num_selects
@@ -272,7 +275,7 @@ class TopKBalancedNoisyGate(BaseGate):
         Args:
         x: a `Tensor`.
         Returns:
-        a `Scalar`.s
+        a `Scalar`.
         """
         # if only num_experts = 1
         if x.shape[0] == 1:
@@ -281,30 +284,31 @@ class TopKBalancedNoisyGate(BaseGate):
 
     # fmt: off
     def forward(self, x):
-        """先计算所有专家的权重值"""
-        logits_gate = self.gate_network(x)  # gate计算出的权重
+        """First calculate the weights for all experts"""
+        logits_gate = self.gate_network(x)  # Weights calculated by the gate
         if self.training and self.add_noise:
-            noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
-            noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
-            logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
-            logits = logits_gate + logits_noise  # 最终权重
+            noise_mm = self.weight_noise(x)  # Result of noise matrix calculation
+            noise_control = self.softplus(noise_mm) + self.noise_epsilon  # Noise increment obtained from the controller
+            logits_noise = torch.randn_like(logits_gate) * noise_control  # Weights added with noise
+            logits = logits_gate + logits_noise  # Final weights
         else:
-            logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
+            logits = logits_gate  # Final weights, shape(batch_size, num_experts)
 
-        """选出前k个权重，并计算各个专家的分数scores"""
-        top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # 选择并排序前k+1个权重
+        """Select the top-k weights and calculate the scores for each expert"""
+        top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # Select and sort top k+1 weights
         top_k_logits = top_logits[:, :self.num_selects]
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits.to(torch.float32)) if self.use_softmax else top_k_logits
         top_k_scores = top_k_scores.to(logits.dtype)
 
-        """计算importance"""
+        """Calculate importance"""
         zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
         scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
         importance = scores_filtered.sum(0)  # shape(num_experts)
 
-        """计算load"""
-        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        """Calculate load"""
+        # zhutong: Do not write `self.training` inside the if statement, otherwise it will cause errors with the device mismatch
+        # in eval mode for balance_loss output values.
         if self.training:
             if self.add_noise and self.num_selects != self.num_experts:
                 batch_size = top_logits.size(0)
@@ -315,7 +319,7 @@ class TopKBalancedNoisyGate(BaseGate):
                 is_in = torch.gt(logits_noise, threshold_if_in)
                 threshold_positions_if_out = threshold_positions_if_in - 1
                 threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-                # is each value currently in the top k.
+                # Check if each value is currently in the top k.
                 prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
                 prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
@@ -329,18 +333,12 @@ class TopKBalancedNoisyGate(BaseGate):
         else:
             load = (scores_filtered > 0).sum(0)
 
-        """计算balance loss"""
+        """Calculate balance loss"""
         if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight
         else:
             balance_loss = torch.tensor(-100.0, device=x.device)
-
-        # print("weight", self.gate_network.weight, sep="\n")
-        # print("logits_gate", logits_gate, sep="\n")
-        # print("importance", importance, sep="\n")
-        # print("load", load, sep="\n")
-        # print("balance_loss", balance_loss, sep="\n")
 
         return {
             "topK_indices": top_k_indices,
@@ -351,32 +349,33 @@ class TopKBalancedNoisyGate(BaseGate):
         }
 
     def forward_return_scores(self, x):
-        """先计算所有专家的权重值"""
-        logits_gate = self.gate_network(x)  # gate计算出的权重
+        """First calculate the weights for all experts"""
+        logits_gate = self.gate_network(x)  # Weights calculated by the gate
         if self.training and self.add_noise:
-            noise_mm = self.weight_noise(x)  # 噪声矩阵计算结果
-            noise_control = self.softplus(noise_mm) + self.noise_epsilon  # 控制器得到的噪声增加量
-            logits_noise = torch.randn_like(logits_gate) * noise_control  # noise附加的权重
-            logits = logits_gate + logits_noise  # 最终权重
+            noise_mm = self.weight_noise(x)  # Result of noise matrix calculation
+            noise_control = self.softplus(noise_mm) + self.noise_epsilon  # Noise increment obtained from the controller
+            logits_noise = torch.randn_like(logits_gate) * noise_control  # Weights added with noise
+            logits = logits_gate + logits_noise  # Final weights
         else:
-            logits = logits_gate  # 最终权重，shape(batch_size, num_experts)
+            logits = logits_gate  # Final weights, shape(batch_size, num_experts)
 
-        """计算各个专家的分数scores"""
+        """Calculate the scores for each expert"""
         scores = self.softmax(logits) if self.use_softmax else logits
 
-        """选出前k个权重，并计算各个专家的分数scores"""
-        top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # 选择并排序前k+1个权重
+        """Select the top-k weights and calculate the scores for each expert"""
+        top_logits, top_indices = logits.topk(min(self.num_selects + 1, self.num_experts), dim=1)  # Select and sort top k+1 weights
         top_k_logits = top_logits[:, :self.num_selects]
         top_k_indices = top_indices[:, :self.num_selects]
         top_k_scores = self.softmax(top_k_logits) if self.use_softmax else top_k_logits
 
-        """计算importance"""
+        """Calculate importance"""
         zeros = torch.zeros_like(logits, requires_grad=True, device=logits.device)
         scores_filtered = zeros.scatter(dim=1, index=top_k_indices, src=top_k_scores)  # shape(batch_size, num_experts)
         importance = scores_filtered.sum(0)  # shape(num_experts)
 
-        """计算load"""
-        # zhutong: 不要把`self.training`写在里面的if语句中，否则会导致eval模式下balance_loss输出值设备不匹配的错误
+        """Calculate load"""
+        # zhutong: Do not write `self.training` inside the if statement, otherwise it will cause errors with the device mismatch
+        # in eval mode for balance_loss output values.
         if self.training:
             if self.add_noise and self.num_selects != self.num_experts:
                 batch_size = top_logits.size(0)
@@ -387,7 +386,7 @@ class TopKBalancedNoisyGate(BaseGate):
                 is_in = torch.gt(logits_noise, threshold_if_in)
                 threshold_positions_if_out = threshold_positions_if_in - 1
                 threshold_if_out = torch.unsqueeze(torch.gather(top_values_flat, 0, threshold_positions_if_out), 1)
-                # is each value currently in the top k.
+                # Check if each value is currently in the top k.
                 prob_if_in = self.normal.cdf((logits_gate - threshold_if_in) / noise_control)
                 prob_if_out = self.normal.cdf((logits_gate - threshold_if_out) / noise_control)
                 prob = torch.where(is_in, prob_if_in, prob_if_out)
@@ -401,7 +400,7 @@ class TopKBalancedNoisyGate(BaseGate):
         else:
             load = (scores_filtered > 0).sum(0)
 
-        """计算balance loss"""
+        """Calculate balance loss"""
         if self.use_balance:
             balance_loss = self.cv_squared(importance) + self.cv_squared(load)
             balance_loss *= self.balance_loss_weight

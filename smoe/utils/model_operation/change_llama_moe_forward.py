@@ -699,7 +699,7 @@ def forward_topk_balanced_noisy_gate_with_selected_pair_recording(self, x):
     ###########################################
     select_pairs = torch.split(top_k_indices, 1, dim=0)
     for pair in select_pairs:
-        pair_list = pair.tolist()
+        pair_list = pair.flatten().tolist()
         self.load_record.append(pair_list)
     ###########################################
 

@@ -2,8 +2,8 @@
 
 #SBATCH --job-name=get-grad
 #SBATCH --partition=MoE
-#SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
-#SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/train-moe/logs/%x-%j.log
+#SBATCH --output=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/logs/%x-%j.log
+#SBATCH --error=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/logs/%x-%j.log
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --nodes=1
@@ -15,14 +15,8 @@
 
 num_nodes=1        # should match with --nodes
 num_gpu_per_node=8 # should match with --gres
-
-# #cpu/#num_gpu_per_node
 export OMP_NUM_THREADS=2
 export LOGLEVEL=INFO
-#export NCCL_DEBUG=INFO
-#export TORCH_DISTRIBUTED_DEBUG=DETAIL
-#export TORCH_SHOW_CPP_STACKTRACES=1
-#export CUDA_LAUNCH_BLOCKING=1
 
 {
   ###################################################################
@@ -47,51 +41,16 @@ export LOGLEVEL=INFO
 
   total_clusters=8 #  4  8  16  32
   dataset_dir=${data_path}/data/clustering_tokenized/${total_clusters}clusters
-  #dataset_dir=/mnt/petrelfs/share_data/quxiaoye/test_tokenized.jsonl
   dataset_name=()
   for ((i = 0; i < ${total_clusters}; i++)); do
     dataset_name+=("${i}.jsonl")
   done
 
-#  dataset_name=("0.jsonl")
-#    dataset_name=("1.jsonl")
-#    dataset_name=("2.jsonl")
-#    dataset_name=("3.jsonl")
-#    dataset_name=("4.jsonl")
-#    dataset_name=("5.jsonl")
-#    dataset_name=("6.jsonl")
-    dataset_name=("7.jsonl")
-#    dataset_name=("8.jsonl")
-#    dataset_name=("9.jsonl")
-#    dataset_name=("10.jsonl")
-#    dataset_name=("11.jsonl")
-#    dataset_name=("12.jsonl")
-#    dataset_name=("13.jsonl")
-#    dataset_name=("14.jsonl")
-#    dataset_name=("15.jsonl")
-#    dataset_name=("16.jsonl")
-#    dataset_name=("17.jsonl")
-#    dataset_name=("18.jsonl")
-#    dataset_name=("19.jsonl")
-#    dataset_name=("20.jsonl")
-#    dataset_name=("21.jsonl")
-#    dataset_name=("22.jsonl")
-#    dataset_name=("23.jsonl")
-#    dataset_name=("24.jsonl")
-#    dataset_name=("25.jsonl")
-#    dataset_name=("26.jsonl")
-#    dataset_name=("27.jsonl")
-#    dataset_name=("28.jsonl")
-#    dataset_name=("29.jsonl")
-#    dataset_name=("30.jsonl")
-#    dataset_name=("31.jsonl")
-
   ###################################################################
-
-  output_dir=/mnt/petrelfs/dongdaize.d/workspace/train-moe/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
+  output_dir=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/outputs/$SLURM_JOB_NAME-$SLURM_JOB_ID
   echo "output_dir: $output_dir"
 
-  deepspeed_config_file=/mnt/petrelfs/dongdaize.d/workspace/train-moe/conf/deepspeed/bf16.json
+  deepspeed_config_file=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/conf/deepspeed/bf16.json
 
   nodes=($(scontrol show hostnames $SLURM_JOB_NODELIS))
   nodes_array=($nodes)
@@ -110,7 +69,7 @@ export LOGLEVEL=INFO
       --rdzv_id $RANDOM \
       --rdzv_backend c10d \
       --rdzv_endpoint $head_node:0 \
-      smoe/entrypoint/moefication/llama_split_gradient_get_grads.py \
+      -m smoe.entrypoint.expert_construction.llama_split_gradient_get_grads \
       --deepspeed ${deepspeed_config_file} \
       --model_name_or_path ${pretrained_model} \
       --tokenizer_name_or_path ${tokenizer_path} \

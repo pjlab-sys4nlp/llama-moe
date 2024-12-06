@@ -7,7 +7,10 @@ import argparse
 import torch.cuda
 from transformers import LlamaTokenizer
 
-from smoe.models.llama_moe.modeling_llama_moe_hf import LlamaMoEModel, LlamaMoEForCausalLM
+from smoe.models.llama_moe.modeling_llama_moe_hf import (
+    LlamaMoEForCausalLM,
+    LlamaMoEModel,
+)
 
 
 def main(args):

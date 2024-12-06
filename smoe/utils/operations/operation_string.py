@@ -1,29 +1,43 @@
 import re
+import types
 from argparse import ArgumentTypeError
 
 
-def str2bool(v):
+def str2none(v, extended=True):
+    if isinstance(v, types.NoneType):
+        return v
+    if v.lower() in ("none",) + (("null",) if extended else ()):
+        return None
+    else:
+        raise ArgumentTypeError("NoneType value expected.")
+
+
+def str2bool(v, extended=True):
     if isinstance(v, bool):
         return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
+    if v.lower() in ("true",) + (("yes", "t", "y", "1") if extended else ()):
         return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
+    elif v.lower() in ("false",) + (("no", "f", "n", "0") if extended else ()):
         return False
     else:
         raise ArgumentTypeError("Boolean value expected.")
 
 
-def string2list(string, sep=","):
+def string2number_list(string, sep=","):
     if isinstance(string, list) or string is None:
         return string
     else:
         split_string = string.split(sep)
-        return [int(num) for num in split_string]
+        return [float(num) if "." in num else int(num) for num in split_string]
 
 
-def extract_numbers(string):
-    """Extract numbers (int, float) from a given string."""
-    pattern = r"[-+]?\d*\.\d+|\d+"
+def extract_numbers(string, match_float=True, match_sign=True):
+    """Extract numbers from a given string."""
+    pattern = r"\d+"
+    if match_float:
+        pattern = r"\d*\.\d+|" + pattern
+    if match_sign:
+        pattern = r"[-+]?" + pattern
     matches = re.findall(pattern, string)
     numbers = [float(match) if "." in match else int(match) for match in matches]
     return numbers

@@ -18,13 +18,11 @@ from smoe.utils.io import torch_load_template_file
 def convert_llama_model_neuron_index(
     llama_model_path,
     split_index_path,
-    select_gate_path,
     save_path,
     template,
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_random_gate=False,
 ):
     """
     LlamaMoEModel
@@ -58,10 +56,6 @@ def convert_llama_model_neuron_index(
             moe_neuron_indices[i][j].size(0) for j in range(num_experts)
         ]
         size_experts.append(this_layer_size_expert)
-
-        if not use_random_gate:
-            this_layer_gate = torch_load_template_file(select_gate_path, template, i)
-            moe_gates.append(this_layer_gate)
 
     """build config"""
     print("Buiding llama-moe config...")
@@ -98,9 +92,6 @@ def convert_llama_model_neuron_index(
                     model_llama_moe_state_dict["layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_random_gate:
-            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
     # fmt: on
 
@@ -123,13 +114,11 @@ def convert_llama_model_neuron_index(
 def convert_llama_model_for_causal_lm_neuron_index(
     llama_model_path,
     split_index_path,
-    select_gate_path,
     save_path,
     template,
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_random_gate=False,
 ):
     """
     LlamaMoEForCausalLM
@@ -163,10 +152,6 @@ def convert_llama_model_for_causal_lm_neuron_index(
             moe_neuron_indices[i][j].size(0) for j in range(num_experts)
         ]
         size_experts.append(this_layer_size_expert)
-
-        if not use_random_gate:
-            this_layer_gate = torch_load_template_file(select_gate_path, template, i)
-            moe_gates.append(this_layer_gate)
 
     """build config"""
     print("Buiding llama-moe config...")
@@ -203,11 +188,7 @@ def convert_llama_model_for_causal_lm_neuron_index(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_random_gate:
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
-        # print(model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)])
     # fmt: on
 
     print("Converting...")
@@ -229,13 +210,11 @@ def convert_llama_model_for_causal_lm_neuron_index(
 def convert_llama_model_for_sequence_classification_neuron_index(
     llama_model_path,
     split_index_path,
-    select_gate_path,
     save_path,
     template,
     num_experts,
     num_selects,
     score_scale_factor=None,
-    use_random_gate=False,
 ):
     """
     LlamaMoEForSequenceClassification
@@ -269,10 +248,6 @@ def convert_llama_model_for_sequence_classification_neuron_index(
             moe_neuron_indices[i][j].size(0) for j in range(num_experts)
         ]
         size_experts.append(this_layer_size_expert)
-
-        if not use_random_gate:
-            this_layer_gate = torch_load_template_file(select_gate_path, template, i)
-            moe_gates.append(this_layer_gate)
 
     """build config"""
     print("Buiding llama-moe config...")
@@ -309,9 +284,6 @@ def convert_llama_model_for_sequence_classification_neuron_index(
                     model_llama_moe_state_dict["model.layers.{}.mlp.calculator.experts.weight_down.{}".format(layer_index, expert_index)] = model_llama_state_dict[key].transpose(0, 1)[moe_neuron_indices[layer_index][expert_index]].transpose(0, 1).cpu().half()
 
     for layer_index in range(num_layers):
-        if not use_random_gate:
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.0.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.0.weight"].cpu().half()
-            model_llama_moe_state_dict["model.layers.{}.mlp.gate.gate_network.2.weight".format(layer_index)] = moe_gates[layer_index]["gate_network.2.weight"].cpu().half()
         model_llama_moe_state_dict["model.layers.{}.mlp.gate.weight_noise.weight".format(layer_index)] = torch.zeros((num_experts, hidden_size), requires_grad=True)
     # fmt: on
 
@@ -334,24 +306,20 @@ def convert_llama_model_for_sequence_classification_neuron_index(
 if __name__ == "__main__":
     llama_model_path = "/home/data/models/llama-transformers/7B/"
     split_index_path = "/home/dongdz/workspace/moefication/llama_moe_temp_files/llama_7B-8Expert-Split-Clustering/"  # split
-    select_gate_path = ""  # select
     save_path = "/home/data/models/llama-moe-transformers/7B/"
     template = "layers.{}.mlp.gate_proj.weight"
     num_experts = 8
     num_selects = 2
     score_scale_factor = 8.0
-    use_random_gate = True
 
     convert_llama_model_neuron_index(
         llama_model_path,
         split_index_path,
-        select_gate_path,
         save_path,
         template,
         num_experts,
         num_selects,
         score_scale_factor=score_scale_factor,
-        use_random_gate=use_random_gate,
     )
 
     # load test

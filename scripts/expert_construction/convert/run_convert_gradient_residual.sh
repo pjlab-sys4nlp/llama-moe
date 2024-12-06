@@ -4,7 +4,7 @@
 #  llama2_7B  llama2_13B  llama2_30B  llama2_base
 llama_size="llama2_7B"
 
-share_neurons=True    #  True  False
+share_neurons=True     #  True  False
 num_experts=7          #  7  14  28
 num_experts_residual=1 #  1  2  3  4
 num_selects=1          #  1  2  3  4
@@ -39,7 +39,6 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   python -m smoe.entrypoint.expert_construction.llama_convert_neuron_index_residual \
   --model_path ${model_path} \
   --split_file_path ${split_file_path} \
-  --select_file_path "" \
   --save_path ${save_path} \
   --template layers.{}.mlp.${proj_type}.weight \
   --num_experts ${num_experts} \
@@ -47,5 +46,4 @@ OMP_NUM_THREADS=2 srun --partition=MoE --job-name=convert --mpi=pmi2 --gres=gpu:
   --num_selects ${num_selects} \
   --score_scale_factor ${score_scale_factor} \
   --score_scale_factor_residual ${score_scale_factor_residual} \
-  --convert_type ${convert_type} \
-  --use_random_gate True
+  --convert_type ${convert_type}

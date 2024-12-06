@@ -5,8 +5,12 @@ import os
 import pickle
 import shutil
 
-import cv2
 import torch
+
+
+def create_dir(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
 
 
 def delete_file_or_dir(dir):
@@ -102,6 +106,8 @@ def dump_jsonlines(obj, filepath, **kwargs):
 
 
 def compress_png_image(image_path, print_info=False):
+    import cv2
+
     img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     cv2.imwrite(image_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
     if print_info:

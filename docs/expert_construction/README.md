@@ -1,4 +1,4 @@
-# Expert Construction of LLaMA Model
+# Expert Construction of LLaMA-MoE
 
 This documentation provides the procedures to convert a LLaMA model to LLaMA-MoE.
 
@@ -67,8 +67,6 @@ We also implenmented the co-activation graph based method in [MoEfication](https
 You need to install [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download) first. Then you can run to following script to perform splitting:
 
 ```shell
-bash ./scripts/expert_construction/get_hidden_features/run_prepare_datasets.sh
-bash ./scripts/expert_construction/get_hidden_features/run_get_hidden_features.sh
 bash ./scripts/expert_construction/split/run_split_graph.sh
 ```
 
@@ -81,7 +79,7 @@ model_path="" # path to the LLaMA checkpoint
 save_path="" # path to save the indices sets
 
 metric="" # metric to measure the sparsity, choices: `l1_norm` `l2_norm` `plain`
-proj_type="" # outputs to use for constructing co-activation graph, should be set to `up_proj`
+proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 ```
 
 
@@ -91,7 +89,7 @@ proj_type="" # outputs to use for constructing co-activation graph, should be se
 Before performing gradient-based splitting (Eq. 8 in the technical report), you need to prepare a bunch of pretraining data and group them into different clusters by running:
 
 ```shell
-python smoe/entrypoint/text_clustering.py
+python smoe/entrypoint/expert_construction/text_clustering.py
 ```
 
 Then, you need to run the following script to get the importance vector $v$ for the intermediate neurons in each layer:
@@ -113,7 +111,7 @@ kernel="" # should be set to `l1_norm`
 importance_type="" # should be set to `feature_change`
 ```
 
-After that, the importance vector files will be saved to the `save_path` with the following file structure: 
+After that, the importance vector files will be saved to the `save_path` with the following file structure:
 
 ```shell
 # this is an example with 16 data clusters
@@ -165,7 +163,7 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # importance vector to use, should be set to `up_proj`
+proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 ```
 
 
@@ -191,7 +189,7 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # importance vector to use, should be set to `up_proj`
+proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 ```
 
 
@@ -218,7 +216,7 @@ save_path="" # path to save the indices sets
 visualization_path="" # path to save the visualization results
 
 criterion="" # criterion to judge the importance of neurons, should be set to `max`
-proj_type="" # importance vector to use, should be set to `up_proj`
+proj_type="" # weights to perform clustering, choices: `up_proj` `gate_proj`
 ```
 
 
@@ -262,9 +260,6 @@ bash ./scripts/expert_construction/convert/run_convert_gradient_residual.sh
 	-- scripts
         -- expert_construction
             -- convert
-            -- get_hidden_features (deprecated, will be removed later)
-            -- prune (deprecated, will be removed later)
-            -- select (deprecated, will be removed later)
             -- split
     -- smoe
         -- entrypoint

@@ -167,7 +167,7 @@ class GradientSplitResidual(LayerSplit):
             self.split_with_neuron_sharing(expert_num_moe, expert_num_residual, expert_size, criterion)
 
     def visualize(self, save_path, share_neurons=False):
-        if share_neurons:  # 必须在share_neuron的情况下才可以可视化
+        if share_neurons:
             num_experts = len(self.labels)
             expert_size = len(self.labels[0])
 

@@ -46,18 +46,18 @@ class LineByLineJsonlTextDataset(Dataset):
         if num_threads <= 1:  # use single process
             for line in lines:
                 try:
-                    # 提前分词，查看分词数量，并以最大长度将文本分块
+                    # Tokenize in advance, check the number of tokens, and split the text into chunks of the maximum length
                     content = json.loads(line)["content"]
                     content_tokenized = tokenizer.tokenize(content)
                     chunk_num = len(content_tokenized) // block_size + 1
 
-                    if chunk_num == 1:  # 只有一块，则直接对原文本编码
+                    if chunk_num == 1:  # If there's only one chunk, encode the original text directly
                         content_encoding = tokenizer(content, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
                         self.examples.append(content_encoding)
-                    else:  # 多于一块，对各块分别编码
+                    else:  # If there are multiple chunks, encode each chunk separately
                         process_bar2 = tqdm(desc="Chunking line", total=chunk_num, leave=False, position=2)
                         for content_tokenized_block in split_list_with_yield(content_tokenized, block_size):  # chunk content by block_size
-                            content_block = tokenizer.convert_tokens_to_string(content_tokenized_block)  # 重新组合为文本形式，以使用tokenizer的encode函数进行自动处理
+                            content_block = tokenizer.convert_tokens_to_string(content_tokenized_block)  # Reassemble into text format for tokenizer's encode function
                             content_encoding = tokenizer(content_block, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
                             self.examples.append(content_encoding)  # dict: {"input_ids":... , "attention_mask":...}
                             process_bar2.update(1)
@@ -97,21 +97,23 @@ class LineByLineJsonlTextDataset(Dataset):
     def __getitem__(self, i):
         return self.examples[i]
 
-    def process_line(self, line, tokenizer, block_size):  # 多进程分词函数
+    def process_line(
+        self, line, tokenizer, block_size
+    ):  # Multi-thread tokenization function
         # fmt: off
         if len(line) > 0 and not line.isspace():
-            # 提前分词，查看分词数量，并以最大长度将文本分块
+            # Tokenize in advance, check the number of tokens, and split the text into chunks of the maximum length
             content = json.loads(line)["content"]
             content_tokenized = tokenizer.tokenize(content)
             chunk_num = len(content_tokenized) // block_size + 1
 
-            if chunk_num == 1:  # 只有一块，则直接对原文本编码
+            if chunk_num == 1:  # If there's only one chunk, encode the original text directly
                 content_encoding = tokenizer(content, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
                 return [content_encoding["input_ids"]]
-            else:  # 多于一块，对各块分别编码
+            else:  # If there are multiple chunks, encode each chunk separately
                 content_encoding_all = []
                 for content_tokenized_block in split_list_with_yield(content_tokenized, block_size):  # chunk content by block_size
-                    content_block = " ".join(content_tokenized_block)  # 重新组合为文本形式，以使用tokenizer的encode函数进行自动处理
+                    content_block = " ".join(content_tokenized_block)  # Reassemble into text format for tokenizer's encode function
                     content_encoding = tokenizer(content_block, add_special_tokens=True, truncation=True, padding="max_length", max_length=block_size, return_tensors="pt")
                     content_encoding_all.append(content_encoding["input_ids"])
                 return content_encoding_all
@@ -134,31 +136,31 @@ class CommonDataset(Dataset):
 """for moe graph split"""
 
 
-class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读取
+class ShardDataset(Dataset):  # Read datasets from multiple shard files
     def __init__(
         self,
         path,
         parallel_mode="shards",
         data_use_percent=1.0,
         file_load_index_range=(0.0, 1.0),
-        shards_in_memory=8,  # 只在"shards"模式下有效
+        shards_in_memory=8,  # Only effective in "shards" mode
     ):
         # fmt: off
-        assert parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
+        assert parallel_mode in ("shards", "workers")  # Two modes of reading provided: shard parallel and worker parallel
         self.parallel_mode = parallel_mode
 
         filename_list = os.listdir(path)
         filename_list.sort()
 
-        # 指定读取文件读取比例
+        # Specify the proportion of files to read
         filename_list = filename_list[:math.floor(len(filename_list) * data_use_percent)]
 
-        # 指定读取文件的范围
+        # Specify the range of files to read
         filename_list = filename_list[math.floor(len(filename_list) * file_load_index_range[0]):
                                       math.floor(len(filename_list) * file_load_index_range[1])]
 
-        # 适用于单个shard较大的情况
-        if self.parallel_mode == "shards":  # 提前读取shards_in_memory个shard到内存并合并，之后各个workers并行读取内存中的数据
+        # Suitable for cases where individual shards are large
+        if self.parallel_mode == "shards":  # Preload shards_in_memory shards into memory and merge; then workers read from memory in parallel
             self.filepath_list = [os.path.join(path, name) for name in filename_list]
             self.chunked_filepath_list = []
             while len(self.filepath_list) > 0:
@@ -167,8 +169,8 @@ class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读�
             self.now_epoch = 0
             self.load_shards()
 
-        # 适用于单个shard较小的情况
-        elif self.parallel_mode == "workers":  # 不提前读取shard到内存，而是运行时每个worker并行读取shard
+        # Suitable for cases where individual shards are small
+        elif self.parallel_mode == "workers":  # No preloading of shards into memory; workers read shards in parallel during runtime
             self.filepath_list = [os.path.join(path, name) for name in filename_list]
         # fmt: on
 
@@ -186,21 +188,21 @@ class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读�
         elif self.parallel_mode == "workers":
             return torch.load(self.filepath_list[i])
 
-    def load_shards(self):  # "shards"并行模式使用
+    def load_shards(self):  # Used in "shards" parallel mode
         object_load_pos = self.now_epoch % len(self.chunked_filepath_list)
         if self.load_pos != object_load_pos:
             self.load_pos = object_load_pos
             self.examples = []
 
             # fmt: off
-            for filepath in tqdm(self.chunked_filepath_list[self.load_pos], desc="loading shards", leave=False, ):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+            for filepath in tqdm(self.chunked_filepath_list[self.load_pos], desc="loading shards", leave=False, ):  # Single-threaded read; multi-threading would slow down due to heavy memory exchange
                 tensor = torch.load(filepath)
                 tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
                 self.examples.extend(tensor_list)
             print("Loaded total {len(self.examples)} examples.")
             # fmt: on
 
-    def next_epoch(self):  # "shards"并行模式使用
+    def next_epoch(self):  # Used in "shards" parallel mode
         self.now_epoch += 1
         self.load_shards()
 
@@ -208,7 +210,9 @@ class ShardDataset(Dataset):  # 从多个数据shard文件中进行数据集读�
 """for moe gate training"""
 
 
-class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数据集读取
+class ShardDatasetForMoEGate(
+    Dataset
+):  # Read datasets from multiple shard files for MoE Gate training
     def __init__(
         self,
         hidden_inputs_path,
@@ -216,7 +220,7 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
         parallel_mode="shards",
         data_use_percent=1.0,
         file_load_index_range=(0.0, 1.0),
-        shards_in_memory=8,  # 只在"shards"模式下有效
+        shards_in_memory=8,  # Only effective in "shards" mode
     ):
         # fmt: off
         hidden_inputs_filename_list = os.listdir(hidden_inputs_path)
@@ -226,20 +230,20 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
         assert len(hidden_inputs_filename_list) == len(hidden_outputs_filename_list)
 
         self.parallel_mode = parallel_mode
-        assert self.parallel_mode in ("shards", "workers")  # 提供两种读取模式，shard并行与worker并行
+        assert self.parallel_mode in ("shards", "workers")  # Two modes of reading provided: shard parallel and worker parallel
 
-        # 指定读取文件读取比例
+        # Specify the proportion of files to read
         hidden_inputs_filename_list = hidden_inputs_filename_list[:math.floor(len(hidden_inputs_filename_list) * data_use_percent)]
         hidden_outputs_filename_list = hidden_outputs_filename_list[:math.floor(len(hidden_outputs_filename_list) * data_use_percent)]
 
-        # 指定读取文件的范围
+        # Specify the range of files to read
         hidden_inputs_filename_list = hidden_inputs_filename_list[math.floor(len(hidden_inputs_filename_list) * file_load_index_range[0]):
                                                                   math.floor(len(hidden_inputs_filename_list) * file_load_index_range[1])]
         hidden_outputs_filename_list = hidden_outputs_filename_list[math.floor(len(hidden_outputs_filename_list) * file_load_index_range[0]):
                                                                     math.floor(len(hidden_outputs_filename_list) * file_load_index_range[1])]
 
-        # 适用于单个shard较大的情况
-        if self.parallel_mode == "shards":  # 提前读取shards_in_memory个shard文件到内存后合并，之后各个workers并行读取内存中的数据
+        # Suitable for cases where individual shards are large
+        if self.parallel_mode == "shards":  # Preload shards_in_memory shard files into memory and merge; then workers read from memory in parallel
             hidden_inputs_filepath_list = [os.path.join(hidden_inputs_path, name) for name in hidden_inputs_filename_list]
             hidden_outputs_filepath_list = [os.path.join(hidden_outputs_path, name) for name in hidden_outputs_filename_list]
 
@@ -256,8 +260,8 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
             self.now_epoch = 0
             self.load_shards()
 
-        # 适用于单个shard较小的情况
-        elif self.parallel_mode == "workers":  # 不提前读取shard到内存，而是运行时每个worker并行读取shard文件
+        # Suitable for cases where individual shards are small
+        elif self.parallel_mode == "workers":  # No preloading of shards into memory; workers read shards in parallel during runtime
             self.hidden_inputs_filepath_list = [os.path.join(hidden_inputs_path, name) for name in hidden_inputs_filename_list]
             self.hidden_outputs_filepath_list = [os.path.join(hidden_outputs_path, name) for name in hidden_outputs_filename_list]
         # fmt: on
@@ -282,7 +286,7 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
             )
             return hidden_inputs, hidden_outputs
 
-    def load_shards(self):  # "shards"并行模式下使用
+    def load_shards(self):  # Used in "shards" parallel mode
         object_load_pos = self.now_epoch % len(self.chunked_hidden_inputs_filepath_list)
 
         if self.load_pos != object_load_pos:
@@ -291,12 +295,12 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
             self.hidden_outputs_examples = []
 
             # fmt: off
-            for filepath in tqdm(self.chunked_hidden_inputs_filepath_list[self.load_pos], desc="loading hidden_inputs shards", leave=False):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+            for filepath in tqdm(self.chunked_hidden_inputs_filepath_list[self.load_pos], desc="loading hidden_inputs shards", leave=False):  # Single-threaded read; multi-threading would slow down due to heavy memory exchange
                 tensor = torch.load(filepath, map_location="cpu")
                 tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
                 self.hidden_inputs_examples.extend(tensor_list)
 
-            for filepath in tqdm(self.chunked_hidden_outputs_filepath_list[self.load_pos], desc="loading hidden_outputs shards", leave=False):  # 单进程读取，使用多进程会由于大量的内存交换而降低速度
+            for filepath in tqdm(self.chunked_hidden_outputs_filepath_list[self.load_pos], desc="loading hidden_outputs shards", leave=False):  # Single-threaded read; multi-threading would slow down due to heavy memory exchange
                 tensor = torch.load(filepath, map_location="cpu")
                 tensor_list = torch.split(tensor.reshape(-1, tensor.shape[-1]), 1, dim=0)
                 self.hidden_outputs_examples.extend(tensor_list)
@@ -304,6 +308,6 @@ class ShardDatasetForMoEGate(Dataset):  # 从多个数据shard文件中进行数
 
             print("Loaded total {len(self.hidden_inputs_examples)} examples.")
 
-    def next_epoch(self):  # "shards"并行模式下使用
+    def next_epoch(self):  # Used in "shards" parallel mode
         self.now_epoch += 1
         self.load_shards()

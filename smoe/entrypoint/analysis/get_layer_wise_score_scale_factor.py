@@ -27,8 +27,8 @@ if __name__ == "__main__":
     parser.add_argument('--save_path', type=str)
     parser.add_argument('--data_begin_index', type=int, default=0)
     parser.add_argument('--data_end_index', type=int, default=500)
-    parser.add_argument('--batch_size', type=int, default=8)  # 单次evaluate的batch_size
-    parser.add_argument('--block_size', type=int, default=2048)  # 单次evaluate的seq_len
+    parser.add_argument('--batch_size', type=int, default=8)  # single evaluation
+    parser.add_argument('--block_size', type=int, default=2048)  # single evaluation
 
     args = parser.parse_args()
     print("\n", args)
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     print("\nReading dataset from file \"" + args.data_path + "\"...", flush=True)
     data_index_range = (args.data_begin_index, args.data_end_index)
     dataset = LineByLineJsonlTextDataset(tokenizer, file_path=args.data_path, block_size=args.block_size, data_index_range=data_index_range)
-    print(f"Dataset: {sum([torch.sum(dataset[i]['attention_mask']).item() for i in range(len(dataset))])} total tokens.", flush=True)  # 统计非special token的数量
+    print(f"Dataset: {sum([torch.sum(dataset[i]['attention_mask']).item() for i in range(len(dataset))])} total tokens.", flush=True)  # non-special tokens
 
     """prepare dataloader"""
     data_loader = DataLoader(dataset, batch_size=args.batch_size, collate_fn=tensor_dict_cat_collator, num_workers=8, pin_memory=True, persistent_workers=True)

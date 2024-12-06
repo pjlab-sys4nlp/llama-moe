@@ -141,9 +141,7 @@ class BaseMoELayer(nn.Module):
         x = x.reshape(-1, self.input_size)
         # shape(batch_size*seq_len, input_size)
 
-        # 计算被选出的专家及其分数，以及gate的loss
         gate_outputs: dict = self.gate(x)
-        # 合并各专家的计算结果
         calc_outs: CalculatorOutput = self.calculator(x, **gate_outputs)
         y = calc_outs.hidden_states
         y = y.reshape(original_shape + (self.output_size,))
@@ -249,7 +247,7 @@ class LinearMoELayer(BaseMoELayer):
     ):
         # fmt: off
         super(LinearMoELayer, self).__init__()
-        assert (num_selects <= num_experts)  # 选择数量大于专家数量，报错
+        assert (num_selects <= num_experts)
         self.input_size = input_size
         self.output_size = output_size
         self.num_experts = num_experts
@@ -283,7 +281,7 @@ class LinearGLUMoELayer(BaseMoELayer):
     ):
         # fmt: off
         super(LinearGLUMoELayer, self).__init__()
-        assert (num_selects <= num_experts)  # 选择数量大于专家数量，报错
+        assert (num_selects <= num_experts)
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size

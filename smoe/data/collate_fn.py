@@ -66,15 +66,15 @@ def fault_tolerance_data_collator(features: list) -> dict[str, Any]:
     return batch
 
 
-def identity_collator(examples):  # 不对数据进行处理
+def identity_collator(examples):  # no processing
     return examples
 
 
-def tensor_cat_collator(examples):  # 拼接tensor
+def tensor_cat_collator(examples):  # cat the tensors
     return torch.cat(examples, dim=0)
 
 
-class tensor_cat_padding_collater:  # 拼接tensor，并padding到最大长度
+class tensor_cat_padding_collater:  # cat the tensors and pad to the max length
     def __init__(self, padding_id, padding_position="right", return_padding_mask=True):
         assert padding_position in ("left", "right")
         self.padding_id = padding_id
@@ -104,14 +104,14 @@ class tensor_cat_padding_collater:  # 拼接tensor，并padding到最大长度
             return padded_examples
 
 
-def tensor_list_cat_collator(examples):  # 拼接list中对应位置的tensor，返回list
+def tensor_list_cat_collator(examples):  # cat tensors in a list
     return [
         torch.cat([tensor[i] for tensor in examples], dim=0)
         for i in range(len(examples[0]))
     ]
 
 
-class tensor_list_cat_padding_collater:  # 拼接list中对应位置的tensor，并padding到最大长度，返回list
+class tensor_list_cat_padding_collater:  # cat tensors in a list and pad to the max length
     def __init__(self, padding_id, padding_position="right", return_padding_mask=True):
         assert padding_position in ("left", "right")
         self.padding_id = padding_id
@@ -153,7 +153,7 @@ class tensor_list_cat_padding_collater:  # 拼接list中对应位置的tensor，
             return padded_tensors
 
 
-def tensor_dict_cat_collator(examples):  # 拼接dict中对应位置的tensor，返回dict
+def tensor_dict_cat_collator(examples):  # cat tensors in a dict
     return {
         key: torch.cat([example[key] for example in examples], dim=0)
         for key in examples[0].keys()

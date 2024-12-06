@@ -28,7 +28,7 @@ data_path=/mnt/petrelfs/share_data/quxiaoye
 model_path=${data_path}/models/${llama_size}
 score_file_path=${data_path}/moefication_results/split/Gradients${expert_num}/${llama_size}-Gradients-${kernel}-${accumulate_level}-${importance_type}
 save_path=${data_path}/moefication_results/split
-visualization_path=/mnt/petrelfs/dongdaize.d/workspace/train-moe/visualization/expert-neuron-overlap/cluster${expert_num}/${llama_size}-${expert_size}-${accumulate_level}-${importance_type}-${kernel}-${criterion}-${proj_type}
+visualization_path=/mnt/petrelfs/dongdaize.d/workspace/llama-moe/visualization/expert-neuron-overlap/cluster${expert_num}/${llama_size}-${expert_size}-${accumulate_level}-${importance_type}-${kernel}-${criterion}-${proj_type}
 
 gpus=0
 cpus=8
